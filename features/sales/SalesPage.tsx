@@ -1,0 +1,81 @@
+
+import React, { useState } from 'react';
+import { useStore } from '../system/context/GlobalStore';
+import { SalesOrder, PlannedPayment } from '@/types';
+import { ShoppingCart, Plus } from 'lucide-react';
+import { useAccess } from '../auth/hooks/useAccess';
+import { SalesOrdersList } from './components/SalesOrdersList';
+import { SalesOrderForm } from './components/SalesOrderForm';
+
+export const SalesPage: React.FC = () => {
+    const { state, actions } = useStore();
+    const access = useAccess('sales');
+
+    const [view, setView] = useState<'list' | 'form'>('list');
+    const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
+
+    const canCreate = access.canWrite('actions', 'create');
+
+    const handleEditOrder = (order: SalesOrder) => {
+        setEditingOrder(order);
+        setView('form');
+    };
+
+    const handleCreateNew = () => {
+        setEditingOrder(null);
+        setView('form');
+    };
+
+    const handleSubmit = (order: SalesOrder, plans: PlannedPayment[]) => {
+        if (editingOrder) {
+            actions.updateSalesOrder(order, plans);
+        } else {
+            actions.createSalesOrder(order, plans);
+        }
+        setView('list');
+    };
+
+    const editingPayments = editingOrder 
+        ? state.plannedPayments.filter(p => p.sourceDocId === editingOrder.id)
+        : [];
+
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-slate-800 flex items-center">
+                    <ShoppingCart className="mr-3 text-blue-600" size={28} /> Заказы клиентов (ЗK)
+                </h2>
+                {view === 'list' && canCreate && (
+                    <button onClick={handleCreateNew} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl flex items-center shadow-lg font-bold transition-all">
+                        <Plus size={20} className="mr-2"/> Новый заказ
+                    </button>
+                )}
+            </div>
+
+            {view === 'list' ? (
+                <SalesOrdersList 
+                    salesOrders={state.salesOrders} 
+                    plannedPayments={state.plannedPayments}
+                    showColClient={access.canSee('fields', 'col_client')}
+                    showColAmount={access.canSee('fields', 'col_amount')}
+                    showColPayment={access.canSee('fields', 'col_payment')}
+                    showColShipment={access.canSee('fields', 'col_shipment')}
+                    canEdit={access.canSee('actions', 'edit')}
+                    canDelete={access.canWrite('actions', 'delete')}
+                    onEdit={handleEditOrder}
+                    onDelete={(order) => actions.moveToTrash(order.id, 'Product' as any, `Заказ ЗК ${order.id.slice(-6)}`, order)}
+                />
+            ) : (
+                <SalesOrderForm 
+                    initialOrder={editingOrder} 
+                    initialPayments={editingPayments}
+                    state={state}
+                    actions={actions}
+                    access={access}
+                    onCancel={() => setView('list')}
+                    onSubmit={handleSubmit}
+                />
+            )}
+        </div>
+    );
+};

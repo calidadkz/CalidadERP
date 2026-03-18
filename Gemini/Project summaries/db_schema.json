@@ -1,0 +1,3405 @@
+{
+  "tables": [
+    {
+      "name": "shipments",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "date",
+          "data_type": "date",
+          "is_nullable": "YES",
+          "column_default": "CURRENT_DATE"
+        },
+        {
+          "column_name": "sales_order_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "client_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "status",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "currency_lots",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO",
+          "column_default": "gen_random_uuid()"
+        },
+        {
+          "column_name": "date",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "currency",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "amount_original",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "amount_remaining",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "rate",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "cost_in_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "bank_accounts",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "bank",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "number",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "currency",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "balance",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "cash_flow_items",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO",
+          "column_default": "gen_random_uuid()"
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "type",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "exchange_rates",
+      "columns": [
+        {
+          "column_name": "currency",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "rate",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "1.0"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "internal_order_items",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": "(gen_random_uuid())::text"
+        },
+        {
+          "column_name": "internal_order_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "product_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "quantity",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "pre_calculations",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "date",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "status",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": "'Draft'::text"
+        },
+        {
+          "column_name": "tax_scheme",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "exchange_rate_usd_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "450"
+        },
+        {
+          "column_name": "shipping_china_usd",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "shipping_karaganda_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "svh_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "broker_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "customs_fees_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "customs_vat_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "total_volume_m3",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "total_weight_kg",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "notes",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "exchange_rate_cny_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "63"
+        },
+        {
+          "column_name": "cit_rate_standard",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "20"
+        },
+        {
+          "column_name": "cit_rate_simplified",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "3"
+        },
+        {
+          "column_name": "vat_rate",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "16"
+        },
+        {
+          "column_name": "intercompany_markup_percent",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "1"
+        }
+      ]
+    },
+    {
+      "name": "pre_calculation_items",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "pre_calculation_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "product_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "product_name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "sku",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "order_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "client_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "client_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "type",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": "'Stock'::text"
+        },
+        {
+          "column_name": "quantity",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": "1"
+        },
+        {
+          "column_name": "supplier_price_usd",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "selling_price_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "length_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "width_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "height_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "weight_kg",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "volume_m3",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "purchase_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "logistics_cn_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "logistics_local_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "svh_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "broker_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "customs_fees_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "customs_vat_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "pnr_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "delivery_local_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "advertising_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "bonus_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "tax_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "vat_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "total_expenses_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "profit_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "margin_percent",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        }
+      ]
+    },
+    {
+      "name": "packing_places",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "pre_calculation_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "place_number",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "length_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "width_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "height_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "weight_kg",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "volume_m3",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "description",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "packing_place_items",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "packing_place_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "pre_calculation_item_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "quantity",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": "1"
+        }
+      ]
+    },
+    {
+      "name": "sales_order_items",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO",
+          "column_default": "gen_random_uuid()"
+        },
+        {
+          "column_name": "sales_order_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "product_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "product_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "sku",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "quantity",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "price_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "total_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "configuration",
+          "data_type": "ARRAY",
+          "is_nullable": "YES",
+          "column_default": "'{}'::text[]"
+        }
+      ]
+    },
+    {
+      "name": "pricing_profile_categories",
+      "columns": [
+        {
+          "column_name": "profile_id",
+          "data_type": "uuid",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "category_id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "pre_calculation_packages",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO",
+          "column_default": "gen_random_uuid()"
+        },
+        {
+          "column_name": "pre_calculation_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "package_number",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "length_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "width_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "height_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "weight_kg",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "volume_m3",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "description",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "items",
+          "data_type": "jsonb",
+          "is_nullable": "YES",
+          "column_default": "'[]'::jsonb"
+        },
+        {
+          "column_name": "created_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "manufacturers",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "country",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "description",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "legal_address",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bin_iin",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "iik",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bik",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "kbe",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bank_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "director",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "legal_email",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "role_permissions",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO",
+          "column_default": "gen_random_uuid()"
+        },
+        {
+          "column_name": "role",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "matrix",
+          "data_type": "jsonb",
+          "is_nullable": "NO",
+          "column_default": "'{}'::jsonb"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "hscodes",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "code",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "description",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "duty_percentage",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "duty_wto_percentage",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "permits",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "explanation",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "reception_items",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO",
+          "column_default": "gen_random_uuid()"
+        },
+        {
+          "column_name": "reception_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "product_id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "product_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "sku",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "qty_plan",
+          "data_type": "integer",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "qty_fact",
+          "data_type": "integer",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "price_foreign",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "cost_base_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "allocated_expense_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "final_cost_unit_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "configuration",
+          "data_type": "ARRAY",
+          "is_nullable": "YES",
+          "column_default": "'{}'::text[]"
+        },
+        {
+          "column_name": "volume_m3",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        }
+      ]
+    },
+    {
+      "name": "option_types",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "is_required",
+          "data_type": "boolean",
+          "is_nullable": "YES",
+          "column_default": "false"
+        },
+        {
+          "column_name": "is_single_select",
+          "data_type": "boolean",
+          "is_nullable": "YES",
+          "column_default": "true"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "category_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "supplier_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "manufacturer",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "option_variants",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "type_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "price",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "currency",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": "'CNY'::text"
+        },
+        {
+          "column_name": "composition",
+          "data_type": "jsonb",
+          "is_nullable": "YES",
+          "column_default": "'[]'::jsonb"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "category_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "supplier_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "manufacturer",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "length_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "width_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "height_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "volume_m3",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "supplier_product_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "description",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "internal_orders",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": "(gen_random_uuid())::text"
+        },
+        {
+          "column_name": "date",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "requested_by",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "status",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": "'Draft'::text"
+        }
+      ]
+    },
+    {
+      "name": "our_companies",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "contact_person",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "phone",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "legal_address",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bin_iin",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "iik",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bik",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "kbe",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bank_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "director",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "legal_email",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "logs",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "timestamp",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "user",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": "'Admin'::text"
+        },
+        {
+          "column_name": "action",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "document_type",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "document_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "description",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "trash",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO",
+          "column_default": "gen_random_uuid()"
+        },
+        {
+          "column_name": "original_id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "type",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "data",
+          "data_type": "jsonb",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "deleted_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "suppliers",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "country",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "legal_address",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bin_iin",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "iik",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bik",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "kbe",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bank_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "director",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "legal_email",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "clients",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "contact_person",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "phone",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "legal_address",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bin_iin",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "iik",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bik",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "kbe",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bank_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "director",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "legal_email",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "employees",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "contact_person",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "phone",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "legal_address",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bin_iin",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "iik",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bik",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "kbe",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bank_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "director",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "legal_email",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "shipment_items",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO",
+          "column_default": "gen_random_uuid()"
+        },
+        {
+          "column_name": "shipment_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "product_id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "product_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "sku",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "qty_shipped",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "price_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "configuration",
+          "data_type": "ARRAY",
+          "is_nullable": "YES",
+          "column_default": "'{}'::text[]"
+        }
+      ]
+    },
+    {
+      "name": "actual_payments",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "date",
+          "data_type": "date",
+          "is_nullable": "YES",
+          "column_default": "CURRENT_DATE"
+        },
+        {
+          "column_name": "direction",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "counterparty_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "counterparty_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "amount",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "currency",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "bank_account_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "exchange_rate",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "1"
+        },
+        {
+          "column_name": "total_cost_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        }
+      ]
+    },
+    {
+      "name": "internal_transactions",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "date",
+          "data_type": "date",
+          "is_nullable": "YES",
+          "column_default": "CURRENT_DATE"
+        },
+        {
+          "column_name": "type",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "from_account_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "to_account_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "amount_sent",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "amount_received",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "fee",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "rate",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "1"
+        }
+      ]
+    },
+    {
+      "name": "payment_allocations",
+      "columns": [
+        {
+          "column_name": "actual_payment_id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "planned_payment_id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "amount_covered",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "planned_payments",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "direction",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "source_doc_id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "source_doc_type",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "counterparty_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "counterparty_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "amount_due",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "amount_paid",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "currency",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "due_date",
+          "data_type": "date",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "is_paid",
+          "data_type": "boolean",
+          "is_nullable": "YES",
+          "column_default": "false"
+        },
+        {
+          "column_name": "cash_flow_item_id",
+          "data_type": "uuid",
+          "is_nullable": "YES",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "supplier_order_items",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO",
+          "column_default": "gen_random_uuid()"
+        },
+        {
+          "column_name": "supplier_order_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "product_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "product_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "sku",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "quantity",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "price_foreign",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "total_foreign",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "configuration",
+          "data_type": "ARRAY",
+          "is_nullable": "YES",
+          "column_default": "'{}'::text[]"
+        },
+        {
+          "column_name": "product_base_price",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "product_currency",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "exchange_rate_to_order_currency",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "1"
+        },
+        {
+          "column_name": "product_type",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "pricing_profiles",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO",
+          "column_default": "gen_random_uuid()"
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "supplier_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "logistics_rate_usd",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "batch_volume_m3",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "batch_shipping_cost_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "batch_svh_cost_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "broker_cost_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "customs_fees_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "vat_rate",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "16"
+        },
+        {
+          "column_name": "cit_rate",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "20"
+        },
+        {
+          "column_name": "sales_bonus_rate",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "pnr_cost_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "delivery_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "target_net_margin_percent",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "20"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "product_categories",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "type",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "profiles",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "email",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "full_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "role",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": "'manager'::text"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "nickname",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "counterparties",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "type",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "bin_iin",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "legal_address",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "contact_person",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "phone",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "director",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "legal_email",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "notes",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "created_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "NO",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "NO",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "country",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bank_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "iik",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "bik",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "kbe",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "counterparty_accounts",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO",
+          "column_default": "gen_random_uuid()"
+        },
+        {
+          "column_name": "counterparty_id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "iik",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "bik",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "bank_name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "currency",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "is_default",
+          "data_type": "boolean",
+          "is_nullable": "NO",
+          "column_default": "false"
+        },
+        {
+          "column_name": "created_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "NO",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "NO",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "supplier_orders",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "date",
+          "data_type": "date",
+          "is_nullable": "YES",
+          "column_default": "CURRENT_DATE"
+        },
+        {
+          "column_name": "supplier_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "currency",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "status",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "total_amount_foreign",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "received_item_count",
+          "data_type": "integer",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "total_item_count",
+          "data_type": "integer",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "buyer_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "supplier_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "total_amount_kzt_est",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "paid_amount_foreign",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "total_paid_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        }
+      ]
+    },
+    {
+      "name": "receptions",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "order_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "warehouse_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": "'Главный склад'::text"
+        },
+        {
+          "column_name": "date",
+          "data_type": "date",
+          "is_nullable": "YES",
+          "column_default": "CURRENT_DATE"
+        },
+        {
+          "column_name": "exchange_rate",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "status",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "close_order",
+          "data_type": "boolean",
+          "is_nullable": "YES",
+          "column_default": "false"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "reception_expenses",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO",
+          "column_default": "gen_random_uuid()"
+        },
+        {
+          "column_name": "reception_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "type",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "amount",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "currency",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": "'KZT'::text"
+        },
+        {
+          "column_name": "exchange_rate_to_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "1"
+        },
+        {
+          "column_name": "allocation_method",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "target_item_id",
+          "data_type": "uuid",
+          "is_nullable": "YES",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "sales_orders",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "date",
+          "data_type": "date",
+          "is_nullable": "YES",
+          "column_default": "CURRENT_DATE"
+        },
+        {
+          "column_name": "client_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "status",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "total_amount",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "shipped_item_count",
+          "data_type": "integer",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "total_item_count",
+          "data_type": "integer",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "client_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "paid_amount",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        }
+      ]
+    },
+    {
+      "name": "products",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "sku",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "type",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "category_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "supplier_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "base_price",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "currency",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": "'CNY'::text"
+        },
+        {
+          "column_name": "markup_percentage",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "sales_price",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "min_stock",
+          "data_type": "integer",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "description",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "pricing_profile_id",
+          "data_type": "uuid",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "machine_config",
+          "data_type": "jsonb",
+          "is_nullable": "YES",
+          "column_default": "'[]'::jsonb"
+        },
+        {
+          "column_name": "internal_composition",
+          "data_type": "jsonb",
+          "is_nullable": "YES",
+          "column_default": "'[]'::jsonb"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "stock",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "reserved",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "incoming",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "working_length_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "working_width_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "working_height_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "working_volume_m3",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "working_weight_kg",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "compatible_machine_category_ids",
+          "data_type": "ARRAY",
+          "is_nullable": "YES",
+          "column_default": "'{}'::text[]"
+        },
+        {
+          "column_name": "manufacturer",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "supplier_product_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "hs_code_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "pricing_method",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": "'Наценка (без НДС)'::text"
+        },
+        {
+          "column_name": "packages",
+          "data_type": "jsonb",
+          "is_nullable": "YES",
+          "column_default": "'[]'::jsonb"
+        }
+      ]
+    },
+    {
+      "name": "bundles",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "base_product_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "selected_variant_ids",
+          "data_type": "ARRAY",
+          "is_nullable": "YES",
+          "column_default": "'{}'::text[]"
+        },
+        {
+          "column_name": "total_purchase_price",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "total_price",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "is_template",
+          "data_type": "boolean",
+          "is_nullable": "YES",
+          "column_default": "true"
+        },
+        {
+          "column_name": "description",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "base_product_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "name": "stock_movements",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "date",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "product_id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "sku",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "product_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "type",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "quantity",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "unit_cost_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "total_cost_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "status_type",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "document_type",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "document_id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "description",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "configuration",
+          "data_type": "ARRAY",
+          "is_nullable": "YES",
+          "column_default": "'{}'::text[]"
+        },
+        {
+          "column_name": "total_sales_price_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "sales_price_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        }
+      ]
+    },
+    {
+      "name": "discrepancies",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "date",
+          "data_type": "date",
+          "is_nullable": "YES",
+          "column_default": "CURRENT_DATE"
+        },
+        {
+          "column_name": "reception_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "order_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "product_id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "product_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "sku",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "missing_qty",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "reason",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "resolution",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        }
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "fk_table_name": "pricing_profiles",
+      "fk_column_name": "supplier_id",
+      "pk_table_name": "suppliers",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "pricing_profile_categories",
+      "fk_column_name": "profile_id",
+      "pk_table_name": "pricing_profiles",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "pricing_profile_categories",
+      "fk_column_name": "category_id",
+      "pk_table_name": "product_categories",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "products",
+      "fk_column_name": "category_id",
+      "pk_table_name": "product_categories",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "products",
+      "fk_column_name": "supplier_id",
+      "pk_table_name": "suppliers",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "products",
+      "fk_column_name": "pricing_profile_id",
+      "pk_table_name": "pricing_profiles",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "option_variants",
+      "fk_column_name": "type_id",
+      "pk_table_name": "option_types",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "bundles",
+      "fk_column_name": "base_product_id",
+      "pk_table_name": "products",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "supplier_orders",
+      "fk_column_name": "supplier_id",
+      "pk_table_name": "suppliers",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "supplier_order_items",
+      "fk_column_name": "supplier_order_id",
+      "pk_table_name": "supplier_orders",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "supplier_order_items",
+      "fk_column_name": "product_id",
+      "pk_table_name": "products",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "receptions",
+      "fk_column_name": "order_id",
+      "pk_table_name": "supplier_orders",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "reception_items",
+      "fk_column_name": "reception_id",
+      "pk_table_name": "receptions",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "reception_expenses",
+      "fk_column_name": "reception_id",
+      "pk_table_name": "receptions",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "sales_orders",
+      "fk_column_name": "client_id",
+      "pk_table_name": "clients",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "sales_order_items",
+      "fk_column_name": "sales_order_id",
+      "pk_table_name": "sales_orders",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "sales_order_items",
+      "fk_column_name": "product_id",
+      "pk_table_name": "products",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "shipments",
+      "fk_column_name": "sales_order_id",
+      "pk_table_name": "sales_orders",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "shipment_items",
+      "fk_column_name": "shipment_id",
+      "pk_table_name": "shipments",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "discrepancies",
+      "fk_column_name": "reception_id",
+      "pk_table_name": "receptions",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "discrepancies",
+      "fk_column_name": "order_id",
+      "pk_table_name": "supplier_orders",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "planned_payments",
+      "fk_column_name": "cash_flow_item_id",
+      "pk_table_name": "cash_flow_items",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "actual_payments",
+      "fk_column_name": "bank_account_id",
+      "pk_table_name": "bank_accounts",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "payment_allocations",
+      "fk_column_name": "actual_payment_id",
+      "pk_table_name": "actual_payments",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "payment_allocations",
+      "fk_column_name": "planned_payment_id",
+      "pk_table_name": "planned_payments",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "internal_transactions",
+      "fk_column_name": "from_account_id",
+      "pk_table_name": "bank_accounts",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "internal_transactions",
+      "fk_column_name": "to_account_id",
+      "pk_table_name": "bank_accounts",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "pricing_profile_categories",
+      "fk_column_name": "profile_id",
+      "pk_table_name": "pricing_profiles",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "products",
+      "fk_column_name": "supplier_id",
+      "pk_table_name": "suppliers",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "products",
+      "fk_column_name": "category_id",
+      "pk_table_name": "product_categories",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "option_variants",
+      "fk_column_name": "type_id",
+      "pk_table_name": "option_types",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "bundles",
+      "fk_column_name": "base_product_id",
+      "pk_table_name": "products",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "supplier_orders",
+      "fk_column_name": "supplier_id",
+      "pk_table_name": "suppliers",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "supplier_order_items",
+      "fk_column_name": "supplier_order_id",
+      "pk_table_name": "supplier_orders",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "supplier_order_items",
+      "fk_column_name": "product_id",
+      "pk_table_name": "products",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "sales_orders",
+      "fk_column_name": "client_id",
+      "pk_table_name": "clients",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "sales_order_items",
+      "fk_column_name": "sales_order_id",
+      "pk_table_name": "sales_orders",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "sales_order_items",
+      "fk_column_name": "product_id",
+      "pk_table_name": "products",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "receptions",
+      "fk_column_name": "order_id",
+      "pk_table_name": "supplier_orders",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "reception_items",
+      "fk_column_name": "reception_id",
+      "pk_table_name": "receptions",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "reception_items",
+      "fk_column_name": "product_id",
+      "pk_table_name": "products",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "reception_expenses",
+      "fk_column_name": "reception_id",
+      "pk_table_name": "receptions",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "shipments",
+      "fk_column_name": "sales_order_id",
+      "pk_table_name": "sales_orders",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "shipment_items",
+      "fk_column_name": "shipment_id",
+      "pk_table_name": "shipments",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "shipment_items",
+      "fk_column_name": "product_id",
+      "pk_table_name": "products",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "stock_movements",
+      "fk_column_name": "product_id",
+      "pk_table_name": "products",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "discrepancies",
+      "fk_column_name": "product_id",
+      "pk_table_name": "products",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "actual_payments",
+      "fk_column_name": "bank_account_id",
+      "pk_table_name": "bank_accounts",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "payment_allocations",
+      "fk_column_name": "actual_payment_id",
+      "pk_table_name": "actual_payments",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "payment_allocations",
+      "fk_column_name": "planned_payment_id",
+      "pk_table_name": "planned_payments",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "internal_transactions",
+      "fk_column_name": "from_account_id",
+      "pk_table_name": "bank_accounts",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "internal_transactions",
+      "fk_column_name": "to_account_id",
+      "pk_table_name": "bank_accounts",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "products",
+      "fk_column_name": "hs_code_id",
+      "pk_table_name": "hscodes",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "option_types",
+      "fk_column_name": "category_id",
+      "pk_table_name": "product_categories",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "option_types",
+      "fk_column_name": "supplier_id",
+      "pk_table_name": "suppliers",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "option_variants",
+      "fk_column_name": "category_id",
+      "pk_table_name": "product_categories",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "option_variants",
+      "fk_column_name": "supplier_id",
+      "pk_table_name": "suppliers",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "packing_place_items",
+      "fk_column_name": "packing_place_id",
+      "pk_table_name": "packing_places",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "packing_place_items",
+      "fk_column_name": "pre_calculation_item_id",
+      "pk_table_name": "pre_calculation_items",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "pre_calculation_items",
+      "fk_column_name": "pre_calculation_id",
+      "pk_table_name": "pre_calculations",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "packing_places",
+      "fk_column_name": "pre_calculation_id",
+      "pk_table_name": "pre_calculations",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "counterparty_accounts",
+      "fk_column_name": "counterparty_id",
+      "pk_table_name": "counterparties",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "pre_calculation_packages",
+      "fk_column_name": "pre_calculation_id",
+      "pk_table_name": "pre_calculations",
+      "pk_column_name": "id"
+    }
+  ]
+}

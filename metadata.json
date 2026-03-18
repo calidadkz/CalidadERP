@@ -1,0 +1,14 @@
+{
+  "name": "CALIDAD ERP",
+  "description": "Система управления закупом и продажей оборудования на базе Google Cloud и Supabase",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "deployment": {
+    "provider": "google-cloud",
+    "buildCommand": "npm run build",
+    "startCommand": "npm start",
+    "outputDir": "dist"
+  }
+}

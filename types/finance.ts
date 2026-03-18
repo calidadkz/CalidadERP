@@ -1,0 +1,100 @@
+import { Currency } from "./currency";
+import { TransactionType } from "./enums";
+
+export enum CashFlowCategory {
+    OPERATING = 'Operating',
+    INVESTING = 'Investing',
+    FINANCIAL = 'Financial',
+}
+
+export interface CounterpartyAccount {
+    id: string;
+    counterpartyId: string;
+    name: string;
+    bankName: string;
+    iik: string;
+    bik: string;
+    currency: Currency;
+    isDefault: boolean;
+}
+
+export interface BankAccount {
+    id: string;
+    name: string;
+    bank: string;
+    number: string;
+    currency: Currency;
+    balance: number;
+}
+
+export interface CashFlowItem {
+    id: string;
+    name: string;
+    type: 'Incoming' | 'Outgoing';
+    category: CashFlowCategory;
+}
+
+export interface CurrencyLot {
+    id: string;
+    date: string;
+    currency: Currency;
+    amountOriginal: number;
+    amountRemaining: number;
+    costInKZT: number;
+    rate: number;
+}
+
+export interface ActualPayment {
+    id: string;
+    date: string;
+    direction: 'Incoming' | 'Outgoing';
+    counterpartyId: string;
+    counterpartyName: string;
+    amount: number;
+    currency: Currency;
+    bankAccountId: string;
+    fromAccount: string;
+    exchangeRate: number;
+    totalCostKZT?: number;
+    allocations?: PaymentAllocation[];
+    documentNumber?: string;
+    knp?: string;
+    purpose?: string;
+    counterpartyBinIin?: string;
+    counterpartyIik?: string;
+    counterpartyBik?: string;
+}
+
+export interface PaymentAllocation {
+    actualPaymentId: string;
+    plannedPaymentId: string;
+    amountCovered: number;
+}
+
+export interface PlannedPayment {
+    id: string;
+    direction: 'Incoming' | 'Outgoing';
+    sourceDocId: string;
+    sourceDocType: 'Order' | 'SalesOrder' | 'Manual';
+    counterpartyId: string;
+    counterpartyName: string;
+    amountDue: number;
+    amountPaid: number;
+    currency: Currency;
+    dueDate: string;
+    isPaid: boolean;
+    cashFlowItemId?: string;
+    cashFlowCategory: CashFlowCategory;
+}
+
+export interface InternalTransaction {
+    id: string;
+    date: string;
+    type: TransactionType;
+    fromAccountId: string;
+    toAccountId: string;
+    amountSent: number;
+    amountReceived: number;
+    fee: number;
+    rate: number;
+}
