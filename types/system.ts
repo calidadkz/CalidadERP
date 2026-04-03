@@ -1,4 +1,4 @@
-export type TrashItemType = 'Product' | 'Counterparty' | 'Category' | 'Order' | 'SalesOrder' | 'User' | 'CashFlowItem' | 'HSCode' | 'OptionType' | 'OptionVariant' | 'Bundle' | 'Manufacturer' | 'OurCompany' | 'Employee' | 'Other';
+export type TrashItemType = 'Product' | 'Counterparty' | 'Category' | 'Order' | 'SalesOrder' | 'PlannedPayment' | 'User' | 'CashFlowItem' | 'HSCode' | 'OptionType' | 'OptionVariant' | 'Bundle' | 'Manufacturer' | 'OurCompany' | 'Employee' | 'Other';
 
 export interface TrashItem {
     id: string;

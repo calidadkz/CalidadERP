@@ -1,9 +1,12 @@
 
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useStore } from '../system/context/GlobalStore';
-import { ProductType, Product, ProductCategory as Category } from '@/types';
-import { LayoutList, FileText, Wallet, PackageSearch, TrendingUp, Download, Upload, Loader2, CheckCircle, AlertCircle, PlusCircle, Box, Zap, Search, Printer, FileDown } from 'lucide-react';
+import { ProductType, ProductCategory as Category, StockMovement } from '@/types';
+import { LayoutList, FileText, Wallet, PackageSearch, TrendingUp, Download, Upload, Loader2, CheckCircle, AlertCircle, PlusCircle, Box, Zap, Search, Printer, FileDown, RefreshCw, ChevronDown } from 'lucide-react';
 import { useAccess } from '../auth/hooks/useAccess';
+import { ApiService } from '@/services/api';
+import { supabase } from '@/services/supabaseClient';
+import { TableNames } from '@/constants';
 
 import { useInventoryData } from './hooks/useInventoryData';
 import { useInventoryFilters } from './hooks/useInventoryFilters';
@@ -12,9 +15,15 @@ import { StockTable } from './components/StockTable';
 import { MovementsTable } from './components/MovementsTable';
 import InventoryVerificationReport from './components/InventoryVerificationReport';
 
+const INITIAL_PAGE_SIZE = 50;
+const MOVEMENTS_PAGE_SIZE = 50;
+
 export const InventoryPage: React.FC = () => {
   const { state, actions } = useStore();
-  const { products, stockMovements, exchangeRates, optionVariants, pricingProfiles, categories, optionTypes } = state;
+  const { 
+    products, inventorySummary, categories,
+    exchangeRates, optionVariants, pricingProfiles, optionTypes 
+  } = state;
   const access = useAccess('inventory');
   
   const canSeeStock = access.canSee('tabs', 'stock_view');
@@ -27,8 +36,20 @@ export const InventoryPage: React.FC = () => {
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [showVerificationReport, setShowVerificationReport] = useState(false);
 
+  // Pagination and local movements state
+  const [localMovements, setLocalMovements] = useState<StockMovement[]>([]);
+  const [isMovementsLoading, setIsMovementsLoading] = useState(false);
+  const [hasMoreMovements, setHasMoreMovements] = useState(true);
+  const [movementsOffset, setMovementsOffset] = useState(0);
+  
+  const [displayLimit, setDisplayLimit] = useState(INITIAL_PAGE_SIZE);
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  // Helper for formatting
+  const f = (val: number) => Math.round(val || 0).toLocaleString();
+
   // Hooks
-  const { stockDataMap, getDetailedBreakdown, totals } = useInventoryData(products, stockMovements);
+  const { getDetailedBreakdown, totals } = useInventoryData(products, inventorySummary);
   const { 
     searchTerm, setSearchTerm, 
     sortConfig, handleSort, 
@@ -41,9 +62,64 @@ export const InventoryPage: React.FC = () => {
 
   const deferredSearchTerm = React.useDeferredValue(searchTerm);
 
-  const processedStockProducts = useMemo(() => {
+  // Загрузка движений (с пагинацией)
+  const fetchMovements = useCallback(async (isInitial = false) => {
+    if (viewMode !== 'movements') return;
+    
+    setIsMovementsLoading(true);
+    const currentOffset = isInitial ? 0 : movementsOffset;
+    
+    try {
+      const { data, error } = await supabase
+        .from(TableNames.STOCK_MOVEMENTS)
+        .select(`
+          id, date, product_id, sku, product_name, type, quantity, 
+          unit_cost_kzt, status_type, document_type, document_id, 
+          description, configuration, sales_price_kzt
+        `)
+        .order('date', { ascending: false })
+        .range(currentOffset, currentOffset + MOVEMENTS_PAGE_SIZE - 1);
+      
+      if (error) throw error;
+      
+      const camelData = ApiService.keysToCamel(data || []);
+      
+      if (isInitial) {
+        setLocalMovements(camelData);
+        setMovementsOffset(MOVEMENTS_PAGE_SIZE);
+      } else {
+        setLocalMovements(prev => [...prev, ...camelData]);
+        setMovementsOffset(prev => prev + MOVEMENTS_PAGE_SIZE);
+      }
+      
+      setHasMoreMovements(camelData.length === MOVEMENTS_PAGE_SIZE);
+    } catch (e) {
+      console.error("Failed to fetch movements", e);
+    } finally {
+      setIsMovementsLoading(false);
+    }
+  }, [viewMode, movementsOffset]);
+
+  // Загружаем первую порцию при переключении на вкладку
+  useEffect(() => {
+    if (viewMode === 'movements' && localMovements.length === 0) {
+      fetchMovements(true);
+    }
+  }, [viewMode, fetchMovements, localMovements.length]);
+
+  const handleRefreshMovements = () => {
+    fetchMovements(true);
+  };
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setDisplayLimit(INITIAL_PAGE_SIZE);
+  }, [deferredSearchTerm, activeType, machineFilter, categoryFilter, sortConfig]);
+
+  const allFilteredProducts = useMemo(() => {
+      const term = deferredSearchTerm.toLowerCase();
       const data = products.filter(p => {
-          const matchSearch = !deferredSearchTerm || (p.name || '').toLowerCase().includes(deferredSearchTerm.toLowerCase()) || (p.sku || '').toLowerCase().includes(deferredSearchTerm.toLowerCase());
+          const matchSearch = !term || (p.name || '').toLowerCase().includes(term) || (p.sku || '').toLowerCase().includes(term);
           if (!matchSearch) return false;
 
           const matchType = p.type === activeType;
@@ -66,14 +142,31 @@ export const InventoryPage: React.FC = () => {
       return data;
   }, [products, deferredSearchTerm, sortConfig, activeType, machineFilter, categoryFilter]);
 
-  const sortedMovements = useMemo(() => {
-      return [...stockMovements].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  }, [stockMovements]);
+  // Lazy sliced products
+  const processedStockProducts = useMemo(() => {
+      return allFilteredProducts.slice(0, displayLimit);
+  }, [allFilteredProducts, displayLimit]);
 
-  const f = (val: number) => Math.round(val).toLocaleString();
+  // Infinite scroll observer for PRODUCTS
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && viewMode === 'stock' && displayLimit < allFilteredProducts.length) {
+          setDisplayLimit(prev => prev + 50);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [displayLimit, allFilteredProducts.length, viewMode]);
 
   const handleExportCSV = () => {
-    const dataToExport = processedStockProducts;
+    const dataToExport = allFilteredProducts;
     if (dataToExport.length === 0) {
         alert("Нет данных для экспорта с текущими фильтрами");
         return;
@@ -144,6 +237,7 @@ export const InventoryPage: React.FC = () => {
                     errors++;
                 }
             }
+            actions.refreshInventorySummary(); 
             setImportStatus({ 
                 show: true, 
                 type: 'success', 
@@ -158,8 +252,6 @@ export const InventoryPage: React.FC = () => {
     };
     reader.readAsText(file);
   };
-
-  if (!state) return null;
 
   return (
     <div className="space-y-6">
@@ -230,6 +322,7 @@ export const InventoryPage: React.FC = () => {
                             {displayedCategories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                         </select>
                     </div>
+                    <button onClick={() => actions.refreshInventorySummary()} className="p-2 text-slate-400 hover:text-blue-600"><RefreshCw size={16}/></button>
                 </div>
             </div>
 
@@ -237,12 +330,12 @@ export const InventoryPage: React.FC = () => {
                 <AdjustmentForm 
                     onClose={() => setIsAdjusting(false)}
                     products={products}
-                    stockMovements={stockMovements}
-                    exchangeRates={exchangeRates}
-                    optionVariants={optionVariants}
-                    pricingProfiles={pricingProfiles}
-                    categories={categories}
-                    optionTypes={optionTypes}
+                    stockMovements={localMovements}
+                    exchangeRates={exchangeRates || {}}
+                    optionVariants={optionVariants || []}
+                    pricingProfiles={pricingProfiles || []}
+                    categories={categories || []}
+                    optionTypes={optionTypes || []}
                     actions={actions}
                 />
             )}
@@ -253,15 +346,54 @@ export const InventoryPage: React.FC = () => {
                 access={access} 
                 handleSort={handleSort} 
             />
+            
+            {allFilteredProducts.length > displayLimit && (
+              <div ref={observerTarget} className="py-8 flex justify-center">
+                <Loader2 size={24} className="text-slate-300 animate-spin" />
+              </div>
+            )}
+            
+            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center mt-4">
+              Показано {processedStockProducts.length} из {allFilteredProducts.length}
+            </div>
           </>
       )}
 
       {viewMode === 'movements' && (
-          <MovementsTable 
-            movements={sortedMovements} 
-            access={access} 
-            actions={actions} 
-          />
+          <div className="space-y-4">
+            <div className="flex justify-end">
+              <button 
+                onClick={handleRefreshMovements}
+                className="flex items-center px-4 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+              >
+                <RefreshCw size={14} className={`mr-2 ${isMovementsLoading ? 'animate-spin' : ''}`} />
+                Обновить историю
+              </button>
+            </div>
+
+            <MovementsTable 
+              movements={localMovements} 
+              access={access} 
+              actions={actions} 
+            />
+
+            {hasMoreMovements && (
+              <div className="flex justify-center py-6">
+                <button 
+                  onClick={() => fetchMovements()}
+                  disabled={isMovementsLoading}
+                  className="flex items-center px-8 py-3 bg-slate-800 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all disabled:opacity-50 shadow-lg"
+                >
+                  {isMovementsLoading ? (
+                    <Loader2 size={16} className="animate-spin mr-2" />
+                  ) : (
+                    <ChevronDown size={16} className="mr-2" />
+                  )}
+                  Загрузить еще
+                </button>
+              </div>
+            )}
+          </div>
       )}
 
       {showVerificationReport && (
@@ -270,7 +402,7 @@ export const InventoryPage: React.FC = () => {
             <InventoryVerificationReport 
               products={products}
               categories={categories}
-              stockMovements={stockMovements}
+              stockMovements={localMovements}
               onClose={() => setShowVerificationReport(false)}
             />
           </div>

@@ -29,9 +29,9 @@ export const ReceivingForm: React.FC<ReceivingFormProps> = ({
             qtyPlan: Number(i.quantity) || 0,
             qtyFact: Number(i.quantity) || 0,
             priceForeign: Number(i.priceForeign) || 0,
-            costBaseKZT: 0,
-            allocatedExpenseKZT: 0,
-            finalCostUnitKZT: 0,
+            costBaseKzt: 0,
+            allocatedExpenseKzt: 0,
+            finalCostUnitKzt: 0,
             configuration: i.configuration || []
         };
     }));
@@ -46,7 +46,7 @@ export const ReceivingForm: React.FC<ReceivingFormProps> = ({
     const f = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
     const totalExpensesKzt = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-    const finalTotalKzt = currentFinalItems.reduce((s, i) => s + (Number(i.finalCostUnitKZT) * (Number(i.qtyFact) || 0)), 0);
+    const finalTotalKzt = currentFinalItems.reduce((s, i) => s + (Number(i.finalCostUnitKzt) * (Number(i.qtyFact) || 0)), 0);
     const totalQty = currentFinalItems.reduce((s, i) => s + (Number(i.qtyFact) || 0), 0);
 
     return (
@@ -83,12 +83,12 @@ export const ReceivingForm: React.FC<ReceivingFormProps> = ({
                                             }}/>
                                         </td>
                                         <td className="px-6 py-3 text-right font-mono text-xs font-bold text-slate-600">
-                                            {f(Math.round(item.costBaseKZT))}
+                                            {f(Math.round(item.costBaseKzt))}
                                             <div className="text-[8px] text-slate-400">{f(item.priceForeign)} {order.currency}</div>
                                         </td>
-                                        <td className="px-6 py-3 text-right font-mono text-xs font-black text-orange-600">+{f(Math.round(item.allocatedExpenseKZT))}</td>
-                                        <td className="px-6 py-4 text-right font-mono text-sm font-black text-slate-900 bg-slate-50/30">{f(Math.round(item.finalCostUnitKZT))} ₸</td>
-                                        <td className="px-6 py-4 text-right font-mono text-sm font-black text-blue-600">{f(Math.round(item.finalCostUnitKZT * item.qtyFact))} ₸</td>
+                                        <td className="px-6 py-3 text-right font-mono text-xs font-black text-orange-600">+{f(Math.round(item.allocatedExpenseKzt))}</td>
+                                        <td className="px-6 py-4 text-right font-mono text-sm font-black text-slate-900 bg-slate-50/30">{f(Math.round(item.finalCostUnitKzt))} ₸</td>
+                                        <td className="px-6 py-4 text-right font-mono text-sm font-black text-blue-600">{f(Math.round(item.finalCostUnitKzt * item.qtyFact))} ₸</td>
                                     </tr>
                                 ))}
                             </tbody>

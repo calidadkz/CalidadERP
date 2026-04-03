@@ -34,7 +34,7 @@ export const ReceivingHistory: React.FC<ReceivingHistoryProps> = ({ receptions, 
                             const totalQty = (r.items || []).reduce((s, i) => s + (Number(i.qtyFact) || 0), 0);
                             const baseSumForeign = (r.items || []).reduce((s, i) => s + (Number(i.priceForeign) * (Number(i.qtyFact) || 0)), 0);
                             const totalExpensesKzt = (r.expenses || []).reduce((s, e) => s + (Number(e.amount) || 0), 0);
-                            const finalValueKzt = (r.items || []).reduce((s, i) => s + (Number(i.finalCostUnitKZT) * (Number(i.qtyFact) || 0)), 0);
+                            const finalValueKzt = (r.items || []).reduce((s, i) => s + (Number(i.finalCostUnitKzt) * (Number(i.qtyFact) || 0)), 0);
                             
                             return (
                               <tr key={r.id} className="hover:bg-slate-50/50 transition-all group">

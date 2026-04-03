@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Product, ProductCategory, ProductPackage } from '@/types/product';
 import { ProductType, PricingMethod } from '@/types/enums';
 import { Currency } from '@/types/currency';
@@ -12,7 +12,9 @@ import { CompositionTab } from '../tabs/CompositionTab';
 import { PricingService } from '@/services/PricingService';
 import { useStore } from '@/features/system/context/GlobalStore';
 import { useAccess } from '@/features/auth/hooks/useAccess';
-import { api } from '@/services/api';
+import { ApiService } from '@/services/api';
+import { storage as firebaseStorage } from '@/services/firebase';
+import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage';
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -31,6 +33,11 @@ interface ProductModalProps {
     manufacturers: Manufacturer[];
 }
 
+export interface StorageImage {
+    name: string;
+    url: string;
+}
+
 export const ProductModal: React.FC<ProductModalProps> = ({ 
     isOpen, onClose, onSave, modalMode, initialData, suppliers, categories, optionTypes, optionVariants, products, addOptionType, addOptionVariant, exchangeRates, manufacturers
 }) => {
@@ -44,7 +51,47 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     const [isSaving, setIsSaving] = useState(false);
     const [localError, setLocalError] = useState<string | null>(null);
 
+    const [storageImages, setStorageImages] = useState<StorageImage[]>([]);
+    const [isImagesLoading, setIsImagesLoading] = useState(false);
 
+    const loadStorageImages = useCallback(async () => {
+        setIsImagesLoading(true);
+        try {
+            const listRef = ref(firebaseStorage, 'product-photos');
+            const res = await listAll(listRef);
+            
+            const imagePromises = res.items.map(async (item) => {
+                const url = await getDownloadURL(item);
+                return { name: item.name, url };
+            });
+
+            const images = await Promise.all(imagePromises);
+            setStorageImages(images);
+        } catch (err) {
+            console.error('[Firebase Storage] Load error:', err);
+        } finally {
+            setIsImagesLoading(false);
+        }
+    }, []);
+
+    const uploadImage = async (file: File) => {
+        try {
+            const baseName = file.name.substring(0, file.name.lastIndexOf('.'));
+            const fileExt = file.name.split('.').pop();
+            const sanitizedBase = baseName.replace(/[^\w\s.-]/gi, '').replace(/\s+/g, '_');
+            const fileName = `${sanitizedBase}_${Date.now()}.${fileExt}`;
+            
+            const storageRef = ref(firebaseStorage, `product-photos/${fileName}`);
+            await uploadBytes(storageRef, file);
+            const downloadURL = await getDownloadURL(storageRef);
+            
+            await loadStorageImages();
+            return downloadURL;
+        } catch (err) {
+            console.error('[Firebase Storage] Upload error:', err);
+            throw err;
+        }
+    };
 
     useEffect(() => {
         if (isOpen) {
@@ -58,10 +105,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             setShowDetails(false);
             setIsSaving(false);
             setLocalError(null);
+            loadStorageImages();
         }
-    }, [initialData, isOpen]);
+    }, [initialData, isOpen, loadStorageImages]);
 
-    // Сброс флага детализации при смене метода расчета на не-профильный
     useEffect(() => {
         if (formData.pricingMethod !== PricingMethod.PROFILE && showDetails) {
             setShowDetails(false);
@@ -70,9 +117,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
     const economyPreview = useMemo(() => {
         if (!formData.name || !formData.categoryId) return null;
-        
         const method = formData.pricingMethod || PricingMethod.MARKUP_WITHOUT_VAT;
-        
         if (method === PricingMethod.PROFILE) {
             const profile = PricingService.findProfile(formData as Product, pricingProfiles);
             const data = PricingService.calculateSmartPrice(formData as Product, profile, exchangeRates);
@@ -82,7 +127,6 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             const purchaseKzt = (formData.basePrice || 0) * rate;
             const markup = Number(formData.markupPercentage) || 0;
             const finalPrice = Math.round(purchaseKzt * (1 + markup / 100));
-            
             return {
                 profile: null,
                 data: {
@@ -97,34 +141,36 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         }
     }, [formData, pricingProfiles, exchangeRates]);
 
-    // Синхронизация расчетной цены и наценки с формой
     useEffect(() => {
         if (!isOpen || !economyPreview?.data) return;
-
-        const newSalesPrice = economyPreview.data.finalPrice;
+        
+        const calculatedPrice = economyPreview.data.finalPrice;
         let newMarkup = formData.markupPercentage;
-
-        // Если активен ценовой профиль, рассчитываем эффективную наценку математически
+        
         if (formData.pricingMethod === PricingMethod.PROFILE) {
             const purchaseKzt = economyPreview.data.purchaseKzt;
             if (purchaseKzt > 0) {
-                // Формула: ((Цена Продажи - Цена Закупа) / Цена Закупа) * 100
-                const rawMarkup = ((newSalesPrice - purchaseKzt) / purchaseKzt) * 100;
+                const rawMarkup = ((calculatedPrice - purchaseKzt) / purchaseKzt) * 100;
                 newMarkup = parseFloat(rawMarkup.toFixed(2));
             } else {
                 newMarkup = 0;
             }
         }
 
-        // Обновляем стейт только если значения изменились (во избежание бесконечного цикла)
-        const priceChanged = newSalesPrice !== formData.salesPrice;
+        const priceChanged = calculatedPrice !== formData.salesPrice;
         const markupChanged = formData.pricingMethod === PricingMethod.PROFILE && newMarkup !== formData.markupPercentage;
 
-        if (priceChanged || markupChanged) {
+        // Если это PROFILE, то цена всегда берется из расчета.
+        // Если это ручная наценка, то мы обновляем цену только если она СИЛЬНО отличается (больше чем на 2 тенге),
+        // чтобы не перебивать ручной ввод из-за микро-округлений наценки.
+        const shouldUpdatePrice = formData.pricingMethod === PricingMethod.PROFILE 
+            ? priceChanged 
+            : Math.abs(calculatedPrice - (formData.salesPrice || 0)) > 2;
+
+        if (shouldUpdatePrice || markupChanged) {
             setFormData(prev => ({ 
                 ...prev, 
-                salesPrice: newSalesPrice,
-                // Обновляем поле наценки только если мы в режиме Профиля
+                salesPrice: shouldUpdatePrice ? calculatedPrice : prev.salesPrice,
                 markupPercentage: formData.pricingMethod === PricingMethod.PROFILE ? newMarkup : prev.markupPercentage
             }));
         }
@@ -137,31 +183,19 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
     const handleChange = (field: keyof Product, value: any) => {
         if (!canWrite) return; 
-        
         setFormData(prev => {
             let finalValue = value;
-            const numericFields: (keyof Product)[] = [
-                'basePrice', 'markupPercentage', 
-                'workingLengthMm', 'workingWidthMm', 'workingHeightMm', 'workingWeightKg',
-                'minStock'
-            ];
-            
-            if (numericFields.includes(field)) {
-                finalValue = isNaN(value) ? 0 : Number(value);
-            }
-
+            const numericFields: (keyof Product)[] = ['basePrice', 'markupPercentage', 'workingLengthMm', 'workingWidthMm', 'workingHeightMm', 'workingWeightKg', 'minStock', 'salesPrice'];
+            if (numericFields.includes(field)) finalValue = isNaN(value) ? 0 : Number(value);
             const updated = { ...prev, [field]: finalValue };
-
             if (['workingLengthMm', 'workingWidthMm', 'workingHeightMm'].includes(field as string)) {
                 const l = Number(updated.workingLengthMm) || 0;
                 const w = Number(updated.workingWidthMm) || 0;
                 const h = Number(updated.workingHeightMm) || 0;
                 updated.workingVolumeM3 = parseFloat(((l * w * h) / 1000000000).toFixed(3));
             }
-
             return updated;
         });
-        
         if (localError) setLocalError(null);
     };
 
@@ -169,14 +203,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         if (!canWrite) return;
         const updatedPackages = [...(formData.packages || [])];
         const numericFields: (keyof ProductPackage)[] = ['lengthMm', 'widthMm', 'heightMm', 'weightKg'];
-        
         let finalValue = value;
-        if (numericFields.includes(field)) {
-            finalValue = isNaN(value) ? 0 : Number(value);
-        }
-
+        if (numericFields.includes(field)) finalValue = isNaN(value) ? 0 : Number(value);
         updatedPackages[index] = { ...updatedPackages[index], [field]: finalValue };
-
         if (['lengthMm', 'widthMm', 'heightMm'].includes(field as string)) {
             const p = updatedPackages[index];
             const l = p.lengthMm || 0;
@@ -184,7 +213,6 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             const h = p.heightMm || 0;
             updatedPackages[index].volumeM3 = parseFloat(((l * w * h) / 1000000000).toFixed(3));
         }
-
         setFormData(prev => ({ ...prev, packages: updatedPackages }));
     };
 
@@ -199,38 +227,28 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         setFormData(prev => ({ ...prev, packages: prev.packages?.filter((_, i) => i !== index) }));
     };
 
-
     const handleFinalSave = async () => {
         if (!canWrite || isSaving) return;
         setLocalError(null);
-
         if (!formData.name?.trim() || !formData.supplierProductName?.trim()) {
             setLocalError("Заполните основные наименования.");
             return;
         }
-
         setIsSaving(true);
         try {
             const supplierObj = suppliers.find(s => s.id === formData.supplierId);
-            const supplierName = supplierObj ? supplierObj.name : '';
-            const compositeSku = [formData.supplierProductName, supplierName, formData.manufacturer]
-                .filter(v => v && v.trim().length > 0)
-                .join('-');
-
-            // Check for duplicate SKU in create mode
+            const compositeSku = [formData.supplierProductName, supplierObj?.name || '', formData.manufacturer].filter(v => v?.trim().length > 0).join('-');
             if (modalMode === 'create' && products.some(p => p.sku === compositeSku)) {
-                setLocalError(`Товар с артикулом "${compositeSku}" уже существует. Измените наименование для поставщика или производителя.`);
+                setLocalError(`Товар с артикулом "${compositeSku}" уже существует.`);
                 setIsSaving(false);
                 return;
             }
-
             const finalProduct = {
                 ...formData,
                 id: formData.id || ApiService.generateId(),
                 sku: compositeSku,
                 salesPrice: economyPreview?.data?.finalPrice || formData.salesPrice || 0
             } as Product;
-
             await onSave(finalProduct);
         } catch (e: unknown) {
             setLocalError(e instanceof Error ? e.message : "Ошибка сохранения.");
@@ -287,6 +305,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                                 appliedProfile={economyPreview?.profile}
                                 onShowDetails={() => setShowDetails(!showDetails)}
                                 showDetails={showDetails}
+                                storageImages={storageImages}
+                                isImagesLoading={isImagesLoading}
+                                onUploadImage={uploadImage}
+                                exchangeRates={exchangeRates}
                             />
                         )}
                         {activeTab === 'options' && (
@@ -314,7 +336,6 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                                     </div>
                                     <button onClick={() => setShowDetails(false)} className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400"><X size={18}/></button>
                                 </div>
-                                
                                 <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar">
                                     <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200 mb-2">
                                         <div className="flex items-center gap-2 overflow-hidden">
@@ -325,29 +346,24 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                                             Цель: {economyPreview.profile.targetNetMarginPercent}%
                                         </div>
                                     </div>
-
                                     <div className="border-l-2 border-blue-500 pl-3 space-y-1.5">
                                         <DetailRow label="Чистая цена закупа" value={economyPreview.data.purchaseKzt} bold color="text-slate-900" />
                                         <DetailRow label="Доставка (Китай)" value={economyPreview.data.logisticsCn} />
                                         <DetailRow label="Доставка (Локальная)" value={economyPreview.data.logisticsLocal} />
                                     </div>
-
                                     <div className="border-l-2 border-orange-500 pl-3 space-y-1.5">
                                         <DetailRow label="Терминал / СВХ" value={economyPreview.data.svh} />
                                         <DetailRow label="Таможенные сборы" value={economyPreview.data.customsFees + economyPreview.data.brokerFees} />
                                     </div>
-
                                     <div className="border-l-2 border-purple-500 pl-3 space-y-1.5">
                                         <DetailRow label="Пусконаладка (ПНР)" value={economyPreview.data.pnr} />
                                         <DetailRow label="Доставка до клиента" value={economyPreview.data.deliveryLocal} />
                                         <DetailRow label="Бонус отдела продаж" value={economyPreview.data.bonus} color="text-purple-600" />
                                     </div>
-
                                     <div className="border-l-2 border-red-500 pl-3 space-y-1.5">
                                         <DetailRow label={`НДС (${economyPreview.profile.vatRate}%)`} value={economyPreview.data.vat} />
                                         <DetailRow label={`КПН (${economyPreview.profile.citRate}%)`} value={economyPreview.data.cit} />
                                     </div>
-
                                     <div className="pt-4 border-t border-slate-100 space-y-3">
                                         <div className="flex justify-between items-center text-slate-500 px-1">
                                             <span className="text-[9px] font-black uppercase tracking-widest">Общие расходы:</span>
@@ -373,7 +389,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                     </div>
                 </div>
 
-                <div className="bg-white border-t border-slate-200 py-3 px-8 flex flex-col gap-2 flex-none shadow-[0_-10px_20px_rgba(0,0,0,0.05)] relative z-20">
+                <div className="bg-white border-t border-slate-200 py-3 px-8 flex flex-col gap-2 flex-none shadow-[0_-10px_20_rgba(0,0,0,0.05)] relative z-20">
                     {localError && (
                         <div className="bg-red-50 border border-red-200 py-1.5 px-3 rounded-xl flex items-center gap-2 text-red-600 animate-in slide-in-from-bottom-2">
                             <AlertCircle size={14}/>

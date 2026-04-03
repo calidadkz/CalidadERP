@@ -27,6 +27,7 @@ export const PaymentsCalendar: React.FC<PaymentsCalendarProps> = ({
     
     const filteredPlans = useMemo(() => {
         return plannedPayments
+            .filter(p => !p.isDeleted) // Исключаем помеченные на удаление
             .filter(p => directionFilter === 'All' || p.direction === directionFilter)
             .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
     }, [plannedPayments, directionFilter]);

@@ -168,6 +168,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setIsFirstLoad(false);
             } else if (event === 'TOKEN_REFRESHED') {
                 setSession(currentSession);
+                // Добавляем явное обновление сессии в клиенте Supabase
+                if (currentSession) {
+                    supabase.auth.setSession(currentSession);
+                }
             }
         });
 

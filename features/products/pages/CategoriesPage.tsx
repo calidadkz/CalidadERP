@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { useStore } from '@/features/system/context/GlobalStore';
 import { ProductCategory, ProductType } from '@/types';
-import { List, Plus, Trash2, Box, Zap, Briefcase, X, Check, AlertCircle, ShieldAlert, Download, Upload, Loader2, CheckCircle, Search } from 'lucide-react';
+import { List, Plus, Trash2, Box, Zap, Briefcase, X, Check, AlertCircle, ShieldAlert, Download, Upload, Loader2, CheckCircle, Search, Edit2 } from 'lucide-react';
 import { useAccess } from '@/features/auth/hooks/useAccess';
 import { ApiService } from '@/services/api';
 
@@ -17,8 +17,11 @@ export const CategoriesPage: React.FC = () => {
     
     const [importStatus, setImportStatus] = useState<{ show: boolean, msg: string, type: 'loading' | 'success' | 'error', details?: string }>({ show: false, msg: '', type: 'loading' });
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editName, setEditName] = useState('');
 
     const canCreate = access.canWrite('actions', 'create');
+    const canUpdate = access.canWrite('actions', 'update');
     const canDelete = access.canWrite('actions', 'delete');
 
     const handleAdd = () => {
@@ -42,6 +45,40 @@ export const CategoriesPage: React.FC = () => {
         };
         actions.addCategory(newCat);
         setNewName('');
+    };
+
+    const handleStartEdit = (cat: ProductCategory) => {
+        setEditingId(cat.id);
+        setEditName(cat.name);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingId || !editName.trim()) return;
+        
+        const category = categories.find(c => c.id === editingId);
+        if (!category) return;
+
+        if (category.name === editName.trim()) {
+            setEditingId(null);
+            return;
+        }
+
+        const isDuplicate = categories.some(c => 
+            c.id !== editingId &&
+            c.type === category.type && 
+            c.name.toLowerCase() === editName.trim().toLowerCase()
+        );
+
+        if (isDuplicate) {
+            alert(`Категория "${editName.trim()}" уже существует`);
+            return;
+        }
+
+        await actions.updateCategory({
+            ...category,
+            name: editName.trim()
+        });
+        setEditingId(null);
     };
 
     const handleDelete = (id: string) => {
@@ -173,19 +210,19 @@ export const CategoriesPage: React.FC = () => {
                 <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-2 rounded-[1.5rem] shadow-sm border border-slate-200">
                     <div className="flex bg-slate-100 p-1 rounded-xl">
                         <button 
-                            onClick={() => { setActiveType(ProductType.MACHINE); setConfirmDeleteId(null); }} 
+                            onClick={() => { setActiveType(ProductType.MACHINE); setConfirmDeleteId(null); setEditingId(null); }} 
                             className={`flex items-center px-6 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${activeType === ProductType.MACHINE ? getTypeStyles(ProductType.MACHINE) : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             <Box size={14} className="mr-2"/> Станки
                         </button>
                         <button 
-                            onClick={() => { setActiveType(ProductType.PART); setConfirmDeleteId(null); }} 
+                            onClick={() => { setActiveType(ProductType.PART); setConfirmDeleteId(null); setEditingId(null); }} 
                             className={`flex items-center px-6 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${activeType === ProductType.PART ? getTypeStyles(ProductType.PART) : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             <Zap size={14} className="mr-2"/> Запчасти
                         </button>
                         <button 
-                            onClick={() => { setActiveType(ProductType.SERVICE); setConfirmDeleteId(null); }} 
+                            onClick={() => { setActiveType(ProductType.SERVICE); setConfirmDeleteId(null); setEditingId(null); }} 
                             className={`flex items-center px-6 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${activeType === ProductType.SERVICE ? getTypeStyles(ProductType.SERVICE) : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             <Briefcase size={14} className="mr-2"/> Услуги
@@ -245,12 +282,31 @@ export const CategoriesPage: React.FC = () => {
                             ) : (
                                 processedCategories.map(c => {
                                     const isConfirming = confirmDeleteId === c.id;
+                                    const isEditing = editingId === c.id;
+
                                     return (
                                         <tr key={c.id} className="hover:bg-slate-50/30 transition-all group">
                                             <td className="px-8 py-5">
                                                 <div className="flex items-center gap-3">
                                                     <div className={`w-2 h-2 rounded-full ${activeType === ProductType.MACHINE ? 'bg-blue-500' : activeType === ProductType.PART ? 'bg-orange-500' : 'bg-indigo-500'}`}/>
-                                                    <span className="font-black text-slate-800 text-sm tracking-tight">{c.name}</span>
+                                                    {isEditing ? (
+                                                        <div className="flex items-center gap-2 flex-1">
+                                                            <input 
+                                                                autoFocus
+                                                                className="flex-1 bg-white border border-blue-200 px-3 py-1.5 rounded-xl outline-none focus:ring-4 focus:ring-blue-500/10 font-bold text-sm"
+                                                                value={editName}
+                                                                onChange={e => setEditName(e.target.value)}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') handleSaveEdit();
+                                                                    if (e.key === 'Escape') setEditingId(null);
+                                                                }}
+                                                            />
+                                                            <button onClick={handleSaveEdit} className="p-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all shadow-sm shadow-emerald-100"><Check size={14}/></button>
+                                                            <button onClick={() => setEditingId(null)} className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-slate-200 transition-all"><X size={14}/></button>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="font-black text-slate-800 text-sm tracking-tight">{c.name}</span>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="px-8 py-5 text-right text-[10px] font-mono font-bold text-slate-300 group-hover:text-slate-400 transition-colors uppercase">{c.id}</td>
@@ -274,15 +330,26 @@ export const CategoriesPage: React.FC = () => {
                                                         </button>
                                                     </div>
                                                 ) : (
-                                                    canDelete && (
-                                                        <button 
-                                                            onClick={() => setConfirmDeleteId(c.id)} 
-                                                            className="text-slate-200 hover:text-red-500 p-2 rounded-xl hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
-                                                            title="Удалить в корзину"
-                                                        >
-                                                            <Trash2 size={18}/>
-                                                        </button>
-                                                    )
+                                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                        {canUpdate && !isEditing && (
+                                                            <button 
+                                                                onClick={() => handleStartEdit(c)} 
+                                                                className="text-slate-400 hover:text-blue-600 p-2 rounded-xl hover:bg-blue-50 transition-all"
+                                                                title="Редактировать"
+                                                            >
+                                                                <Edit2 size={18}/>
+                                                            </button>
+                                                        )}
+                                                        {canDelete && (
+                                                            <button 
+                                                                onClick={() => setConfirmDeleteId(c.id)} 
+                                                                className="text-slate-300 hover:text-red-500 p-2 rounded-xl hover:bg-red-50 transition-all"
+                                                                title="Удалить в корзину"
+                                                            >
+                                                                <Trash2 size={18}/>
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </td>
                                         </tr>
@@ -297,8 +364,11 @@ export const CategoriesPage: React.FC = () => {
                     <div className="flex items-start p-6 bg-blue-50/50 rounded-[2rem] text-blue-700 border border-blue-100 animate-in fade-in slide-in-from-bottom-2">
                         <AlertCircle size={20} className="mr-4 flex-shrink-0 mt-0.5 text-blue-500"/>
                         <div className="space-y-1">
-                            <p className="text-xs font-black uppercase tracking-widest mb-1">Политика удаления</p>
-                            <p className="text-xs font-medium leading-relaxed opacity-80 text-slate-600">Категории не удаляются безвозвратно, а перемещаются в <b>Корзину</b>. Связанные товары не будут удалены, но могут потребовать переназначения категории. Для окончательного удаления используйте раздел Корзина.</p>
+                            <p className="text-xs font-black uppercase tracking-widest mb-1">Политика удаления и редактирования</p>
+                            <p className="text-xs font-medium leading-relaxed opacity-80 text-slate-600">
+                                При изменении названия категории, все связанные товары автоматически отобразят новое название. 
+                                Удаленные категории перемещаются в <b>Корзину</b>.
+                            </p>
                         </div>
                     </div>
                 )}

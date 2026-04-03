@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { Product, ProductType, Currency, Counterparty } from '@/types';
+import { Product, ProductType, Currency, Counterparty, OptionType, OptionVariant } from '@/types';
 import { Download, Upload, Loader2, CheckCircle, AlertCircle, Box, Trash2, Monitor, Filter, Layers, ChevronRight, ChevronLeft, Hash, Tags } from 'lucide-react';
 import { useStore } from '../system/context/GlobalStore';
 import { NomenclatureTable } from './components/NomenclatureTable';
@@ -86,6 +86,14 @@ export const NomenclaturePage: React.FC = () => {
     const suppliers = useMemo(() => 
         (state.counterparties || []).filter(c => c.type === 'Supplier'),
     [state.counterparties]);
+
+    const handleAddOptionType = async (ot: OptionType) => {
+        await actions.addOptionType(ot);
+    };
+
+    const handleAddOptionVariant = async (ov: OptionVariant) => {
+        await actions.addOptionVariant(ov);
+    };
 
     if (!state || !state.products) {
         return <div className="flex items-center justify-center h-full">Загрузка данных...</div>;
@@ -217,10 +225,10 @@ export const NomenclaturePage: React.FC = () => {
                 optionTypes={state.optionTypes || []} 
                 optionVariants={state.optionVariants || []} 
                 products={state.products || []} 
-                exchangeRates={state.exchangeRates || {}} 
+                exchangeRates={state.exchangeRates} 
                 manufacturers={state.manufacturers || []}
-                addOptionType={actions.addOptionType} 
-                addOptionVariant={actions.addOptionVariant} 
+                addOptionType={handleAddOptionType} 
+                addOptionVariant={handleAddOptionVariant} 
             />
         </div>
     );

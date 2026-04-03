@@ -54,10 +54,10 @@ export class InventoryMediator {
           (docData.items || []).forEach((item: any) => {
             const p = findProduct(item.productId);
             if (p) {
-              const unitCost = Number(item.finalCostUnitKZT) || 0;
+              const unitCost = Number(item.finalCostUnitKzt) || 0;
               const qty = Number(item.qtyFact) || 0;
 
-              let salesPriceKZT = p.salesPrice || 0;
+              let salesPriceKzt = p.salesPrice || 0;
               if (p.type === ProductType.MACHINE) {
                   const variantIds = (item.configuration || []).map((name: string) => 
                       optionVariants.find(ov => ov.name === name)?.id
@@ -66,14 +66,14 @@ export class InventoryMediator {
                   const profile = PricingService.findProfile(p, pricingProfiles);
                   const productVolume = p.packages?.reduce((sum, pkg) => sum + (pkg.volumeM3 || 0), 0) || 0;
                   const economy = PricingService.calculateSmartPrice(p, profile, exchangeRates, productVolume, totalPurchaseForeign);
-                  salesPriceKZT = economy.finalPrice;
+                  salesPriceKzt = economy.finalPrice;
               }
 
               const mvPhys = this.createBaseMovement('In', 'Reception', docId, p, qty, 'Physical');
-              mvPhys.unitCostKZT = unitCost;
-              mvPhys.totalCostKZT = MoneyMath.multiply(qty, unitCost);
-              mvPhys.salesPriceKZT = salesPriceKZT;
-              mvPhys.totalSalesPriceKZT = MoneyMath.multiply(qty, salesPriceKZT);
+              mvPhys.unitCostKzt = unitCost;
+              mvPhys.totalCostKzt = MoneyMath.multiply(qty, unitCost);
+              mvPhys.salesPriceKzt = salesPriceKzt;
+              mvPhys.totalSalesPriceKzt = MoneyMath.multiply(qty, salesPriceKzt);
               mvPhys.configuration = item.configuration;
               movements.push(mvPhys);
 
@@ -94,14 +94,14 @@ export class InventoryMediator {
               const fifo = InventoryService.calculateFIFODeduction(p.id, qty, currentMovements, item.configuration);
 
               // Если FIFO не нашло лотов (пустая история), берем текущую цену товара как fallback
-              const finalUnitCost = fifo.unitCostKZT || 0;
-              const finalUnitSales = fifo.unitSalesKZT || Number(item.priceKZT) || Number(p.salesPrice) || 0;
+              const finalUnitCost = fifo.unitCostKzt || 0;
+              const finalUnitSales = fifo.unitSalesKzt || Number(item.priceKzt) || Number(p.salesPrice) || 0;
 
               const mvPhys = this.createBaseMovement('Out', 'Shipment', docId, p, qty, 'Physical');
-              mvPhys.unitCostKZT = finalUnitCost;
-              mvPhys.totalCostKZT = MoneyMath.multiply(qty, finalUnitCost);
-              mvPhys.salesPriceKZT = finalUnitSales;
-              mvPhys.totalSalesPriceKZT = MoneyMath.multiply(qty, finalUnitSales);
+              mvPhys.unitCostKzt = finalUnitCost;
+              mvPhys.totalCostKzt = MoneyMath.multiply(qty, finalUnitCost);
+              mvPhys.salesPriceKzt = finalUnitSales;
+              mvPhys.totalSalesPriceKzt = MoneyMath.multiply(qty, finalUnitSales);
               mvPhys.configuration = item.configuration;
               movements.push(mvPhys);
 
@@ -122,19 +122,19 @@ export class InventoryMediator {
                 const mv = this.createBaseMovement(type, 'Adjustment', docId, p, qty, 'Physical');
                 
                 if (type === 'In') {
-                    mv.unitCostKZT = Number(docData.unitCostKZT) || 0;
-                    mv.totalCostKZT = MoneyMath.multiply(qty, mv.unitCostKZT);
-                    mv.salesPriceKZT = Number(docData.salesPriceKZT) || Number(p.salesPrice) || 0;
-                    mv.totalSalesPriceKZT = MoneyMath.multiply(qty, mv.salesPriceKZT);
+                    mv.unitCostKzt = Number(docData.unitCostKzt) || 0;
+                    mv.totalCostKzt = MoneyMath.multiply(qty, mv.unitCostKzt);
+                    mv.salesPriceKzt = Number(docData.salesPriceKzt) || Number(p.salesPrice) || 0;
+                    mv.totalSalesPriceKzt = MoneyMath.multiply(qty, mv.salesPriceKzt);
                 } else {
                     const fifo = InventoryService.calculateFIFODeduction(p.id, qty, currentMovements, docData.configuration);
-                    const finalUnitCost = fifo.unitCostKZT || 0;
-                    const finalUnitSales = fifo.unitSalesKZT || Number(p.salesPrice) || 0;
+                    const finalUnitCost = fifo.unitCostKzt || 0;
+                    const finalUnitSales = fifo.unitSalesKzt || Number(p.salesPrice) || 0;
                     
-                    mv.unitCostKZT = finalUnitCost;
-                    mv.totalCostKZT = MoneyMath.multiply(qty, finalUnitCost);
-                    mv.salesPriceKZT = finalUnitSales;
-                    mv.totalSalesPriceKZT = MoneyMath.multiply(qty, finalUnitSales);
+                    mv.unitCostKzt = finalUnitCost;
+                    mv.totalCostKzt = MoneyMath.multiply(qty, finalUnitCost);
+                    mv.salesPriceKzt = finalUnitSales;
+                    mv.totalSalesPriceKzt = MoneyMath.multiply(qty, finalUnitSales);
                 }
                 mv.configuration = docData.configuration;
                 mv.description = docData.description;
@@ -163,8 +163,8 @@ export class InventoryMediator {
       productName: p.name,
       type,
       quantity: qty,
-      unitCostKZT: 0,
-      totalCostKZT: 0,
+      unitCostKzt: 0,
+      totalCostKzt: 0,
       statusType: status,
       documentType: docType,
       documentId: docId

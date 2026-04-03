@@ -4,18 +4,13 @@ import { Counterparty, CounterpartyAccount, Currency } from '@/types';
 import { TableNames } from '@/constants';
 
 const toCamel = (s: string) => {
-    const camel = s.replace(/_([a-z0-9])/g, g => g[1].toUpperCase());
-    return camel.replace(/Kzt/g, 'KZT').replace(/Usd/g, 'USD');
+    return s.replace(/_([a-z0-9])/g, g => g[1].toUpperCase());
 };
 
 const toSnake = (s: string) => {
-    let res = s
-        .replace(/KZT/g, '_kzt')
-        .replace(/USD/g, '_usd')
-        .replace(/([A-Z])/g, '_$1')
-        .toLowerCase();
-    res = res.replace(/__/g, '_');
-    if (res.startsWith('_')) res = res.substring(1);
+    if (s.includes('_') && s === s.toLowerCase()) return s;
+    let res = s.replace(/([A-Z])/g, '_$1').toLowerCase();
+    res = res.replace(/__/g, '_').replace(/^_/, "");
     if (s.endsWith('M3')) {
         res = res.replace(/_m_3$/, '_m3');
     }
@@ -28,10 +23,17 @@ const PROTECTED_JSON_FIELDS = [
     'priceOverrides', 
     'internalComposition',
     'composition',
-    'configuration'
+    'configuration',
+    'settings',
+    'items',
+    'packingList',
+    'options'
 ];
 
 export class ApiService {
+    static get(arg0: string): { data: any; } | PromiseLike<{ data: any; }> {
+        throw new Error('Method not implemented.');
+    }
     static generateId(prefix?: string): string {
         const id = Math.random().toString(36).substring(2, 9).toUpperCase();
         return prefix ? `${prefix}-${id}` : id;
@@ -74,23 +76,45 @@ export class ApiService {
         return n;
     }
 
-    static async fetchAll<T>(tableName: string, orderBy: string = 'id', retries = 3): Promise<T[]> {
+    static async fetchAll<T>(tableName: string, options?: string | Record<string, any>, retries = 3): Promise<T[]> {
         const CHUNK_SIZE = 1000;
         let allData: any[] = [];
         let from = 0;
         let to = CHUNK_SIZE - 1;
         let hasMore = true;
-
+    
+        const orderBy = typeof options === 'string' ? options : null;
+        const filters = typeof options === 'object' ? options : null;
+    
+        // УЛУЧШЕННАЯ ЛОГИКА ОПРЕДЕЛЕНИЯ ПОЛЯ ДЛЯ СОРТИРОВКИ
+        let effectiveOrderBy = orderBy;
+        if (!effectiveOrderBy) {
+            if (tableName === TableNames.EXCHANGE_RATES) effectiveOrderBy = 'currency';
+            else if (tableName === TableNames.INVENTORY_SUMMARY) effectiveOrderBy = 'product_id';
+            else effectiveOrderBy = 'id';
+        }
+    
         while (hasMore) {
             let chunk: any[] | null = null;
             for (let i = 0; i < retries; i++) {
                 try {
-                    const { data, error: fetchError } = await supabase
+                    let query = supabase
                         .from(tableName)
                         .select('*')
-                        .range(from, to)
-                        .order(orderBy, { ascending: true });
+                        .range(from, to);
+    
+                    if (filters) {
+                        Object.entries(filters).forEach(([key, value]) => {
+                            query = query.eq(toSnake(key), value);
+                        });
+                    }
 
+                    if (effectiveOrderBy) {
+                        query = query.order(effectiveOrderBy, { ascending: true });
+                    }
+    
+                    const { data, error: fetchError } = await query;
+    
                     if (fetchError) {
                         console.error(`[API] Error fetching ${tableName} chunk ${from}-${to} (attempt ${i + 1}):`, fetchError.message);
                         if (i === retries - 1) throw fetchError;
@@ -105,7 +129,7 @@ export class ApiService {
                     await new Promise(r => setTimeout(r, 1000 * (i + 1)));
                 }
             }
-
+    
             if (chunk && chunk.length > 0) {
                 allData = [...allData, ...chunk];
                 if (chunk.length < CHUNK_SIZE) {
@@ -118,10 +142,24 @@ export class ApiService {
                 hasMore = false;
             }
         }
-
+    
         return this.keysToCamel(allData);
     }
-    
+
+    static async fetchOne<T>(tableName: string, id: string): Promise<T | null> {
+        const { data, error } = await supabase
+            .from(tableName)
+            .select('*')
+            .eq('id', id)
+            .single();
+        
+        if (error) {
+            if (error.code === 'PGRST116') return null; // Not found
+            throw error;
+        }
+        return this.keysToCamel(data);
+    }
+
     static async createCounterpartyWithAccount(
         counterpartyData: Partial<Counterparty>,
         accountData: Partial<CounterpartyAccount>
@@ -210,14 +248,17 @@ export class ApiService {
             .select()
             .single();
             
-        if (error) throw error;
+        if (error) {
+            console.error(`[API] Upsert Error in ${tableName}:`, error.message);
+            throw error;
+        }
         return this.keysToCamel(upserted);
     }
 
     static async upsertMany<T>(tableName: string, data: Partial<T>[], onConflict: string = 'id'): Promise<T[]> {
         if (!data || data.length === 0) return [];
         const snakeData = data.map(i => this.keysToSnake(i));
-        const { data: upserted, error } = await supabase
+        const { data: upserted, error = null } = await supabase
             .from(tableName)
             .upsert(snakeData, { onConflict: toSnake(onConflict) })
             .select();
@@ -238,12 +279,12 @@ export class ApiService {
         await this.upsert(TableNames.EXCHANGE_RATES, { currency, rate }, 'currency');
     }
 
-    // Instance methods for compatibility if needed, but they just call static versions
     generateId(prefix?: string): string { return ApiService.generateId(prefix); }
     generateUUID(): string { return ApiService.generateUUID(); }
     keysToCamel(o: any): any { return ApiService.keysToCamel(o); }
     keysToSnake(o: any): any { return ApiService.keysToSnake(o); }
-    async fetchAll<T>(t: string, o: string = 'id'): Promise<T[]> { return ApiService.fetchAll<T>(t, o); }
+    async fetchAll<T>(t: string, o?: string | Record<string, any>): Promise<T[]> { return ApiService.fetchAll<T>(t, o); }
+    async fetchOne<T>(t: string, id: string): Promise<T | null> { return ApiService.fetchOne<T>(t, id); }
     async create<T>(t: string, d: Partial<T>): Promise<T> { return ApiService.create<T>(t, d); }
     async update<T>(t: string, id: string, d: Partial<T>): Promise<T> { return ApiService.update<T>(t, id, d); }
     async delete(t: string, id: string): Promise<void> { return ApiService.delete(t, id); }

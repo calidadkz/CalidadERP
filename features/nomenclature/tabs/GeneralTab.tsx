@@ -1,9 +1,11 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Product, ProductType, Currency, Supplier, ProductCategory, PricingProfile, HSCode, PricingMethod, Manufacturer, ProductPackage } from '@/types';
-import { Info, Package, Zap, Calculator, Search, ChevronDown, CheckCircle, Monitor, AlignLeft, Factory, Hash, Plus } from 'lucide-react';
+import { Info, Package, Zap, Calculator, Search, ChevronDown, CheckCircle, Monitor, AlignLeft, Factory, Hash, Plus, Image as ImageIcon, Loader2, Upload, LayoutGrid, Cloud, Cpu } from 'lucide-react';
 import { useAccess } from '@/features/auth/hooks/useAccess';
 import { PackageInputRow } from './PackageComponents';
+import { MediaLibraryModal } from '@/components/ui/MediaLibraryModal';
+import { useGoogleDrivePicker } from '../hooks/useGoogleDrivePicker';
 
 interface GeneralTabProps {
     formData: Partial<Product>;
@@ -14,6 +16,7 @@ interface GeneralTabProps {
     manufacturers: Manufacturer[];
     modalMode: 'create' | 'edit';
     onChange: (field: keyof Product, value: any) => void;
+    exchangeRates: Record<Currency, number>;
     economyData?: any;
     appliedProfile?: PricingProfile | null;
     onShowDetails?: () => void;
@@ -21,10 +24,14 @@ interface GeneralTabProps {
     onAddPackage: () => void;
     onRemovePackage: (index: number) => void;
     showDetails?: boolean;
+    storageImages?: { name: string; url: string }[];
+    isImagesLoading?: boolean;
+    onUploadImage?: (file: File) => Promise<string>;
 }
 
 export const GeneralTab: React.FC<GeneralTabProps> = ({ 
-    formData, suppliers = [], categories = [], hscodes = [], pricingProfiles = [], manufacturers = [], modalMode, onChange, onPackageChange, onAddPackage, onRemovePackage, economyData, appliedProfile, onShowDetails, showDetails = false 
+    formData, suppliers = [], categories = [], hscodes = [], pricingProfiles = [], manufacturers = [], modalMode, onChange, exchangeRates = {} as Record<Currency, number>, onPackageChange, onAddPackage, onRemovePackage, economyData, appliedProfile, onShowDetails, showDetails = false,
+    storageImages = [], isImagesLoading = false, onUploadImage
 }) => {
     const access = useAccess('nomenclature');
     const [isCatOpen, setIsCatOpen] = useState(false);
@@ -38,6 +45,12 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
 
     const [isMethodOpen, setIsMethodOpen] = useState(false);
     const methodRef = useRef<HTMLDivElement>(null);
+
+    const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isUploading, setIsUploading] = useState(false);
+
+    const { openPicker, isLoaded: isDriveLoaded } = useGoogleDrivePicker();
 
     const canWriteField = (key: string) => access.canWrite('fields', key);
 
@@ -60,12 +73,44 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         onChange(field, isNaN(num) ? 0 : num);
     };
 
+    const handleSalesPriceInput = (val: string) => {
+        if (formData.pricingMethod === PricingMethod.PROFILE) return;
+        
+        // Если поле пустое, сбрасываем значения
+        if (val === '') {
+            onChange('salesPrice', 0);
+            onChange('markupPercentage', 0);
+            return;
+        }
+
+        const salesPrice = parseFloat(val);
+        if (isNaN(salesPrice)) return;
+
+        const rate = exchangeRates[formData.currency as Currency] || 1;
+        const purchaseKzt = (formData.basePrice || 0) * rate;
+
+        if (purchaseKzt > 0) {
+            // Увеличиваем точность до 8 знаков, чтобы избежать прыжков при обратном расчете
+            const newMarkup = ((salesPrice / purchaseKzt) - 1) * 100;
+            onChange('markupPercentage', parseFloat(newMarkup.toFixed(8)));
+            onChange('salesPrice', salesPrice);
+        } else {
+            onChange('salesPrice', salesPrice);
+        }
+    };
+
     const filteredCategories = useMemo(() => {
         return categories
             .filter(c => c.type === formData.type)
             .filter(c => !catSearch || c.name.toLowerCase().includes(catSearch.toLowerCase()))
             .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
     }, [categories, formData.type, catSearch]);
+
+    const machineCategories = useMemo(() => {
+        return categories
+            .filter(c => c.type === ProductType.MACHINE)
+            .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    }, [categories]);
 
     const filteredHSCodes = useMemo(() => {
         return hscodes
@@ -95,10 +140,6 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             }
         }
     }, [formData.supplierId, formData.categoryId, availableProfiles]);
-
-    const machineCategories = useMemo(() => {
-        return categories.filter(c => c.type === ProductType.MACHINE).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-    }, [categories]);
 
     const currentCategory = useMemo(() => 
         categories.find(c => c.id === formData.categoryId), 
@@ -136,6 +177,41 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         onChange('pricingMethod', method);
         onChange('pricingProfileId', profileId || null);
         setIsMethodOpen(false);
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !onUploadImage) return;
+
+        setIsUploading(true);
+        try {
+            const url = await onUploadImage(file);
+            onChange('imageUrl', url);
+        } catch (err) {
+            alert('Ошибка при загрузке изображения');
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleDriveFileSelected = async (file: any) => {
+        if (!onUploadImage) return;
+        setIsUploading(true);
+        try {
+            const response = await fetch(file.downloadUrl, {
+                headers: { 'Authorization': `Bearer ${file.accessToken}` }
+            });
+            const blob = await response.blob();
+            const driveFile = new File([blob], file.name, { type: file.mimeType });
+            const url = await onUploadImage(driveFile);
+            onChange('imageUrl', url);
+        } catch (err) {
+            console.error('Drive upload error:', err);
+            alert('Ошибка при переносе файла с Google Диска');
+        } finally {
+            setIsUploading(false);
+        }
     };
 
     const totalVolume = useMemo(() => formData.packages?.reduce((sum, p) => sum + (p.volumeM3 || 0), 0) || 0, [formData.packages]);
@@ -265,40 +341,6 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                         </div>
                     </div>
                 </div>
-
-                {(formData.type === ProductType.PART || formData.type === ProductType.SERVICE) && (
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 animate-in slide-in-from-top-2">
-                        <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center pb-1.5 border-b">
-                            <Monitor size={14} className="mr-2 text-indigo-500"/> Совместимость с оборудованием
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                            {machineCategories.length > 0 ? (
-                                machineCategories.map(cat => {
-                                    const isSelected = (formData.compatibleMachineCategoryIds || []).includes(cat.id);
-                                    return (
-                                        <button
-                                            key={cat.id}
-                                            type="button"
-                                            onClick={() => toggleMachineCompatibility(cat.id)}
-                                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight border transition-all flex items-center gap-1.5 shadow-sm active:scale-95 ${
-                                                isSelected 
-                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-indigo-200' 
-                                                : 'bg-white border-slate-200 text-slate-400 hover:border-indigo-300 hover:text-indigo-500'
-                                            }`}
-                                        >
-                                            {isSelected ? <CheckCircle size={12}/> : <div className="w-3 h-3 rounded-full border border-current opacity-30"/>}
-                                            {cat.name}
-                                        </button>
-                                    );
-                                })
-                            ) : (
-                                <div className="p-4 text-center w-full bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">Категории оборудования не найдены</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
 
                 <div className="grid grid-cols-12 gap-3">
                     <div className="col-span-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
@@ -431,7 +473,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                                     <input 
                                         type="number" 
                                         className={`w-full h-full border rounded-lg px-2 text-sm font-black font-mono outline-none transition-all ${formData.pricingMethod === PricingMethod.PROFILE ? 'bg-slate-50 border-slate-100 text-slate-400' : 'border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-500/10'}`} 
-                                        value={formData.markupPercentage || ''} 
+                                        value={formData.markupPercentage !== undefined ? parseFloat(formData.markupPercentage.toFixed(2)) : ''} 
                                         onChange={e => formData.pricingMethod !== PricingMethod.PROFILE && handleNumChange('markupPercentage', e.target.value)}
                                         readOnly={formData.pricingMethod === PricingMethod.PROFILE}
                                     />
@@ -443,9 +485,15 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                         <div className="grid grid-cols-2 gap-3 mb-3">
                             <div className="flex flex-col">
                                 <label className="block text-[8px] font-black text-slate-400 uppercase mb-1.5 ml-1">Цена продажи</label>
-                                <div className={`flex items-center justify-between h-[34px] border rounded-lg px-2 shadow-inner transition-all ${formData.pricingMethod === PricingMethod.PROFILE ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-200'}`}>
-                                    <span className={`text-sm font-black font-mono truncate ${formData.pricingMethod === PricingMethod.PROFILE ? 'text-blue-700' : 'text-slate-700'}`}>{(formData.salesPrice || 0).toLocaleString()}</span>
-                                    <span className={`text-[9px] font-black uppercase ml-1 flex-shrink-0 ${formData.pricingMethod === PricingMethod.PROFILE ? 'text-blue-400' : 'text-slate-400'}`}>₸</span>
+                                <div className={`relative h-[34px] border rounded-lg shadow-inner transition-all ${formData.pricingMethod === PricingMethod.PROFILE ? 'bg-blue-50 border-blue-100' : 'bg-white border-slate-200 focus-within:ring-2 focus-within:ring-blue-500/10'}`}>
+                                    <input 
+                                        type="number"
+                                        className={`w-full h-full bg-transparent px-2 text-sm font-black font-mono outline-none ${formData.pricingMethod === PricingMethod.PROFILE ? 'text-blue-700' : 'text-slate-700'}`}
+                                        value={formData.salesPrice || ''}
+                                        onChange={e => handleSalesPriceInput(e.target.value)}
+                                        readOnly={formData.pricingMethod === PricingMethod.PROFILE}
+                                    />
+                                    <span className={`absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-black uppercase pointer-events-none ${formData.pricingMethod === PricingMethod.PROFILE ? 'text-blue-400' : 'text-slate-400'}`}>₸</span>
                                 </div>
                             </div>
                             <div className="flex flex-col">
@@ -541,18 +589,110 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                     </div>
                 </div>
 
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                    <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center pb-1.5 border-b">
-                        <AlignLeft size={14} className="mr-2 text-slate-500"/> Описание товара
-                    </h4>
-                    <textarea 
-                        className="w-full border border-slate-200 rounded-xl p-3 text-xs font-medium focus:ring-4 focus:ring-blue-500/10 outline-none transition-all resize-none min-h-[100px] placeholder:text-slate-300"
-                        placeholder="Введите описание..."
-                        value={formData.description || ''}
-                        onChange={e => onChange('description', e.target.value)}
-                    />
+                {formData.type === ProductType.PART && (
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                        <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center pb-1.5 border-b">
+                            <Cpu size={14} className="mr-2 text-indigo-500"/> Совместимость со станками
+                        </h4>
+                        <div className="grid grid-cols-4 gap-2 max-h-32 overflow-y-auto p-1 custom-scrollbar">
+                            {machineCategories.map(cat => {
+                                const isSelected = formData.compatibleMachineCategoryIds?.includes(cat.id);
+                                return (
+                                    <div 
+                                        key={cat.id}
+                                        onClick={() => toggleMachineCompatibility(cat.id)}
+                                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
+                                            isSelected 
+                                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700' 
+                                                : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
+                                        }`}
+                                    >
+                                        <div className={`w-3 h-3 rounded flex items-center justify-center border ${
+                                            isSelected ? 'bg-indigo-500 border-indigo-500' : 'bg-white border-slate-300'
+                                        }`}>
+                                            {isSelected && <CheckCircle size={8} className="text-white"/>}
+                                        </div>
+                                        <span className="text-[10px] font-bold leading-none">{cat.name}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex gap-3">
+                    <div className="w-[40%] bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                        <div className="flex justify-between items-center mb-3 pb-1.5 border-b">
+                            <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center">
+                                <ImageIcon size={14} className="mr-2 text-blue-500"/> Изображение
+                            </h4>
+                            <div className="flex gap-1">
+                                <button 
+                                    onClick={() => openPicker(handleDriveFileSelected)}
+                                    disabled={!isDriveLoaded || isUploading}
+                                    className="flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-600 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all disabled:opacity-50"
+                                >
+                                    <Cloud size={10}/> Drive
+                                </button>
+                                <button 
+                                    onClick={() => setIsMediaModalOpen(true)}
+                                    className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                >
+                                    <LayoutGrid size={10}/> Библиотека
+                                </button>
+                                <button 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isUploading}
+                                    className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all disabled:opacity-50"
+                                >
+                                    {isUploading ? <Loader2 size={10} className="animate-spin"/> : <Upload size={10}/>}
+                                    Загрузить
+                                </button>
+                            </div>
+                            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                        </div>
+                        
+                        <div className="flex-1 flex gap-3 overflow-hidden">
+                            <div className="w-24 h-24 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                                {formData.imageUrl ? (
+                                    <img src={formData.imageUrl} alt="Превью" className="w-full h-full object-cover" />
+                                ) : (
+                                    <ImageIcon size={32} className="text-slate-200" />
+                                )}
+                            </div>
+                            
+                            <div className="flex-1 flex flex-col min-w-0">
+                                <label className="block text-[8px] font-black text-slate-400 uppercase mb-1.5 ml-1">Текущий файл</label>
+                                <div className="w-full border border-slate-200 rounded-lg py-1.5 px-3 text-[10px] font-bold bg-slate-50 text-slate-500 truncate">
+                                    {formData.imageUrl ? storageImages.find(img => img.url === formData.imageUrl)?.name || 'Внешняя ссылка' : 'Файл не выбран'}
+                                </div>
+                                <p className="text-[8px] text-slate-400 mt-2 leading-tight italic">Вы можете загрузить новое фото или выбрать из уже имеющихся в библиотеке</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="w-[60%] bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                        <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center pb-1.5 border-b">
+                            <AlignLeft size={14} className="mr-2 text-slate-500"/> Описание товара
+                        </h4>
+                        <textarea 
+                            className="w-full flex-1 border border-slate-200 rounded-xl p-3 text-xs font-medium focus:ring-4 focus:ring-blue-500/10 outline-none transition-all resize-none min-h-[100px] placeholder:text-slate-300"
+                            placeholder="Введите описание..."
+                            value={formData.description || ''}
+                            onChange={e => onChange('description', e.target.value)}
+                        />
+                    </div>
                 </div>
             </div>
+
+            <MediaLibraryModal 
+                isOpen={isMediaModalOpen}
+                onClose={() => setIsMediaModalOpen(false)}
+                images={storageImages}
+                isLoading={isImagesLoading}
+                onSelect={(url) => onChange('imageUrl', url)}
+                currentUrl={formData.imageUrl}
+            />
         </div>
     );
 };

@@ -36,7 +36,7 @@ export const useReceivingLogic = (
                 if (planIds.includes(al.plannedPaymentId)) {
                     const apAmount = Number(ap.amount) || 0;
                     const alAmount = Number(al.amountCovered) || 0;
-                    const apTotalKzt = Number(ap.totalCostKZT) || 0;
+                    const apTotalKzt = Number(ap.totalCostKzt) || 0;
                     const apRate = Number(ap.exchangeRate) || 1;
 
                     if (apTotalKzt > 0) {
@@ -73,16 +73,16 @@ export const useReceivingLogic = (
         const currentRate = effectiveInfo.rate;
         
         return items.map(item => {
-            const costBaseKZT = Number(item.priceForeign) * currentRate;
+            const costBaseKzt = Number(item.priceForeign) * currentRate;
             let allocated = 0;
             
             expenses.forEach(exp => {
-                const expInKZT = Number(exp.amount) || 0; 
+                const expInKzt = Number(exp.amount) || 0; 
                 const qtyFact = Number(item.qtyFact) || 1;
                 
                 if (exp.allocationMethod === ExpenseAllocationMethod.SPECIFIC_ITEM) {
                     if (exp.targetItemId === item.id) {
-                        allocated += expInKZT / (qtyFact || 1);
+                        allocated += expInKzt / (qtyFact || 1);
                     }
                 } else if (exp.allocationMethod === ExpenseAllocationMethod.BY_VOLUME) {
                     const totalVol = items.reduce((s, i) => {
@@ -92,21 +92,21 @@ export const useReceivingLogic = (
                     }, 0);
                     const product = products.find(p => p.id === item.productId);
                     const productVolume = product?.packages?.reduce((sum, p) => sum + (p.volumeM3 || 0), 0) || 0;
-                    if (totalVol > 0) allocated += (expInKZT * (productVolume * qtyFact / totalVol)) / qtyFact;
+                    if (totalVol > 0) allocated += (expInKzt * (productVolume * qtyFact / totalVol)) / qtyFact;
                 } else if (exp.allocationMethod === ExpenseAllocationMethod.BY_VALUE) {
                     const totalVal = items.reduce((s, i) => s + (Number(i.priceForeign) * currentRate * Number(i.qtyFact)), 0);
-                    if (totalVal > 0) allocated += (expInKZT * (costBaseKZT * qtyFact / totalVal)) / qtyFact;
+                    if (totalVal > 0) allocated += (expInKzt * (costBaseKzt * qtyFact / totalVal)) / qtyFact;
                 } else if (exp.allocationMethod === ExpenseAllocationMethod.BY_QUANTITY) {
                     const totalQty = items.reduce((s, i) => s + Number(i.qtyFact), 0);
-                    if (totalQty > 0) allocated += (expInKZT * (qtyFact / totalQty)) / qtyFact;
+                    if (totalQty > 0) allocated += (expInKzt * (qtyFact / totalQty)) / qtyFact;
                 }
             });
             
             return { 
                 ...item, 
-                costBaseKZT: costBaseKZT,
-                allocatedExpenseKZT: allocated, 
-                finalCostUnitKZT: costBaseKZT + allocated 
+                costBaseKzt: costBaseKzt,
+                allocatedExpenseKzt: allocated, 
+                finalCostUnitKzt: costBaseKzt + allocated 
             };
         });
     }, [items, expenses, effectiveInfo.rate, products]);

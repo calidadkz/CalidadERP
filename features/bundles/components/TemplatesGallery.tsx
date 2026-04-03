@@ -4,6 +4,7 @@ import { useStore } from '@/features/system/context/GlobalStore';
 import { ProductType, Bundle, Product, OptionVariant, OptionType } from '@/types';
 import { Search, RotateCcw, Box, Star, Trash2, ChevronRight, AlignLeft, ChevronDown, ChevronUp, Pencil, LayoutGrid, List, Monitor, Truck, X, Info, Download } from 'lucide-react';
 import { useAccess } from '@/features/auth/hooks/useAccess';
+import { BundleExporter } from '@/services/BundleExporter';
 
 interface TemplatesGalleryProps {
   onLoad: (b: Bundle) => void;
@@ -46,22 +47,19 @@ export const TemplatesGallery: React.FC<TemplatesGalleryProps> = ({ onLoad }) =>
   const showPrice = access.canSee('fields', 'col_price');
 
   const handleExportBundle = (bundle: Bundle) => {
-    const headers = ['Параметр', 'Значение'];
-    const rows: string[][] = [['Название шаблона', bundle.name], ['Модель станка', bundle.baseProductName], ['Системный ID станка', bundle.baseProductId]];
-    const baseProduct = products.find(p => p.id === bundle.baseProductId);
-    const basePackages = baseProduct?.packages || [];
-    const baseVolume = basePackages.reduce((sum, p) => sum + (p.volumeM3 || 0), 0);
-    if (basePackages.length > 0) { rows.push(['Габариты базы (мест: ' + basePackages.length + ')', basePackages.map(p => `${p.lengthMm || 0}x${p.widthMm || 0}x${p.heightMm || 0} (${p.volumeM3 || 0} м³)`).join('; ')]); } else { rows.push(['Габариты базы', 'Не заданы']); }
-    const groupedOptions: Record<string, string[]> = {}; const optionsWithDims: string[] = []; let optionsVolume = 0;
-    bundle.selectedVariantIds.forEach(vid => { const variant = optionVariants.find(v => v.id === vid); if (variant) { const typeName = optionTypes.find(ot => ot.id === variant.typeId)?.name || 'Прочее'; if (!groupedOptions[typeName]) groupedOptions[typeName] = []; groupedOptions[typeName].push(variant.name); if ((variant.volumeM3 || 0) > 0) { optionsWithDims.push(`${variant.name}: ${variant.lengthMm || 0}x${variant.widthMm || 0}x${variant.heightMm || 0} (${variant.volumeM3 || 0} м³)`); optionsVolume += (variant.volumeM3 || 0); } } });
-    Object.entries(groupedOptions).forEach(([typeName, variants]) => { rows.push([`Опция: ${typeName}`, variants.join(', ')]); });
-    if (optionsWithDims.length > 0) { rows.push(['Габариты опций', optionsWithDims.join('; ')]); }
-    rows.push(['Суммарный объем', `${(baseVolume + optionsVolume).toFixed(3)} м³`]);
-    if (baseProduct && ((baseProduct.workingLengthMm || 0) > 0 || (baseProduct.workingWidthMm || 0) > 0 || (baseProduct.workingHeightMm || 0) > 0)) { rows.push(['Рабочие габариты', `${baseProduct.workingLengthMm || 0}x${baseProduct.workingWidthMm || 0}x${baseProduct.workingHeightMm || 0} (${baseProduct.workingVolumeM3 || 0} м³)`]); }
-    rows.push(['Описание', bundle.description || '—']); rows.push(['Цена продажи (KZT)', bundle.totalPrice.toString()]); rows.push(['Дата экспорта', new Date().toLocaleString('ru-RU')]);
-    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.map(cell => `"${cell.toString().replace(/"/g, '""')}"`).join(';'))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `bundle_${bundle.name.replace(/[^a-z0-9а-яё]/gi, '_')}.csv`; link.click();
-    actions.addLog('Export', 'Комплектации', bundle.id, `Экспорт комплектации "${bundle.name}" в CSV`);
+    BundleExporter.exportToCsv(
+      {
+        name: bundle.name,
+        baseProductId: bundle.baseProductId,
+        selectedVariantIds: bundle.selectedVariantIds,
+        totalPrice: bundle.totalPrice,
+        description: bundle.description
+      },
+      products,
+      optionVariants,
+      optionTypes,
+      (module, sub, id, msg) => actions.addLog(module, sub, id, msg)
+    );
   };
 
   const toggleDescription = (id: string, e: React.MouseEvent) => { e.stopPropagation(); setExpandedDescriptions(prev => ({ ...prev, [id]: !prev[id] })); };

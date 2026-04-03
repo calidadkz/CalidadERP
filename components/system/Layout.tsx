@@ -3,7 +3,7 @@ import React, { ReactNode, useState } from 'react';
 import { 
   Settings, Calculator, FileText, History, Trash2, 
   Box, ShoppingCart, Truck, Users, List, RefreshCcw, PackageSearch, LogOut, ShieldCheck, 
-  Calendar, Landmark, Receipt, Tag, ChevronLeft, Menu, Hash, LineChart
+  Calendar, Landmark, Receipt, Tag, ChevronLeft, Menu, Hash, LineChart, Layers
 } from 'lucide-react';
 import { useAuth } from '@/features/system/context/AuthContext';
 import { AppRole } from '@/types';
@@ -37,6 +37,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
             label: 'Операции',
             items: [
                 { id: 'pre-calculations', label: 'Предрасчеты', icon: <LineChart size={18} /> },
+                { id: 'batches', label: 'Партии', icon: <Layers size={18} /> },
                 { id: 'procurement', label: 'Снабжение (ЗП)', icon: <Truck size={18} /> },
                 { id: 'receiving', label: 'Приемка на склад', icon: <Box size={18} /> },
                 { id: 'sales', label: 'Продажи (ЗК)', icon: <ShoppingCart size={18} /> },

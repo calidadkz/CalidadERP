@@ -8,10 +8,10 @@ export interface StockMovement {
     productName: string;
     type: 'In' | 'Out';
     quantity: number;
-    unitCostKZT: number;
-    totalCostKZT: number;
-    salesPriceKZT?: number; 
-    totalSalesPriceKZT?: number; 
+    unitCostKzt: number;
+    totalCostKzt: number;
+    salesPriceKzt?: number;
+    totalSalesPriceKzt?: number;
     statusType: MovementStatus;
     documentType: 'Order' | 'SalesOrder' | 'Reception' | 'Shipment' | 'Adjustment';
     documentId: string;
@@ -40,9 +40,9 @@ export interface ReceptionItem {
     qtyPlan: number;
     qtyFact: number;
     priceForeign: number;
-    costBaseKZT: number;
-    allocatedExpenseKZT: number;
-    finalCostUnitKZT: number;
+    costBaseKzt: number;
+    allocatedExpenseKzt: number;
+    finalCostUnitKzt: number;
     configuration?: string[];
     receptionId?: string;
 }
@@ -52,7 +52,7 @@ export interface ReceptionExpense {
     type: string;
     amount: number;
     currency: any;
-    exchangeRateToKZT: number;
+    exchangeRateToKzt: number;
     allocationMethod: ExpenseAllocationMethod;
     targetItemId?: string;
     receptionId?: string;
@@ -72,7 +72,7 @@ export interface ShipmentItem {
     productName: string;
     sku: string;
     qtyShipped: number;
-    priceKZT: number;
+    priceKzt: number;
     configuration?: string[];
     shipmentId?: string;
 }

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Product, ProductType, Currency, SalesOrderItem, ProductCategory, StockMovement } from '@/types';
+import { Product, ProductType, Currency, SalesOrderItem, ProductCategory, StockMovement, OptionVariant } from '@/types';
 import { Search, Box, Zap, Briefcase, Monitor, Tags, Trash2 } from 'lucide-react';
 import { InventoryService } from '@/services/InventoryService';
 import { PricingService } from '@/services/PricingService';
@@ -11,6 +11,7 @@ interface SalesItemsTabProps {
     products: Product[];
     categories: ProductCategory[];
     stockMovements: StockMovement[];
+    optionVariants: OptionVariant[];
     pricingProfiles: any[];
     exchangeRates: Record<Currency, number>;
     items: SalesOrderItem[];
@@ -20,7 +21,7 @@ interface SalesItemsTabProps {
 }
 
 export const SalesItemsTab: React.FC<SalesItemsTabProps> = ({
-    products, categories, stockMovements, pricingProfiles, exchangeRates, items, setItems, isFormWriteable, canEditPrices
+    products, categories, stockMovements, optionVariants, pricingProfiles, exchangeRates, items, setItems, isFormWriteable, canEditPrices
 }) => {
     const [activeType, setActiveType] = useState<ProductType>(ProductType.MACHINE);
     const [machineTypeFilter, setMachineTypeFilter] = useState<string | 'all'>('all');
@@ -65,7 +66,7 @@ export const SalesItemsTab: React.FC<SalesItemsTabProps> = ({
         }).sort((a, b) => a.name.localeCompare(b.name));
     }, [products, activeType, machineTypeFilter, categoryFilter, productInput]);
 
-    const handleAddItemToOrder = (customData?: { name: string, price: number, config?: string[] }) => {
+    const handleAddItemToOrder = (customData?: { name: string, price: number, config: string[], selectedVariantIds?: string[] }) => {
         if (!customData) {
             const p = products.find(prod => prod.name === productInput || prod.sku === productInput);
             if (!p) return;
@@ -73,13 +74,18 @@ export const SalesItemsTab: React.FC<SalesItemsTabProps> = ({
             const economy = PricingService.calculateSmartPrice(p, profile, exchangeRates);
             setItems(prev => [...prev, {
                 id: ApiService.generateId(), productId: p.id, productName: p.name, sku: p.sku, quantity: itemQty,
-                priceKZT: economy.finalPrice, totalKZT: economy.finalPrice * itemQty, configuration: []
+                priceKzt: economy.finalPrice, totalKzt: economy.finalPrice * itemQty, configuration: []
             }]);
         } else {
             if (!configMachine) return;
+            // Use selectedVariantIds (IDs) if available, otherwise fallback to config (names)
+            const finalConfig = customData.selectedVariantIds && customData.selectedVariantIds.length > 0 
+                ? customData.selectedVariantIds 
+                : customData.config;
+
             setItems(prev => [...prev, {
                 id: ApiService.generateId(), productId: configMachine.id, productName: configMachine.name, sku: configMachine.sku,
-                quantity: itemQty, priceKZT: customData.price, totalKZT: customData.price * itemQty, configuration: customData.config || []
+                quantity: itemQty, priceKzt: customData.price, totalKzt: customData.price * itemQty, configuration: finalConfig || []
             }]);
         }
         setIsConfiguring(false); setProductInput(''); setItemQty(1); setIsDropdownOpen(false);
@@ -136,10 +142,21 @@ export const SalesItemsTab: React.FC<SalesItemsTabProps> = ({
                     <tbody className="bg-white divide-y divide-slate-50">
                         {items.map((item, idx) => (
                             <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
-                                <td className="px-6 py-3"><div className="font-black text-slate-800 text-xs leading-tight">{item.productName}</div><div className="text-[9px] text-slate-400 font-mono mt-0.5 uppercase">{item.sku}</div>{item.configuration && item.configuration.length > 0 && (<div className="flex flex-wrap gap-1 mt-1">{item.configuration.map((c, i) => <span key={i} className="text-[8px] bg-blue-50 px-1 py-0.5 rounded-[4px] text-blue-600 border border-blue-100 font-bold">{c}</span>)}</div>)}</td>
-                                <td className="px-4 py-3 text-right"><input type="number" className="w-14 bg-slate-50 border-none p-1.5 rounded-lg text-right font-black text-slate-700 outline-none text-xs" value={item.quantity} onChange={e => { if(!isFormWriteable) return; const u = [...items]; u[idx].quantity = parseInt(e.target.value) || 1; u[idx].totalKZT = u[idx].quantity * u[idx].priceKZT; setItems(u); }} disabled={!isFormWriteable}/></td>
-                                <td className="px-4 py-3 text-right font-mono font-bold text-slate-800"><input type="number" className={`w-28 p-1.5 rounded-lg text-right outline-none text-xs font-black ${canEditPrices ? 'bg-slate-50' : 'bg-transparent cursor-default'}`} value={item.priceKZT} onChange={e => { if(!canEditPrices) return; const u = [...items]; u[idx].priceKZT = parseFloat(e.target.value) || 0; u[idx].totalKZT = u[idx].quantity * u[idx].priceKZT; setItems(u); }} readOnly={!canEditPrices}/></td>
-                                <td className="px-6 py-3 text-right font-black text-slate-900 font-mono text-base">{f(item.totalKZT)} <span className="text-[9px] opacity-40">₸</span></td>
+                                <td className="px-6 py-3">
+                                    <div className="font-black text-slate-800 text-xs leading-tight">{item.productName}</div>
+                                    <div className="text-[9px] text-slate-400 font-mono mt-0.5 uppercase">{item.sku}</div>
+                                    {item.configuration && item.configuration.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                            {item.configuration.map((c, i) => {
+                                                const variant = optionVariants.find(v => v.id === c);
+                                                return <span key={i} className="text-[8px] bg-blue-50 px-1 py-0.5 rounded-[4px] text-blue-600 border border-blue-100 font-bold">{variant?.name || c}</span>
+                                            })}
+                                        </div>
+                                    )}
+                                </td>
+                                <td className="px-4 py-3 text-right"><input type="number" className="w-14 bg-slate-50 border-none p-1.5 rounded-lg text-right font-black text-slate-700 outline-none text-xs" value={item.quantity} onChange={e => { if(!isFormWriteable) return; const u = [...items]; u[idx].quantity = parseInt(e.target.value) || 1; u[idx].totalKzt = u[idx].quantity * u[idx].priceKzt; setItems(u); }} disabled={!isFormWriteable}/></td>
+                                <td className="px-4 py-3 text-right font-mono font-bold text-slate-800"><input type="number" className={`w-28 p-1.5 rounded-lg text-right outline-none text-xs font-black ${canEditPrices ? 'bg-slate-50' : 'bg-transparent cursor-default'}`} value={item.priceKzt} onChange={e => { if(!canEditPrices) return; const u = [...items]; u[idx].priceKzt = parseFloat(e.target.value) || 0; u[idx].totalKzt = u[idx].quantity * u[idx].priceKzt; setItems(u); }} readOnly={!canEditPrices}/></td>
+                                <td className="px-6 py-3 text-right font-black text-slate-900 font-mono text-base">{f(item.totalKzt)} <span className="text-[9px] opacity-40">₸</span></td>
                                 <td className="px-4 py-3 text-center">{isFormWriteable && <button onClick={() => setItems(items.filter((_, i) => i !== idx))} className="text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>}</td>
                             </tr>
                         ))}

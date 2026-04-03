@@ -10,11 +10,12 @@ export class PricingService {
         if (!product || (product.type !== ProductType.MACHINE && product.type !== ProductType.PART)) return null;
 
         if (product.pricingProfileId) {
-            const match = (profiles || []).find(p => p.id === product.pricingProfileId);
+            const match = (profiles || []).find(p => p && p.id === product.pricingProfileId);
             if (match) return match;
         }
 
         return (profiles || []).find(p => {
+            if (!p) return false;
             const matchSupplier = !p.supplierId || p.supplierId === product.supplierId;
             const matchCategory = !p.applicableCategoryIds?.length || p.applicableCategoryIds.includes(product.categoryId || '');
             return matchSupplier && matchCategory;
@@ -23,63 +24,111 @@ export class PricingService {
 
     /**
      * Рассчитывает общую закупочную стоимость конфигурации.
+     * Логика: Базовая цена станка + (Сумма цен выбранных вариантов - Сумма цен базовых вариантов)
      */
     static calculateBundlePurchasePrice(
         machine: Product,
         selectedVariantIds: string[],
         allVariants: OptionVariant[],
-        exchangeRates: Record<Currency, number>
+        exchangeRates: Record<string, number>
     ): number {
+        if (!machine) return 0;
+        
         let totalPurchaseInMachineCurrency = Number(machine.basePrice) || 0;
-        const machineRate = exchangeRates[machine.currency] || 1;
+        const machineRate = (exchangeRates && exchangeRates[machine.currency]) || 1;
 
-        if (!machine.machineConfig || machine.machineConfig.length === 0) {
+        if (!machine.machineConfig || !Array.isArray(machine.machineConfig)) {
             return totalPurchaseInMachineCurrency;
         }
 
         machine.machineConfig.forEach(group => {
-            const defaultIds = [
+            if (!group || !group.typeId) return;
+
+            // 1. Считаем стоимость БАЗОВЫХ (дефолтных) опций для этой группы
+            const defaultIds = Array.from(new Set([
                 group.defaultVariantId,
                 ...(group.defaultVariantIds || [])
-            ].filter((id): id is string => !!id);
-            
-            const selectedInGroup = selectedVariantIds.filter(vid => {
-                const v = allVariants.find(av => av.id === vid);
-                return v && v.typeId === group.typeId;
-            });
+            ].filter((id): id is string => !!id)));
 
-            let baselinePriceInMachineCurrency = 0;
-            
+            let groupBaseCostInMachineCurrency = 0;
             defaultIds.forEach(defId => {
-                const defV = allVariants.find(v => v.id === defId);
+                const defV = (allVariants || []).find(v => v && v.id === defId);
                 if (defV) {
-                    const price = group.priceOverrides[defId] ?? defV.price;
-                    const defRate = exchangeRates[defV.currency] || 1;
-                    baselinePriceInMachineCurrency += (Number(price) || 0) * (defRate / machineRate);
+                    const price = group.priceOverrides?.[defId] ?? defV.price;
+                    const defRate = (exchangeRates && exchangeRates[defV.currency]) || 1;
+                    groupBaseCostInMachineCurrency += (Number(price) || 0) * (defRate / machineRate);
                 }
             });
 
-            if (selectedInGroup.length > 0) {
-                selectedInGroup.forEach((vid, index) => {
-                    const v = allVariants.find(av => av.id === vid);
-                    if (!v) return;
+            // 2. Считаем стоимость ТЕКУЩИХ ВЫБРАННЫХ опций для этой группы
+            const selectedInGroup = (selectedVariantIds || []).filter(vid => {
+                const v = (allVariants || []).find(av => av && av.id === vid);
+                return v && v.typeId === group.typeId;
+            });
 
-                    const price = group.priceOverrides[vid] ?? v.price;
-                    const vRate = exchangeRates[v.currency] || 1;
-                    const currentPriceInMachineCurrency = (Number(price) || 0) * (vRate / machineRate);
+            let groupCurrentCostInMachineCurrency = 0;
+            selectedInGroup.forEach(vid => {
+                const v = (allVariants || []).find(av => av && av.id === vid);
+                if (v) {
+                    const price = group.priceOverrides?.[vid] ?? v.price;
+                    const vRate = (exchangeRates && exchangeRates[v.currency]) || 1;
+                    groupCurrentCostInMachineCurrency += (Number(price) || 0) * (vRate / machineRate);
+                }
+            });
 
-                    if (index === 0 && defaultIds.length > 0) {
-                        totalPurchaseInMachineCurrency += (currentPriceInMachineCurrency - baselinePriceInMachineCurrency);
-                    } else {
-                        totalPurchaseInMachineCurrency += currentPriceInMachineCurrency;
-                    }
-                });
-            } else if (defaultIds.length > 0) {
-                totalPurchaseInMachineCurrency -= baselinePriceInMachineCurrency;
-            }
+            // 3. Добавляем разницу
+            totalPurchaseInMachineCurrency += (groupCurrentCostInMachineCurrency - groupBaseCostInMachineCurrency);
         });
 
         return isNaN(totalPurchaseInMachineCurrency) ? 0 : totalPurchaseInMachineCurrency;
+    }
+
+    /**
+     * Рассчитывает итоговый объем конфигурации.
+     * Логика аналогична цене: Базовый объем + (Выбранные - Дефолтные)
+     */
+    static calculateBundleVolume(
+        machine: Product,
+        selectedVariantIds: string[],
+        allVariants: OptionVariant[]
+    ): number {
+        if (!machine) return 0;
+        
+        // Базовый объем из workingVolumeM3 или суммы пакетов
+        const packagesVolume = (machine.packages || []).reduce((sum, p) => sum + (Number(p.volumeM3) || 0), 0);
+        let totalVolume = Number(machine.workingVolumeM3) || packagesVolume || 0;
+
+        if (!machine.machineConfig || !Array.isArray(machine.machineConfig)) {
+            return totalVolume;
+        }
+
+        machine.machineConfig.forEach(group => {
+            const defaultIds = Array.from(new Set([
+                group.defaultVariantId,
+                ...(group.defaultVariantIds || [])
+            ].filter((id): id is string => !!id)));
+
+            let groupBaseVolume = 0;
+            defaultIds.forEach(defId => {
+                const defV = (allVariants || []).find(v => v && v.id === defId);
+                if (defV) groupBaseVolume += (Number(defV.volumeM3) || 0);
+            });
+
+            const selectedInGroup = (selectedVariantIds || []).filter(vid => {
+                const v = (allVariants || []).find(av => av && av.id === vid);
+                return v && v.typeId === group.typeId;
+            });
+
+            let groupCurrentVolume = 0;
+            selectedInGroup.forEach(vid => {
+                const v = (allVariants || []).find(av => av && av.id === vid);
+                if (v) groupCurrentVolume += (Number(v.volumeM3) || 0);
+            });
+
+            totalVolume += (groupCurrentVolume - groupBaseVolume);
+        });
+
+        return isNaN(totalVolume) ? 0 : Math.max(0, totalVolume);
     }
 
     /**
@@ -88,12 +137,15 @@ export class PricingService {
     static calculateSmartPrice(
         product: Product,
         profile: PricingProfile | null,
-        exchangeRates: Record<Currency, number>,
+        exchangeRates: Record<string, number>,
         configVolumeM3?: number,
         configPurchaseForeign?: number,
         marginOverridePercent?: number
     ) {
-        const productRate = exchangeRates[product.currency as Currency] || 1;
+        if (!product) return { finalPrice: 0, purchaseKzt: 0, logisticsCn: 0, logisticsLocal: 0, svh: 0, brokerFees: 0, customsFees: 0, customs: 0, pnr: 0, deliveryLocal: 0, vat: 0, cit: 0, taxes: 0, bonus: 0, landedCost: 0, totalExpenses: 0, netProfit: 0 };
+        
+        const rates = exchangeRates || {};
+        const productRate = rates[product.currency as Currency] || 1;
         const basePrice = Number(configPurchaseForeign ?? product.basePrice) || 0;
         const purchaseKzt = basePrice * productRate;
 
@@ -111,22 +163,22 @@ export class PricingService {
             };
         }
 
-        const usdRate = exchangeRates[Currency.USD] || 1;
-        const productVolume = product.packages?.reduce((sum, p) => sum + (Number(p.volumeM3) || 0), 0) || 0;
+        const usdRate = rates[Currency.Usd] || 1;
+        const productVolume = (product.packages || []).reduce((sum, p) => sum + (Number(p?.volumeM3) || 0), 0) || product.workingVolumeM3 || 0;
         const volume = configVolumeM3 ?? productVolume;
         
         const batchVolume = Number(profile.batchVolumeM3) || 0;
 
-        const logisticsCnKzt = (Number(profile.logisticsRateUSD) || 0) * volume * usdRate;
+        const logisticsCnKzt = (Number(profile.logisticsRateUsd) || 0) * volume * usdRate;
         const volumeRatio = batchVolume > 0 ? (volume / batchVolume) : 0;
         
-        const logisticsKrKzt = volumeRatio * (Number(profile.batchShippingCostKZT) || 0);
-        const svhKzt = volumeRatio * (Number(profile.batchSvhCostKZT) || 0);
-        const brokerKzt = volumeRatio * (Number(profile.brokerCostKZT) || 0);
-        const feesKzt = volumeRatio * (Number(profile.customsFeesKZT) || 0);
+        const logisticsKrKzt = volumeRatio * (Number(profile.batchShippingCostKzt) || 0);
+        const svhKzt = volumeRatio * (Number(profile.batchSvhCostKzt) || 0);
+        const brokerKzt = volumeRatio * (Number(profile.brokerCostKzt) || 0);
+        const feesKzt = volumeRatio * (Number(profile.customsFeesKzt) || 0);
         
-        const pnrKzt = Number(profile.pnrCostKZT) || 0;
-        const deliveryLocalKzt = Number(profile.deliveryKZT) || 0;
+        const pnrKzt = Number(profile.pnrCostKzt) || 0;
+        const deliveryLocalKzt = Number(profile.deliveryKzt) || 0;
         
         const directCosts = purchaseKzt + logisticsCnKzt + logisticsKrKzt + svhKzt + brokerKzt + feesKzt + pnrKzt + deliveryLocalKzt;
 
@@ -187,13 +239,14 @@ export class PricingService {
         rates: Record<Currency, number>
     ) {
         const updates = products.map(p => {
+            if (!p) return null;
             const profile = this.findProfile(p, profiles);
             const pricing = this.calculateSmartPrice(p, profile, rates);
             return {
                 id: p.id,
                 salesPrice: pricing.finalPrice
             };
-        });
+        }).filter((u): u is {id: string, salesPrice: number} => !!u);
 
         for (const up of updates) {
             await ApiService.update('products', up.id, { salesPrice: up.salesPrice });

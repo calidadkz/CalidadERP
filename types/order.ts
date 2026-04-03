@@ -1,6 +1,12 @@
 import { Currency } from "./currency";
 import { OrderStatus, ProductType } from "./enums";
 
+export interface OrderDocument {
+    name: string;
+    url: string;
+    uploadedAt: string;
+}
+
 export interface OrderItem {
     productId: string;
     productName: string;
@@ -9,7 +15,7 @@ export interface OrderItem {
     quantity: number;
     productBasePrice: number;
     productCurrency: Currency;
-    exchange_rate_to_order_currency: number;
+    exchangeRateToOrderCurrency: number;
     priceForeign: number;
     totalForeign: number;
     configuration?: string[];
@@ -18,6 +24,7 @@ export interface OrderItem {
 
 export interface SupplierOrder {
     id: string;
+    name?: string; // Название заказа
     date: string;
     supplierId: string;
     supplierName: string;
@@ -26,11 +33,15 @@ export interface SupplierOrder {
     status: OrderStatus;
     items: OrderItem[];
     totalAmountForeign: number;
-    totalAmountKZT_Est: number;
+    totalAmountKztEst: number;
     paidAmountForeign: number;
-    totalPaidKZT: number;
+    totalPaidKzt: number;
     receivedItemCount: number;
     totalItemCount: number;
+    contractUrl?: string;
+    contractName?: string;
+    additionalDocuments?: OrderDocument[];
+    isDeleted?: boolean; // Пометка на удаление
 }
 
 export interface SalesOrderItem {
@@ -40,22 +51,26 @@ export interface SalesOrderItem {
     productName: string;
     sku: string;
     quantity: number;
-    priceKZT: number;
-    totalKZT: number;
+    priceKzt: number;
+    totalKzt: number;
     configuration?: string[];
+    preCalcItemId?: string; // Связь с позицией предрасчета
 }
 
 export interface SalesOrder {
     id: string;
+    name?: string; // Название заказа
     date: string;
     clientId: string;
     clientName: string;
     items: SalesOrderItem[];
     status: OrderStatus;
-    total_amount?: number; 
     totalAmount: number;
     paidAmount: number;
-    shippedItem_count?: number; 
     shippedItemCount: number;
     totalItemCount: number;
+    contractUrl?: string;
+    contractName?: string;
+    additionalDocuments?: OrderDocument[];
+    isDeleted?: boolean; // Пометка на удаление
 }

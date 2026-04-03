@@ -32,6 +32,12 @@ export const ProcurementPage: React.FC = () => {
         setView('list');
     };
 
+    const handleDeleteOrder = (order: SupplierOrder) => {
+        if (confirm(`Вы уверены, что хотите переместить заказ "${order.name || order.id}" в корзину? Все связанные ПП также будут помечены на удаление.`)) {
+            actions.deleteOrder(order.id);
+        }
+    };
+
     const editingPayments = editingOrder 
         ? state.plannedPayments.filter(p => p.sourceDocId === editingOrder.id)
         : [];
@@ -68,6 +74,7 @@ export const ProcurementPage: React.FC = () => {
                     setSupplierFilter={setSupplierFilter} 
                     plannedPayments={state.plannedPayments} 
                     onEdit={handleEditOrder}
+                    onDelete={handleDeleteOrder}
                 />
             ) : (
                 <OrderForm 

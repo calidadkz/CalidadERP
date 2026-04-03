@@ -71,17 +71,17 @@ export const PricingManagerPage: React.FC = () => {
             name: p.name,
             applicableCategoryIds: p.applicableCategoryIds.join(','),
             supplierId: p.supplierId || '',
-            logisticsRateUSD: p.logisticsRateUSD,
+            logisticsRateUsd: p.logisticsRateUsd,
             batchVolumeM3: p.batchVolumeM3,
-            batchShippingCostKZT: p.batchShippingCostKZT,
-            batchSvhCostKZT: p.batchSvhCostKZT,
-            brokerCostKZT: p.brokerCostKZT,
-            customsFeesKZT: p.customsFeesKZT,
+            batchShippingCostKzt: p.batchShippingCostKzt,
+            batchSvhCostKzt: p.batchSvhCostKzt,
+            brokerCostKzt: p.brokerCostKzt,
+            customsFeesKzt: p.customsFeesKzt,
             vatRate: p.vatRate,
             citRate: p.citRate,
             salesBonusRate: p.salesBonusRate,
-            pnrCostKZT: p.pnrCostKZT,
-            deliveryKZT: p.deliveryKZT,
+            pnrCostKzt: p.pnrCostKzt,
+            deliveryKzt: p.deliveryKzt,
             targetNetMarginPercent: p.targetNetMarginPercent,
         }));
 
@@ -117,7 +117,7 @@ export const PricingManagerPage: React.FC = () => {
             const row = rows[i].trim();
             if (!row) continue;
             
-            const [name, applicableCategoryIds, supplierId, logisticsRateUSD, batchVolumeM3, batchShippingCostKZT, batchSvhCostKZT, brokerCostKZT, customsFeesKZT, vatRate, citRate, salesBonusRate, pnrCostKZT, deliveryKZT, targetNetMarginPercent] = row.split(';');
+            const [name, applicableCategoryIds, supplierId, logisticsRateUsd, batchVolumeM3, batchShippingCostKzt, batchSvhCostKzt, brokerCostKzt, customsFeesKzt, vatRate, citRate, salesBonusRate, pnrCostKzt, deliveryKzt, targetNetMarginPercent] = row.split(';');
             
             const profileName = name.trim();
             if (!profileName) {
@@ -129,18 +129,18 @@ export const PricingManagerPage: React.FC = () => {
                 name: profileName,
                 applicableCategoryIds: applicableCategoryIds.split(',').map(id => id.trim()).filter(Boolean),
                 supplierId: supplierId.trim() || undefined,
-                logisticsRateUSD: parseFloat(logisticsRateUSD),
-                batchVolumeM3: parseFloat(batchVolumeM3),
-                batchShippingCostKZT: parseFloat(batchShippingCostKZT),
-                batchSvhCostKZT: parseFloat(batchSvhCostKZT),
-                brokerCostKZT: parseFloat(brokerCostKZT),
-                customsFeesKZT: parseFloat(customsFeesKZT),
-                vatRate: parseFloat(vatRate),
-                citRate: parseFloat(citRate),
-                salesBonusRate: parseFloat(salesBonusRate),
-                pnrCostKZT: parseFloat(pnrCostKZT),
-                deliveryKZT: parseFloat(deliveryKZT),
-                targetNetMarginPercent: parseFloat(targetNetMarginPercent),
+                logisticsRateUsd: parseFloat(logisticsRateUsd) || 0,
+                batchVolumeM3: parseFloat(batchVolumeM3) || 0,
+                batchShippingCostKzt: parseFloat(batchShippingCostKzt) || 0,
+                batchSvhCostKzt: parseFloat(batchSvhCostKzt) || 0,
+                brokerCostKzt: parseFloat(brokerCostKzt) || 0,
+                customsFeesKzt: parseFloat(customsFeesKzt) || 0,
+                vatRate: parseFloat(vatRate) || 0,
+                citRate: parseFloat(citRate) || 0,
+                salesBonusRate: parseFloat(salesBonusRate) || 0,
+                pnrCostKzt: parseFloat(pnrCostKzt) || 0,
+                deliveryKzt: parseFloat(deliveryKzt) || 0,
+                targetNetMarginPercent: parseFloat(targetNetMarginPercent) || 0,
             };
 
             const existing = pricingProfiles.find(p => p.name.toLowerCase() === profileName.toLowerCase());
@@ -332,10 +332,10 @@ const PricingProfileModal: React.FC<PricingProfileModalProps> = ({ profileId, on
         } else {
             setProfile({
                 name: '', type: ProductType.MACHINE, applicableCategoryIds: [],
-                logisticsRateUSD: 160, batchVolumeM3: 70, batchShippingCostKZT: 1200000,
-                batchSvhCostKZT: 250000, brokerCostKZT: 150000, customsFeesKZT: 60000,
-                vatRate: 12, citRate: 20, salesBonusRate: 1, pnrCostKZT: 50000,
-                deliveryKZT: 100000, targetNetMarginPercent: 25
+                logisticsRateUsd: 160, batchVolumeM3: 70, batchShippingCostKzt: 1200000,
+                batchSvhCostKzt: 250000, brokerCostKzt: 150000, customsFeesKzt: 60000,
+                vatRate: 12, citRate: 20, salesBonusRate: 1, pnrCostKzt: 50000,
+                deliveryKzt: 100000, targetNetMarginPercent: 25
             });
         }
     }, [profileId, pricingProfiles, categories]);
@@ -353,6 +353,10 @@ const PricingProfileModal: React.FC<PricingProfileModalProps> = ({ profileId, on
     }, [profile?.type, categories]);
 
     const handleChange = (field: keyof PricingProfile, value: any) => {
+        // Если это числовое поле и значение NaN, превращаем его в 0 для стейта
+        if (typeof value === 'number' && isNaN(value)) {
+            value = 0;
+        }
         if (profile) setProfile(prev => ({ ...prev, [field]: value }));
     };
 
@@ -362,13 +366,29 @@ const PricingProfileModal: React.FC<PricingProfileModalProps> = ({ profileId, on
             return;
         }
     
-        // Exclude the 'type' property as it's not a real DB column
-        const { type, ...profileToSave } = profile;
+        // Ensure all numeric fields are present and valid numbers (not NaN)
+        const profileWithDefaults = {
+            ...profile,
+            logisticsRateUsd: Number(profile.logisticsRateUsd) || 0,
+            batchVolumeM3: Number(profile.batchVolumeM3) || 0,
+            batchShippingCostKzt: Number(profile.batchShippingCostKzt) || 0,
+            batchSvhCostKzt: Number(profile.batchSvhCostKzt) || 0,
+            brokerCostKzt: Number(profile.brokerCostKzt) || 0,
+            customsFeesKzt: Number(profile.customsFeesKzt) || 0,
+            vatRate: Number(profile.vatRate) || 0,
+            citRate: Number(profile.citRate) || 0,
+            salesBonusRate: Number(profile.salesBonusRate) || 0,
+            pnrCostKzt: Number(profile.pnrCostKzt) || 0,
+            deliveryKzt: Number(profile.deliveryKzt) || 0,
+            targetNetMarginPercent: Number(profile.targetNetMarginPercent) || 0,
+            applicableCategoryIds: profile.applicableCategoryIds || []
+        };
+
+        const { type, ...profileToSave } = profileWithDefaults;
     
         if (profileId) {
             await actions.updatePricingProfile(profileToSave as PricingProfile);
         } else {
-            // For new profiles, don't send an ID. DB will generate it.
             const { id, ...newProfileData } = profileToSave;
             await actions.addPricingProfile(newProfileData as any);
         }
@@ -408,37 +428,37 @@ const PricingProfileModal: React.FC<PricingProfileModalProps> = ({ profileId, on
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                         <FormCard title="Логистика" icon={<Truck size={16}/>} color="blue">
-                            <StyledInput label="Тариф Китай ($/m³)" value={profile.logisticsRateUSD || ''} onChange={e => handleChange('logisticsRateUSD', parseFloat(e.target.value))} type="number" />
+                            <StyledInput label="Тариф Китай ($/m³)" value={profile.logisticsRateUsd ?? ''} onChange={e => handleChange('logisticsRateUsd', parseFloat(e.target.value))} type="number" />
                             <div className="grid grid-cols-2 gap-3">
-                                <StyledInput label="Объем партии (m³)" value={profile.batchVolumeM3 || ''} onChange={e => handleChange('batchVolumeM3', parseFloat(e.target.value))} type="number" />
-                                <StyledInput label="Доставка КРГ (₸)" value={profile.batchShippingCostKZT || ''} onChange={e => handleChange('batchShippingCostKZT', parseFloat(e.target.value))} type="number" />
+                                <StyledInput label="Объем партии (m³)" value={profile.batchVolumeM3 ?? ''} onChange={e => handleChange('batchVolumeM3', parseFloat(e.target.value))} type="number" />
+                                <StyledInput label="Доставка КРГ (₸)" value={profile.batchShippingCostKzt ?? ''} onChange={e => handleChange('batchShippingCostKzt', parseFloat(e.target.value))} type="number" />
                             </div>
-                            <StyledInput label="Терминал/СВХ (₸)" value={profile.batchSvhCostKZT || ''} onChange={e => handleChange('batchSvhCostKZT', parseFloat(e.target.value))} type="number" />
+                            <StyledInput label="Терминал/СВХ (₸)" value={profile.batchSvhCostKzt ?? ''} onChange={e => handleChange('batchSvhCostKzt', parseFloat(e.target.value))} type="number" />
                         </FormCard>
 
                         <FormCard title="Налоги / Таможня" icon={<Landmark size={16}/>} color="orange">
                             <div className="grid grid-cols-2 gap-3">
-                                <StyledInput label="Брокер (₸)" value={profile.brokerCostKZT || ''} onChange={e => handleChange('brokerCostKZT', parseFloat(e.target.value))} type="number" />
-                                <StyledInput label="Сборы (₸)" value={profile.customsFeesKZT || ''} onChange={e => handleChange('customsFeesKZT', parseFloat(e.target.value))} type="number"/>
+                                <StyledInput label="Брокер (₸)" value={profile.brokerCostKzt ?? ''} onChange={e => handleChange('brokerCostKzt', parseFloat(e.target.value))} type="number" />
+                                <StyledInput label="Сборы (₸)" value={profile.customsFeesKzt ?? ''} onChange={e => handleChange('customsFeesKzt', parseFloat(e.target.value))} type="number"/>
                             </div>
                             <div className="grid grid-cols-2 gap-3 p-2 bg-orange-50/50 rounded-lg">
-                                <StyledInput label="НДС (%)" value={profile.vatRate || ''} onChange={e => handleChange('vatRate', parseFloat(e.target.value))} type="number" />
-                                <StyledInput label="КПН (%)" value={profile.citRate || ''} onChange={e => handleChange('citRate', parseFloat(e.target.value))} type="number" />
+                                <StyledInput label="НДС (%)" value={profile.vatRate ?? ''} onChange={e => handleChange('vatRate', parseFloat(e.target.value))} type="number" />
+                                <StyledInput label="КПН (%)" value={profile.citRate ?? ''} onChange={e => handleChange('citRate', parseFloat(e.target.value))} type="number" />
                             </div>
-                            <StyledInput label="Бонус Менеджера (%)" value={profile.salesBonusRate || ''} onChange={e => handleChange('salesBonusRate', parseFloat(e.target.value))} type="number" />
+                            <StyledInput label="Бонус Менеджера (%)" value={profile.salesBonusRate ?? ''} onChange={e => handleChange('salesBonusRate', parseFloat(e.target.value))} type="number" />
                         </FormCard>
                         
                         <div className="space-y-5">
                             <FormCard title="Сервис и Цель" icon={<Users size={16}/>} color="purple">
                                  <div className="grid grid-cols-2 gap-3">
-                                    <StyledInput label="ПНР (₸)" value={profile.pnrCostKZT || ''} onChange={e => handleChange('pnrCostKZT', parseFloat(e.target.value))} type="number" />
-                                    <StyledInput label="Доставка (₸)" value={profile.deliveryKZT || ''} onChange={e => handleChange('deliveryKZT', parseFloat(e.target.value))} type="number" />
+                                    <StyledInput label="ПНР (₸)" value={profile.pnrCostKzt ?? ''} onChange={e => handleChange('pnrCostKzt', parseFloat(e.target.value))} type="number" />
+                                    <StyledInput label="Доставка (₸)" value={profile.deliveryKzt ?? ''} onChange={e => handleChange('deliveryKzt', parseFloat(e.target.value))} type="number" />
                                 </div>
                             </FormCard>
                             <div className="bg-emerald-50/80 p-4 rounded-2xl border-2 border-emerald-300/50 shadow-sm text-center">
                                  <h3 className="text-xs font-black text-emerald-800 flex items-center justify-center gap-2 mb-2 uppercase tracking-wider"><Target size={14}/> Рентабельность</h3>
                                  <div className="relative flex items-center justify-center">
-                                     <input type="number" value={profile.targetNetMarginPercent || ''} onChange={e => handleChange('targetNetMarginPercent', parseFloat(e.target.value))} className="text-5xl font-black text-emerald-700 bg-transparent text-center w-full outline-none pr-10" placeholder="0" />
+                                     <input type="number" value={profile.targetNetMarginPercent ?? ''} onChange={e => handleChange('targetNetMarginPercent', parseFloat(e.target.value))} className="text-5xl font-black text-emerald-700 bg-transparent text-center w-full outline-none pr-10" placeholder="0" />
                                      <span className="text-4xl font-bold text-emerald-500/80">%</span>
                                  </div>
                             </div>
@@ -476,7 +496,11 @@ const PricingProfileModal: React.FC<PricingProfileModalProps> = ({ profileId, on
 const StyledInput: React.FC<any> = ({ label, ...props }) => (
     <div>
         <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">{label}</label>
-        <input {...props} className="w-full bg-white border border-slate-300/70 py-2 px-3 rounded-lg text-base font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-0 shadow-sm" />
+        <input 
+            {...props} 
+            value={typeof props.value === 'number' && isNaN(props.value) ? '' : props.value}
+            className="w-full bg-white border border-slate-300/70 py-2 px-3 rounded-lg text-base font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-0 shadow-sm" 
+        />
     </div>
 );
 

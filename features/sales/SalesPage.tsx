@@ -35,6 +35,12 @@ export const SalesPage: React.FC = () => {
         setView('list');
     };
 
+    const handleDeleteOrder = (order: SalesOrder) => {
+        if (confirm(`Вы уверены, что хотите переместить заказ клиента "${order.name || order.id}" в корзину? Все связанные ПП также будут помечены на удаление.`)) {
+            actions.deleteSalesOrder(order.id);
+        }
+    };
+
     const editingPayments = editingOrder 
         ? state.plannedPayments.filter(p => p.sourceDocId === editingOrder.id)
         : [];
@@ -63,7 +69,7 @@ export const SalesPage: React.FC = () => {
                     canEdit={access.canSee('actions', 'edit')}
                     canDelete={access.canWrite('actions', 'delete')}
                     onEdit={handleEditOrder}
-                    onDelete={(order) => actions.moveToTrash(order.id, 'Product' as any, `Заказ ЗК ${order.id.slice(-6)}`, order)}
+                    onDelete={handleDeleteOrder}
                 />
             ) : (
                 <SalesOrderForm 

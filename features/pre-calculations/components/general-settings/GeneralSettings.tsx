@@ -1,118 +1,191 @@
 import React from 'react';
-import type { GeneralSettings as IGeneralSettings } from '@/types/pre-calculations';
+import { GeneralSettings as GeneralSettingsType } from '@/types/pre-calculations';
+import { 
+  Truck, 
+  Globe, 
+  Banknote, 
+  Percent, 
+  Zap, 
+  BarChart3, 
+  DollarSign, 
+  ShieldAlert,
+  Target,
+  GanttChartSquare,
+  ArrowRightLeft,
+  Briefcase,
+  Coins,
+  Info
+} from 'lucide-react';
 
 interface GeneralSettingsProps {
-  settings: IGeneralSettings;
-  onSettingChange: (key: keyof IGeneralSettings, value: number | string) => void;
+  settings: GeneralSettingsType;
+  onSettingChange: (key: keyof GeneralSettingsType, value: number) => void;
 }
 
-export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
-  settings,
-  onSettingChange,
-}) => {
+const SettingRow = ({ label, icon: Icon, value, onChange, unit = "" }: any) => (
+  <div className="flex items-center justify-between gap-3 py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50/80 transition-colors px-2 rounded-lg group">
+    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+      <div className="p-1.5 bg-slate-100 rounded-md group-hover:bg-white transition-colors flex-shrink-0">
+        {Icon && <Icon size={14} className="text-slate-500" />}
+      </div>
+      <label className="text-[11px] font-bold text-slate-600 uppercase tracking-tight truncate" title={label}>
+        {label}
+      </label>
+    </div>
+    <div className="relative flex-shrink-0">
+      <input 
+        type="number" 
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+        className="w-24 sm:w-28 bg-slate-100 border border-slate-200 rounded-lg pl-8 pr-2 py-1.5 text-xs font-black text-slate-800 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none text-right shadow-inner"
+      />
+      {unit && (
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 pointer-events-none group-focus-within:text-blue-600 transition-colors uppercase">
+          {unit}
+        </span>
+      )}
+    </div>
+  </div>
+);
+
+const SettingsCard = ({ title, icon: Icon, children, colorClass = "text-blue-500" }: any) => (
+  <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3 hover:shadow-md transition-shadow h-fit">
+    <div className="flex items-center gap-2.5 mb-1">
+      <div className={`p-2 rounded-xl bg-slate-50 ${colorClass} shadow-inner`}>
+        <Icon size={16} />
+      </div>
+      <h3 className="font-black uppercase text-[10px] tracking-widest text-slate-400">{title}</h3>
+    </div>
+    <div className="flex flex-col gap-0.5">
+      {children}
+    </div>
+  </div>
+);
+
+export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, onSettingChange }) => {
   return (
-    <div className="p-4 border rounded shadow-md">
-      <h2 className="text-xl font-semibold mb-4">Общие настройки партии</h2>
-      <div className="space-y-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Тариф доставки по Китаю (USD/куб.м)</label>
-          <input
-            type="number"
-            value={settings.shippingChinaUsdPerM3}
-            onChange={(e) => onSettingChange('shippingChinaUsdPerM3', parseFloat(e.target.value))}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+    <div className="max-w-full mx-auto px-4 py-2 animate-in fade-in duration-500 overflow-y-auto max-h-[calc(100vh-140px)] custom-scrollbar">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        
+        {/* Logistics & Customs */}
+        <SettingsCard title="Логистика" icon={Truck} colorClass="text-blue-500">
+          <SettingRow 
+            label="Доставка из Китая" 
+            icon={Globe} 
+            value={settings.shippingChinaUsdPerM3} 
+            onChange={(v: number) => onSettingChange('shippingChinaUsdPerM3', v)}
+            unit="$" 
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Курс валюты для доставки</label>
-          <input
-            type="number"
-            value={settings.exchangeRateForShipping}
-            onChange={(e) => onSettingChange('exchangeRateForShipping', parseFloat(e.target.value))}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+          <SettingRow 
+            label="Курс логистики" 
+            icon={ArrowRightLeft} 
+            value={settings.exchangeRateForShipping} 
+            onChange={(v: number) => onSettingChange('exchangeRateForShipping', v)}
+            unit="₸" 
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Доставка Алмата-Караганда (KZT)</label>
-          <input
-            type="number"
-            value={settings.deliveryAlmatyKaragandaKzt}
-            onChange={(e) => onSettingChange('deliveryAlmatyKaragandaKzt', parseFloat(e.target.value))}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+          <SettingRow 
+            label="Доставка Алматы-Караганда (за м³)" // Изменена метка
+            icon={Truck} 
+            value={settings.deliveryAlmatyKaragandaKztPerM3} // Изменено поле
+            onChange={(v: number) => onSettingChange('deliveryAlmatyKaragandaKztPerM3', v)} // Изменен ключ
+            unit="₸ / м³" // Изменены единицы измерения
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">СВХ (KZT)</label>
-          <input
-            type="number"
-            value={settings.svhKzt}
-            onChange={(e) => onSettingChange('svhKzt', parseFloat(e.target.value))}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+          <SettingRow 
+            label="СВХ" 
+            icon={Briefcase} 
+            value={settings.svhKzt} 
+            onChange={(v: number) => onSettingChange('svhKzt', v)}
+            unit="₸" 
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Брокер (KZT)</label>
-          <input
-            type="number"
-            value={settings.brokerKzt}
-            onChange={(e) => onSettingChange('brokerKzt', parseFloat(e.target.value))}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+          <SettingRow 
+            label="Брокер" 
+            icon={Briefcase} 
+            value={settings.brokerKzt} 
+            onChange={(v: number) => onSettingChange('brokerKzt', v)}
+            unit="₸" 
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Таможенные сборы (KZT)</label>
-          <input
-            type="number"
-            value={settings.customsFeesKzt}
-            onChange={(e) => onSettingChange('customsFeesKzt', parseFloat(e.target.value))}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+          <SettingRow 
+            label="Тамож. сборы" 
+            icon={ArrowRightLeft} 
+            value={settings.customsFeesKzt} 
+            onChange={(v: number) => onSettingChange('customsFeesKzt', v)}
+            unit="₸" 
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">НДС (%)</label>
-          <input
-            type="number"
-            value={settings.ndsRate}
-            onChange={(e) => onSettingChange('ndsRate', parseFloat(e.target.value))}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+        </SettingsCard>
+
+        {/* Financial Rates */}
+        <SettingsCard title="Валюты" icon={Coins} colorClass="text-emerald-500">
+          <SettingRow 
+            label="Курс USD" 
+            icon={ArrowRightLeft} 
+            value={settings.exchangeRateUsd} 
+            onChange={(v: number) => onSettingChange('exchangeRateUsd', v)}
+            unit="₸" 
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">КПН 20% (Общеустановленный режим)</label>
-          <input
-            type="number"
-            value={settings.kpn20Rate}
-            onChange={(e) => onSettingChange('kpn20Rate', parseFloat(e.target.value))}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+          <SettingRow 
+            label="Курс CNY" 
+            icon={ArrowRightLeft} 
+            value={settings.exchangeRateCny} 
+            onChange={(v: number) => onSettingChange('exchangeRateCny', v)}
+            unit="₸" 
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">КПН 4% (Упрощенный режим)</label>
-          <input
-            type="number"
-            value={settings.kpn4Rate}
-            onChange={(e) => onSettingChange('kpn4Rate', parseFloat(e.target.value))}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+        </SettingsCard>
+
+        {/* Taxes */}
+        <SettingsCard title="Налоги" icon={ShieldAlert} colorClass="text-orange-500">
+          <SettingRow 
+            label="НДС" 
+            icon={ShieldAlert} 
+            value={settings.ndsRate} 
+            onChange={(v: number) => onSettingChange('ndsRate', v)}
+            unit="%" 
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Наценка при перепродаже (%)</label>
-          <input
-            type="number"
-            value={settings.resaleMarkup}
-            onChange={(e) => onSettingChange('resaleMarkup', parseFloat(e.target.value))}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+          <SettingRow 
+            label="КПН (Общий)" 
+            icon={BarChart3} 
+            value={settings.kpn20Rate} 
+            onChange={(v: number) => onSettingChange('kpn20Rate', v)}
+            unit="%" 
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Бонус Отделу продаж (%)</label>
-          <input
-            type="number"
-            value={settings.salesBonusRate}
-            onChange={(e) => onSettingChange('salesBonusRate', parseFloat(e.target.value))}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+          <SettingRow 
+            label="КПН (Упр.)" 
+            icon={BarChart3} 
+            value={settings.kpn4Rate} 
+            onChange={(v: number) => onSettingChange('kpn4Rate', v)}
+            unit="%" 
           />
+        </SettingsCard>
+
+        {/* Commercial */}
+        <div className="space-y-4">
+          <SettingsCard title="Коммерция" icon={Target} colorClass="text-purple-500">
+            <SettingRow 
+              label="Наценка (ресейл)" 
+              icon={Target} 
+              value={settings.resaleMarkup} 
+              onChange={(v: number) => onSettingChange('resaleMarkup', v)}
+              unit="%" 
+            />
+            <SettingRow 
+              label="Бонус ОП" 
+              icon={Briefcase} 
+              value={settings.salesBonusRate} 
+              onChange={(v: number) => onSettingChange('salesBonusRate', v)}
+              unit="%" 
+            />
+          </SettingsCard>
+
+          <div className="bg-slate-900 rounded-2xl p-4 text-white shadow-lg border border-slate-800">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-600 rounded-lg">
+                <Info size={14} className="text-white" />
+              </div>
+              <h4 className="font-black uppercase text-[9px] tracking-widest text-blue-400">Информация</h4>
+            </div>
+            <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Изменения применяются мгновенно ко всем позициям партии.</p>
+          </div>
         </div>
+
       </div>
     </div>
   );

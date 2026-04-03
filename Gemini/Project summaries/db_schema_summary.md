@@ -1,6 +1,6 @@
 # 🗄️ Database Schema Summary
 
-Generated on: Mon, 16 Mar 2026 13:05:13 GMT
+Generated on: Thu, 02 Apr 2026 11:23:59 GMT
 
 ### 📄 Table: `shipments`
 | Column | Type | Nullable | Default |
@@ -63,70 +63,6 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | `quantity` | `numeric` | NO | - |
 
 ---
-### 📄 Table: `pre_calculations`
-| Column | Type | Nullable | Default |
-| :--- | :--- | :--- | :--- |
-| `id` | `text` | NO | - |
-| `name` | `text` | NO | - |
-| `date` | `timestamp with time zone` | YES | now() |
-| `status` | `text` | NO | 'Draft'::text |
-| `tax_scheme` | `text` | NO | - |
-| `exchange_rate_usd_kzt` | `numeric` | NO | 450 |
-| `shipping_china_usd` | `numeric` | NO | 0 |
-| `shipping_karaganda_kzt` | `numeric` | NO | 0 |
-| `svh_kzt` | `numeric` | NO | 0 |
-| `broker_kzt` | `numeric` | NO | 0 |
-| `customs_fees_kzt` | `numeric` | NO | 0 |
-| `customs_vat_kzt` | `numeric` | NO | 0 |
-| `total_volume_m3` | `numeric` | YES | 0 |
-| `total_weight_kg` | `numeric` | YES | 0 |
-| `notes` | `text` | YES | - |
-| `updated_at` | `timestamp with time zone` | YES | now() |
-| `exchange_rate_cny_kzt` | `numeric` | YES | 63 |
-| `cit_rate_standard` | `numeric` | YES | 20 |
-| `cit_rate_simplified` | `numeric` | YES | 3 |
-| `vat_rate` | `numeric` | YES | 16 |
-| `intercompany_markup_percent` | `numeric` | YES | 1 |
-
----
-### 📄 Table: `pre_calculation_items`
-| Column | Type | Nullable | Default |
-| :--- | :--- | :--- | :--- |
-| `id` | `text` | NO | - |
-| `pre_calculation_id` | `text` | YES | - |
-| `product_id` | `text` | YES | - |
-| `product_name` | `text` | NO | - |
-| `sku` | `text` | YES | - |
-| `order_id` | `text` | YES | - |
-| `client_id` | `text` | YES | - |
-| `client_name` | `text` | YES | - |
-| `type` | `text` | NO | 'Stock'::text |
-| `quantity` | `integer` | NO | 1 |
-| `supplier_price_usd` | `numeric` | NO | 0 |
-| `selling_price_kzt` | `numeric` | NO | 0 |
-| `length_mm` | `numeric` | YES | 0 |
-| `width_mm` | `numeric` | YES | 0 |
-| `height_mm` | `numeric` | YES | 0 |
-| `weight_kg` | `numeric` | YES | 0 |
-| `volume_m3` | `numeric` | YES | 0 |
-| `purchase_kzt` | `numeric` | YES | 0 |
-| `logistics_cn_kzt` | `numeric` | YES | 0 |
-| `logistics_local_kzt` | `numeric` | YES | 0 |
-| `svh_kzt` | `numeric` | YES | 0 |
-| `broker_kzt` | `numeric` | YES | 0 |
-| `customs_fees_kzt` | `numeric` | YES | 0 |
-| `customs_vat_kzt` | `numeric` | YES | 0 |
-| `pnr_kzt` | `numeric` | YES | 0 |
-| `delivery_local_kzt` | `numeric` | YES | 0 |
-| `advertising_kzt` | `numeric` | YES | 0 |
-| `bonus_kzt` | `numeric` | YES | 0 |
-| `tax_kzt` | `numeric` | YES | 0 |
-| `vat_kzt` | `numeric` | YES | 0 |
-| `total_expenses_kzt` | `numeric` | YES | 0 |
-| `profit_kzt` | `numeric` | YES | 0 |
-| `margin_percent` | `numeric` | YES | 0 |
-
----
 ### 📄 Table: `packing_places`
 | Column | Type | Nullable | Default |
 | :--- | :--- | :--- | :--- |
@@ -163,6 +99,7 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | `price_kzt` | `numeric` | NO | - |
 | `total_kzt` | `numeric` | NO | - |
 | `configuration` | `ARRAY` | YES | '{}'::text[] |
+| `pre_calc_item_id` | `text` | YES | - |
 
 ---
 ### 📄 Table: `pricing_profile_categories`
@@ -170,40 +107,6 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | :--- | :--- | :--- | :--- |
 | `profile_id` | `uuid` | NO | - |
 | `category_id` | `text` | NO | - |
-
----
-### 📄 Table: `pre_calculation_packages`
-| Column | Type | Nullable | Default |
-| :--- | :--- | :--- | :--- |
-| `id` | `uuid` | NO | gen_random_uuid() |
-| `pre_calculation_id` | `text` | YES | - |
-| `package_number` | `integer` | NO | - |
-| `length_mm` | `numeric` | YES | - |
-| `width_mm` | `numeric` | YES | - |
-| `height_mm` | `numeric` | YES | - |
-| `weight_kg` | `numeric` | YES | - |
-| `volume_m3` | `numeric` | YES | - |
-| `description` | `text` | YES | - |
-| `items` | `jsonb` | YES | '[]'::jsonb |
-| `created_at` | `timestamp with time zone` | YES | now() |
-
----
-### 📄 Table: `manufacturers`
-| Column | Type | Nullable | Default |
-| :--- | :--- | :--- | :--- |
-| `id` | `text` | NO | - |
-| `name` | `text` | NO | - |
-| `country` | `text` | YES | - |
-| `description` | `text` | YES | - |
-| `legal_address` | `text` | YES | - |
-| `bin_iin` | `text` | YES | - |
-| `iik` | `text` | YES | - |
-| `bik` | `text` | YES | - |
-| `kbe` | `text` | YES | - |
-| `bank_name` | `text` | YES | - |
-| `director` | `text` | YES | - |
-| `legal_email` | `text` | YES | - |
-| `updated_at` | `timestamp with time zone` | YES | now() |
 
 ---
 ### 📄 Table: `role_permissions`
@@ -260,6 +163,26 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | `manufacturer` | `text` | YES | - |
 
 ---
+### 📄 Table: `sales_orders`
+| Column | Type | Nullable | Default |
+| :--- | :--- | :--- | :--- |
+| `id` | `text` | NO | - |
+| `date` | `date` | YES | CURRENT_DATE |
+| `client_id` | `text` | YES | - |
+| `status` | `text` | NO | - |
+| `total_amount` | `numeric` | YES | 0 |
+| `shipped_item_count` | `integer` | YES | 0 |
+| `total_item_count` | `integer` | YES | 0 |
+| `updated_at` | `timestamp with time zone` | YES | now() |
+| `client_name` | `text` | YES | - |
+| `paid_amount` | `numeric` | YES | 0 |
+| `contract_url` | `text` | YES | - |
+| `contract_name` | `text` | YES | - |
+| `additional_documents` | `jsonb` | YES | '[]'::jsonb |
+| `name` | `text` | YES | - |
+| `is_deleted` | `boolean` | YES | false |
+
+---
 ### 📄 Table: `option_variants`
 | Column | Type | Nullable | Default |
 | :--- | :--- | :--- | :--- |
@@ -279,6 +202,7 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | `volume_m3` | `numeric` | YES | - |
 | `supplier_product_name` | `text` | YES | - |
 | `description` | `text` | YES | - |
+| `image_url` | `text` | YES | - |
 
 ---
 ### 📄 Table: `internal_orders`
@@ -366,6 +290,30 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | `legal_email` | `text` | YES | - |
 
 ---
+### 📄 Table: `pre_calculations`
+| Column | Type | Nullable | Default |
+| :--- | :--- | :--- | :--- |
+| `id` | `text` | NO | - |
+| `name` | `text` | NO | - |
+| `date` | `timestamp with time zone` | YES | now() |
+| `status` | `text` | NO | 'Draft'::text |
+| `shipping_china_usd` | `numeric` | NO | 150 |
+| `exchange_rate_shipping` | `numeric` | NO | 450 |
+| `shipping_karaganda_kzt` | `numeric` | NO | 200000 |
+| `svh_kzt` | `numeric` | NO | 100000 |
+| `broker_kzt` | `numeric` | NO | 104000 |
+| `customs_fees_kzt` | `numeric` | NO | 52000 |
+| `exchange_rate_usd_kzt` | `numeric` | NO | 450 |
+| `exchange_rate_cny_kzt` | `numeric` | NO | 63 |
+| `vat_rate` | `numeric` | NO | 12 |
+| `cit_rate_standard` | `numeric` | NO | 20 |
+| `cit_rate_simplified` | `numeric` | NO | 4 |
+| `intercompany_markup_percent` | `numeric` | NO | 25 |
+| `sales_bonus_rate` | `numeric` | NO | 0 |
+| `notes` | `text` | YES | - |
+| `updated_at` | `timestamp with time zone` | YES | now() |
+
+---
 ### 📄 Table: `employees`
 | Column | Type | Nullable | Default |
 | :--- | :--- | :--- | :--- |
@@ -382,6 +330,61 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | `director` | `text` | YES | - |
 | `legal_email` | `text` | YES | - |
 | `updated_at` | `timestamp with time zone` | YES | now() |
+
+---
+### 📄 Table: `pre_calculation_items`
+| Column | Type | Nullable | Default |
+| :--- | :--- | :--- | :--- |
+| `id` | `text` | NO | - |
+| `pre_calculation_id` | `text` | YES | - |
+| `product_id` | `text` | YES | - |
+| `order_id` | `text` | YES | - |
+| `client_name` | `text` | YES | - |
+| `product_name` | `text` | NO | - |
+| `sku` | `text` | YES | - |
+| `type` | `text` | NO | 'PART'::text |
+| `manufacturer` | `text` | YES | - |
+| `hs_code` | `text` | YES | - |
+| `quantity` | `integer` | NO | 1 |
+| `supplier_name` | `text` | YES | - |
+| `supplier_price_usd` | `numeric` | NO | 0 |
+| `purchase_currency` | `text` | YES | 'USD'::text |
+| `selling_price_kzt` | `numeric` | NO | 0 |
+| `is_revenue_confirmed` | `boolean` | YES | false |
+| `pnr_kzt` | `numeric` | YES | 0 |
+| `delivery_local_kzt` | `numeric` | YES | 0 |
+| `margin_percent` | `numeric` | YES | 0 |
+| `tax_regime` | `text` | YES | 'Общ.'::text |
+| `volume_m3` | `numeric` | YES | 0 |
+| `weight_kg` | `numeric` | YES | 0 |
+| `use_dimensions` | `boolean` | YES | true |
+| `purchase_kzt` | `numeric` | YES | - |
+| `delivery_china_kzt` | `numeric` | YES | - |
+| `logistics_local_kzt` | `numeric` | YES | - |
+| `customs_nds_kzt` | `numeric` | YES | - |
+| `total_nds_kzt` | `numeric` | YES | - |
+| `nds_difference_kzt` | `numeric` | YES | - |
+| `kpn_kzt` | `numeric` | YES | - |
+| `sales_bonus_kzt` | `numeric` | YES | - |
+| `full_cost_kzt` | `numeric` | YES | - |
+| `profit_kzt` | `numeric` | YES | - |
+| `updated_at` | `timestamp with time zone` | YES | now() |
+| `options` | `jsonb` | YES | '[]'::jsonb |
+
+---
+### 📄 Table: `pre_calculation_packages`
+| Column | Type | Nullable | Default |
+| :--- | :--- | :--- | :--- |
+| `id` | `text` | NO | - |
+| `pre_calculation_id` | `text` | YES | - |
+| `package_number` | `integer` | NO | - |
+| `length_mm` | `numeric` | YES | 0 |
+| `width_mm` | `numeric` | YES | 0 |
+| `height_mm` | `numeric` | YES | 0 |
+| `weight_kg` | `numeric` | YES | 0 |
+| `volume_m3` | `numeric` | YES | 0 |
+| `items` | `jsonb` | YES | '[]'::jsonb |
+| `created_at` | `timestamp with time zone` | YES | now() |
 
 ---
 ### 📄 Table: `shipment_items`
@@ -432,6 +435,8 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | `actual_payment_id` | `text` | NO | - |
 | `planned_payment_id` | `text` | NO | - |
 | `amount_covered` | `numeric` | NO | - |
+| `cash_flow_item_id` | `uuid` | YES | - |
+| `target_bank_account_id` | `text` | YES | - |
 
 ---
 ### 📄 Table: `planned_payments`
@@ -449,6 +454,7 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | `due_date` | `date` | YES | - |
 | `is_paid` | `boolean` | YES | false |
 | `cash_flow_item_id` | `uuid` | YES | - |
+| `is_deleted` | `boolean` | YES | false |
 
 ---
 ### 📄 Table: `supplier_order_items`
@@ -530,6 +536,7 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | `iik` | `text` | YES | - |
 | `bik` | `text` | YES | - |
 | `kbe` | `text` | YES | - |
+| `roles` | `ARRAY` | YES | '{}'::text[] |
 
 ---
 ### 📄 Table: `counterparty_accounts`
@@ -537,7 +544,6 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | :--- | :--- | :--- | :--- |
 | `id` | `uuid` | NO | gen_random_uuid() |
 | `counterparty_id` | `text` | NO | - |
-| `name` | `text` | NO | - |
 | `iik` | `text` | NO | - |
 | `bik` | `text` | NO | - |
 | `bank_name` | `text` | NO | - |
@@ -545,6 +551,19 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | `is_default` | `boolean` | NO | false |
 | `created_at` | `timestamp with time zone` | NO | now() |
 | `updated_at` | `timestamp with time zone` | NO | now() |
+
+---
+### 📄 Table: `batches`
+| Column | Type | Nullable | Default |
+| :--- | :--- | :--- | :--- |
+| `id` | `text` | NO | - |
+| `pre_calculation_id` | `text` | YES | - |
+| `name` | `text` | NO | - |
+| `status` | `text` | YES | 'active'::text |
+| `date` | `timestamp with time zone` | YES | now() |
+| `updated_at` | `timestamp with time zone` | YES | now() |
+| `total_planned_profit` | `numeric` | YES | - |
+| `total_actual_profit` | `numeric` | YES | - |
 
 ---
 ### 📄 Table: `supplier_orders`
@@ -564,6 +583,11 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | `total_amount_kzt_est` | `numeric` | YES | 0 |
 | `paid_amount_foreign` | `numeric` | YES | 0 |
 | `total_paid_kzt` | `numeric` | YES | 0 |
+| `contract_url` | `text` | YES | - |
+| `contract_name` | `text` | YES | - |
+| `additional_documents` | `jsonb` | YES | '[]'::jsonb |
+| `name` | `text` | YES | - |
+| `is_deleted` | `boolean` | YES | false |
 
 ---
 ### 📄 Table: `receptions`
@@ -592,19 +616,28 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | `target_item_id` | `uuid` | YES | - |
 
 ---
-### 📄 Table: `sales_orders`
+### 📄 Table: `batch_item_actuals`
 | Column | Type | Nullable | Default |
 | :--- | :--- | :--- | :--- |
 | `id` | `text` | NO | - |
-| `date` | `date` | YES | CURRENT_DATE |
-| `client_id` | `text` | YES | - |
-| `status` | `text` | NO | - |
-| `total_amount` | `numeric` | YES | 0 |
-| `shipped_item_count` | `integer` | YES | 0 |
-| `total_item_count` | `integer` | YES | 0 |
-| `updated_at` | `timestamp with time zone` | YES | now() |
-| `client_name` | `text` | YES | - |
-| `paid_amount` | `numeric` | YES | 0 |
+| `batch_id` | `text` | YES | - |
+| `pre_calculation_item_id` | `text` | YES | - |
+| `actual_revenue_kzt` | `numeric` | YES | 0 |
+| `actual_purchase_kzt` | `numeric` | YES | 0 |
+
+---
+### 📄 Table: `batch_expenses`
+| Column | Type | Nullable | Default |
+| :--- | :--- | :--- | :--- |
+| `id` | `text` | NO | - |
+| `batch_id` | `text` | YES | - |
+| `category` | `text` | NO | - |
+| `description` | `text` | YES | - |
+| `amount_kzt` | `numeric` | NO | 0 |
+| `date` | `timestamp with time zone` | YES | now() |
+| `payment_id` | `text` | YES | - |
+| `planned_payment_id` | `text` | YES | - |
+| `document_ids` | `ARRAY` | YES | - |
 
 ---
 ### 📄 Table: `products`
@@ -640,6 +673,7 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | `hs_code_id` | `text` | YES | - |
 | `pricing_method` | `text` | YES | 'Наценка (без НДС)'::text |
 | `packages` | `jsonb` | YES | '[]'::jsonb |
+| `image_url` | `text` | YES | - |
 
 ---
 ### 📄 Table: `bundles`
@@ -691,5 +725,18 @@ Generated on: Mon, 16 Mar 2026 13:05:13 GMT
 | `missing_qty` | `integer` | NO | - |
 | `reason` | `text` | YES | - |
 | `resolution` | `text` | YES | - |
+
+---
+### 📄 Table: `batch_documents`
+| Column | Type | Nullable | Default |
+| :--- | :--- | :--- | :--- |
+| `id` | `text` | NO | - |
+| `batch_id` | `text` | YES | - |
+| `name` | `text` | NO | - |
+| `url` | `text` | NO | - |
+| `type` | `text` | YES | - |
+| `size` | `integer` | YES | - |
+| `uploaded_at` | `timestamp with time zone` | YES | now() |
+| `uploaded_by` | `text` | YES | - |
 
 ---

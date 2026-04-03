@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { SalesOrder, Shipment, OrderStatus } from '@/types';
-import { ShoppingCart, ChevronDown } from 'lucide-react';
+import { ShoppingCart, User, Package, Calendar, ArrowRight } from 'lucide-react';
 
 interface PendingShipmentsProps {
     orders: SalesOrder[];
@@ -10,52 +10,80 @@ interface PendingShipmentsProps {
 }
 
 export const PendingShipments: React.FC<PendingShipmentsProps> = ({ orders, shipments, onSelect }) => {
-    const f = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    const f = (val: number) => val.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
     const eligibleOrders = orders.filter(o => {
-        if (o.status === OrderStatus.CLOSED) return false;
-        const totalOrdered = o.items.reduce((sum, i) => sum + (i.quantity || 0), 0);
+        if (o.status === OrderStatus.CLOSED || o.isDeleted) return false;
+        const totalOrdered = o.items.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
         const totalShipped = shipments
            .filter(s => s.salesOrderId === o.id && s.status === 'Posted')
-           .reduce((acc, s) => acc + (s.items || []).reduce((sum, i) => sum + (i.qtyShipped || 0), 0), 0);
+           .reduce((acc, s) => acc + (s.items || []).reduce((sum, i) => sum + (Number(i.qtyShipped) || 0), 0), 0);
         return totalOrdered > totalShipped;
     });
 
     return (
         <div className="space-y-3">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2 ml-1">
-                <ShoppingCart size={14}/> Ожидают отгрузки
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="flex items-center justify-between px-2">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                    Ожидают отгрузки ({eligibleOrders.length})
+                </h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {eligibleOrders.map(o => {
                     const totalQty = o.items.reduce((s, i) => s + Number(i.quantity), 0);
                     const shippedQty = shipments
                         .filter(s => s.salesOrderId === o.id && s.status === 'Posted')
-                        .reduce((acc, s) => acc + (s.items || []).reduce((sum, i) => sum + (i.qtyShipped || 0), 0), 0);
+                        .reduce((acc, s) => acc + (s.items || []).reduce((sum, i) => sum + (Number(i.qtyShipped) || 0), 0), 0);
+                    
+                    const progress = totalQty > 0 ? (shippedQty / totalQty) * 100 : 0;
                     
                     return (
-                      <div key={o.id} onClick={() => onSelect(o.id)} className="bg-white p-3.5 rounded-2xl border border-slate-100 hover:border-blue-500 hover:shadow-lg transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[110px]">
+                      <div 
+                        key={o.id} 
+                        onClick={() => onSelect(o.id)} 
+                        className="group bg-white p-3 rounded-2xl border border-slate-200 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/5 transition-all cursor-pointer relative overflow-hidden flex flex-col gap-2"
+                      >
                           <div className="flex justify-between items-start">
-                              <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><ShoppingCart size={14}/></div>
-                              <span className="text-[8px] font-black text-slate-400 uppercase font-mono bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">#{o.id.slice(-6).toUpperCase()}</span>
-                          </div>
-                          <div className="mt-2">
-                              <h3 className="font-black text-slate-800 text-xs truncate leading-tight mb-0.5" title={o.clientName}>{o.clientName}</h3>
-                              <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-bold uppercase tracking-tighter">
-                                  <span>{shippedQty} / {totalQty} шт.</span>
-                                  <span className="w-0.5 h-0.5 bg-slate-300 rounded-full"></span>
-                                  <span className="text-blue-600 font-black">В процессе</span>
+                              <div className="flex items-center gap-2 min-w-0">
+                                  <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
+                                      <ShoppingCart size={14}/>
+                                  </div>
+                                  <div className="min-w-0">
+                                      <h3 className="font-black text-slate-800 text-[11px] uppercase tracking-tight truncate leading-none" title={o.clientName}>
+                                          {o.clientName}
+                                      </h3>
+                                      <span className="text-[8px] font-black text-slate-300 uppercase font-mono tracking-tighter">
+                                          #{o.id.slice(-6).toUpperCase()} • {new Date(o.date).toLocaleDateString()}
+                                      </span>
+                                  </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                  <div className="text-[11px] font-black text-blue-600 tracking-tighter">{f(Number(o.totalAmount))} ₸</div>
                               </div>
                           </div>
-                          <div className="flex justify-between items-center mt-3 pt-2 border-t border-slate-50">
-                              <div className="text-xs font-black text-slate-900 tracking-tight">{f(Number(o.totalAmount))} <span className="text-[9px] font-medium opacity-40">₸</span></div>
-                              <ChevronDown className="-rotate-90 text-slate-200 group-hover:text-blue-500 transition-all group-hover:translate-x-0.5" size={14}/>
+
+                          <div className="space-y-1.5">
+                              <div className="flex justify-between items-end px-0.5">
+                                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Прогресс: {shippedQty} / {totalQty}</span>
+                                  <ArrowRight size={10} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
+                              </div>
+                              <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                                  <div 
+                                      className="h-full bg-blue-500 transition-all duration-500 group-hover:bg-blue-600" 
+                                      style={{ width: `${progress}%` }}
+                                  />
+                              </div>
                           </div>
                       </div>
                     );
                 })}
                 {eligibleOrders.length === 0 && (
-                    <div className="col-span-full py-8 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-100 text-slate-400 text-xs font-bold uppercase tracking-widest">Нет заказов, готовых к отгрузке</div>
+                    <div className="col-span-full py-8 text-center bg-white rounded-2xl border-2 border-dashed border-slate-100 flex flex-col items-center gap-2">
+                        <Package size={24} className="text-slate-200" />
+                        <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Нет активных заказов</p>
+                    </div>
                 )}
             </div>
         </div>

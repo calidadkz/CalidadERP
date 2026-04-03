@@ -27,4 +27,5 @@ export interface OptionVariant {
     heightMm?: number;
     volumeM3?: number;
     composition?: { productId: string; quantity: number }[];
+    imageUrl?: string;
 }

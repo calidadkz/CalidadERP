@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Product, Currency, OptionVariant, PricingProfile, OptionType, Bundle, StockMovement } from '@/types';
-import { X, Settings, Layers, Calculator, Zap } from 'lucide-react';
+import { X, Settings, Layers, Calculator, Zap, Check } from 'lucide-react';
 import { useStore } from '@/features/system/context/GlobalStore';
 import { PricingService } from '@/services/PricingService';
 
@@ -10,14 +10,14 @@ interface ConfiguratorModalProps {
     onClose: () => void;
     mode: 'procurement' | 'sales';
     baseMachine: Product;
-    onApply: (data: { name: string, price: number, currency: Currency, config: string[] }) => void;
+    onApply: (data: { name: string, price: number, currency: Currency, config: string[], selectedVariantIds?: string[] }) => void;
 }
 
 export const ConfiguratorModal: React.FC<ConfiguratorModalProps> = ({ 
     isOpen, onClose, mode, baseMachine, onApply 
 }) => {
     const { state } = useStore();
-    const { optionTypes = [], optionVariants = [], bundles = [], stockMovements = [], exchangeRates = {} as Record<Currency, number>, pricingProfiles = [] } = state;
+    const { optionTypes = [], optionVariants = [], bundles = [], stockMovements = [], exchangeRates = {} as Record<string, number>, pricingProfiles = [] } = state;
 
     const [configTab, setConfigTab] = useState<'manual' | 'favorites' | 'warehouse'>('manual');
     const [selectedOptions, setSelectedOptions] = useState<Record<string, string[]>>({});
@@ -34,7 +34,7 @@ export const ConfiguratorModal: React.FC<ConfiguratorModalProps> = ({
             });
         }
         setSelectedOptions(defaults);
-    }, [baseMachine]);
+    }, [baseMachine, isOpen]);
 
     const f = (val: number) => Math.round(val).toLocaleString();
 
@@ -53,51 +53,33 @@ export const ConfiguratorModal: React.FC<ConfiguratorModalProps> = ({
     const bundleTotals = useMemo(() => {
         if (!baseMachine) return { purchaseTotal: 0, totalVolume: 0 };
         
-        let purchaseTotal = baseMachine.basePrice;
-        let totalVolume = (baseMachine.packages || []).reduce((acc, p) => acc + p.volumeM3, 0);
-    
-        const baseOptionsCost = (baseMachine.machineConfig || []).reduce((acc, configEntry) => {
-            const defaultIds = configEntry.defaultVariantIds || (configEntry.defaultVariantId ? [configEntry.defaultVariantId] : []);
-            defaultIds.forEach(defaultId => {
-                const variant = optionVariants.find(v => v.id === defaultId);
-                if (variant) {
-                    const price = configEntry.priceOverrides?.[defaultId] ?? variant.price;
-                    const rate = exchangeRates[variant.currency] || 1;
-                    const machineRate = exchangeRates[baseMachine.currency] || 1;
-                    acc += price * (rate / machineRate);
-                }
-            });
-            return acc;
-        }, 0);
-    
-        purchaseTotal -= baseOptionsCost;
-    
-        Object.values(selectedOptions).flat().forEach(variantId => {
-            const variant = optionVariants.find(v => v.id === variantId);
-            const type = optionTypes.find(t => t.id === variant?.typeId);
-            const configEntry = baseMachine.machineConfig?.find(mc => mc.typeId === type?.id);
-    
-            if (variant && type && configEntry) {
-                const price = configEntry.priceOverrides?.[variantId] ?? variant.price;
-                const rate = exchangeRates[variant.currency] || 1;
-                const machineRate = exchangeRates[baseMachine.currency] || 1;
-                purchaseTotal += price * (rate / machineRate);
-                totalVolume += variant.volumeM3 || 0;
-            }
-        });
+        const selectedVariantIds = Object.values(selectedOptions).flat();
+        
+        const purchaseTotal = PricingService.calculateBundlePurchasePrice(
+            baseMachine,
+            selectedVariantIds,
+            optionVariants,
+            exchangeRates as any
+        );
+
+        const totalVolume = PricingService.calculateBundleVolume(
+            baseMachine,
+            selectedVariantIds,
+            optionVariants
+        );
     
         return { purchaseTotal, totalVolume };
     }, [baseMachine, selectedOptions, optionVariants, optionTypes, exchangeRates]);
 
     const currentEconomy = useMemo(() => {
-        if (!baseMachine) return { finalPrice: 0, currency: Currency.USD, details: null };
+        if (!baseMachine) return { finalPrice: 0, currency: Currency.Usd, details: null };
 
         if (mode === 'procurement') {
             return { finalPrice: bundleTotals.purchaseTotal, currency: baseMachine.currency, details: null };
         } else {
             const profile = PricingService.findProfile(baseMachine, pricingProfiles);
-            const data = PricingService.calculateSmartPrice(baseMachine, profile, exchangeRates, bundleTotals.totalVolume, bundleTotals.purchaseTotal);
-            return { finalPrice: data.finalPrice, currency: Currency.KZT, details: data };
+            const data = PricingService.calculateSmartPrice(baseMachine, profile, exchangeRates as any, bundleTotals.totalVolume, bundleTotals.purchaseTotal);
+            return { finalPrice: data.finalPrice, currency: Currency.Kzt, details: data };
         }
     }, [baseMachine, mode, exchangeRates, pricingProfiles, bundleTotals]);
 
@@ -133,7 +115,8 @@ export const ConfiguratorModal: React.FC<ConfiguratorModalProps> = ({
             name: baseMachine.name,
             price: currentEconomy.finalPrice,
             currency: currentEconomy.currency,
-            config: configNames
+            config: configNames,
+            selectedVariantIds: selectedVariantIds
         });
     };
 
@@ -192,7 +175,6 @@ export const ConfiguratorModal: React.FC<ConfiguratorModalProps> = ({
                                             .filter(v => v.typeId === type.id && allowedVarIds.includes(v.id))
                                             .map(variant => {
                                                 const isSelected = selectedOptions[type.id]?.includes(variant.id);
-                                                const isDefault = (configEntry?.defaultVariantIds || []).includes(variant.id) || configEntry?.defaultVariantId === variant.id;
                                                 const price = configEntry?.priceOverrides?.[variant.id] ?? variant.price;
 
                                                 return (
@@ -200,7 +182,7 @@ export const ConfiguratorModal: React.FC<ConfiguratorModalProps> = ({
                                                         className={`px-4 py-3 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between group ${isSelected ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-50' : 'border-slate-50 hover:border-slate-200 bg-white'}`}>
                                                         <span className={`text-xs font-bold ${isSelected ? 'text-blue-800' : 'text-slate-600'}`}>{variant.name}</span>
                                                         <span className={`text-[10px] font-black font-mono ${isSelected ? 'text-blue-600' : 'text-slate-400'}`}>
-                                                           {isDefault ? 'Включено' : `+${f(price)} ${variant.currency}`}
+                                                           {f(price)} {variant.currency}
                                                         </span>
                                                     </div>
                                                 );
@@ -213,13 +195,28 @@ export const ConfiguratorModal: React.FC<ConfiguratorModalProps> = ({
 
                     {configTab === 'favorites' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {bundles.filter(b => b.baseProductId === baseMachine.id).map(b => (
-                                <div key={b.id} onClick={() => onApply({ name: b.name, price: mode === 'sales' ? b.totalPrice : b.totalPurchasePrice, currency: mode === 'sales' ? Currency.KZT : baseMachine.currency, config: b.selectedVariantIds.map(vid => optionVariants.find(ov => ov.id === vid)?.name || '') })} 
+                            {bundles.filter(b => b.baseProductId === baseMachine.id).map(b => {
+                                const selectedIds = b.selectedVariantIds;
+                                const purchasePrice = PricingService.calculateBundlePurchasePrice(baseMachine, selectedIds, optionVariants, exchangeRates as any);
+                                
+                                let dispPrice = purchasePrice;
+                                let dispCurr = baseMachine.currency;
+                                
+                                if (mode === 'sales') {
+                                    const totalVol = PricingService.calculateBundleVolume(baseMachine, selectedIds, optionVariants);
+                                    const profile = PricingService.findProfile(baseMachine, pricingProfiles);
+                                    const economy = PricingService.calculateSmartPrice(baseMachine, profile, exchangeRates as any, totalVol, purchasePrice);
+                                    dispPrice = economy.finalPrice;
+                                    dispCurr = Currency.Kzt;
+                                }
+
+                                return (
+                                <div key={b.id} onClick={() => onApply({ name: b.name, price: dispPrice, currency: dispCurr, config: b.selectedVariantIds.map(vid => optionVariants.find(ov => ov.id === vid)?.name || ''), selectedVariantIds: b.selectedVariantIds })} 
                                      className="p-5 bg-white border border-slate-100 rounded-[1.5rem] hover:border-blue-500 cursor-pointer transition-all hover:shadow-lg group relative flex flex-col min-h-[160px]">
                                     <div className="flex justify-between items-start mb-1 gap-2">
                                         <h4 className="font-black text-slate-800 text-sm leading-tight flex-1">{b.name}</h4>
                                         <div className="bg-blue-600 text-white px-2 py-0.5 rounded-lg font-black text-[10px] shadow-sm whitespace-nowrap">
-                                            {f(mode === 'sales' ? b.totalPrice : b.totalPurchasePrice)} {mode === 'sales' ? 'KZT' : baseMachine.currency}
+                                            {f(dispPrice)} {dispCurr}
                                         </div>
                                     </div>
                                     <div className="flex flex-wrap gap-1 mt-3">
@@ -231,7 +228,8 @@ export const ConfiguratorModal: React.FC<ConfiguratorModalProps> = ({
                                     </div>
                                     {b.description && <p className="mt-4 text-[10px] text-slate-400 italic line-clamp-2">{b.description}</p>}
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
 
@@ -239,65 +237,23 @@ export const ConfiguratorModal: React.FC<ConfiguratorModalProps> = ({
                         <div className="space-y-3">
                             {getUniqueStockConfigs(baseMachine.id).map((conf, idx) => {
                                 const free = conf.physical + conf.incoming - conf.reserved;
-                                
-                                let dispPrice = 0;
-                                let dispCurr = baseMachine.currency;
-                                
                                 const selectedIds = conf.names.map(n => optionVariants.find(ov => ov.name === n)?.id).filter(Boolean) as string[];
 
-                                let tempSelectedOptions: Record<string, string[]> = {};
-                                selectedIds.forEach(id => {
-                                    const variant = optionVariants.find(v => v.id === id);
-                                    if (variant) {
-                                        if (!tempSelectedOptions[variant.typeId]) tempSelectedOptions[variant.typeId] = [];
-                                        tempSelectedOptions[variant.typeId].push(id);
-                                    }
-                                });
-
-                                const tempTotals = (()=>{ // IIFE to calculate totals for this specific config
-                                    let purchaseTotal = baseMachine.basePrice;
-                                    let totalVolume = (baseMachine.packages || []).reduce((acc, p) => acc + p.volumeM3, 0);
-                                    const baseOptionsCost = (baseMachine.machineConfig || []).reduce((acc, configEntry) => {
-                                        const defaultIds = configEntry.defaultVariantIds || (configEntry.defaultVariantId ? [configEntry.defaultVariantId] : []);
-                                        defaultIds.forEach(defaultId => {
-                                            const variant = optionVariants.find(v => v.id === defaultId);
-                                            if (variant) {
-                                                const price = configEntry.priceOverrides?.[defaultId] ?? variant.price;
-                                                const rate = exchangeRates[variant.currency] || 1;
-                                                const machineRate = exchangeRates[baseMachine.currency] || 1;
-                                                acc += price * (rate / machineRate);
-                                            }
-                                        });
-                                        return acc;
-                                    }, 0);
-                                    purchaseTotal -= baseOptionsCost;
-                                    Object.values(tempSelectedOptions).flat().forEach(variantId => {
-                                        const variant = optionVariants.find(v => v.id === variantId);
-                                        const type = optionTypes.find(t => t.id === variant?.typeId);
-                                        const configEntry = baseMachine.machineConfig?.find(mc => mc.typeId === type?.id);
-                                        if (variant && type && configEntry) {
-                                            const price = configEntry.priceOverrides?.[variantId] ?? variant.price;
-                                            const rate = exchangeRates[variant.currency] || 1;
-                                            const machineRate = exchangeRates[baseMachine.currency] || 1;
-                                            purchaseTotal += price * (rate / machineRate);
-                                            totalVolume += variant.volumeM3 || 0;
-                                        }
-                                    });
-                                    return { purchaseTotal, totalVolume };
-                                })();
-
-
+                                const purchasePrice = PricingService.calculateBundlePurchasePrice(baseMachine, selectedIds, optionVariants, exchangeRates as any);
+                                
+                                let dispPrice = purchasePrice;
+                                let dispCurr = baseMachine.currency;
+                                
                                 if (mode === 'sales') {
+                                    const totalVol = PricingService.calculateBundleVolume(baseMachine, selectedIds, optionVariants);
                                     const profile = PricingService.findProfile(baseMachine, pricingProfiles);
-                                    const economy = PricingService.calculateSmartPrice(baseMachine, profile, exchangeRates, tempTotals.totalVolume, tempTotals.purchaseTotal);
+                                    const economy = PricingService.calculateSmartPrice(baseMachine, profile, exchangeRates as any, totalVol, purchasePrice);
                                     dispPrice = economy.finalPrice;
-                                    dispCurr = Currency.KZT;
-                                } else {
-                                    dispPrice = tempTotals.purchaseTotal;
+                                    dispCurr = Currency.Kzt;
                                 }
 
                                 return (
-                                    <div key={idx} onClick={() => onApply({ name: baseMachine.name, price: dispPrice, currency: dispCurr, config: conf.names })} 
+                                    <div key={idx} onClick={() => onApply({ name: baseMachine.name, price: dispPrice, currency: dispCurr, config: conf.names, selectedVariantIds: selectedIds })} 
                                          className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-2xl hover:border-emerald-500 hover:shadow-md cursor-pointer transition-all">
                                         <div className="flex flex-col gap-3 flex-1">
                                             <div className="flex items-center gap-2">

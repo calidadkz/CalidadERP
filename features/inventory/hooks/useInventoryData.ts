@@ -1,79 +1,61 @@
 
 import { useMemo, useCallback } from 'react';
-import { Product, StockMovement, ProductType } from '@/types';
-import { MoneyMath } from '@/services/MoneyMath';
+import { Product, ProductType } from '@/types';
 
-const normalizeOptions = (opts?: string[]) => [...(opts || [])].sort((a, b) => a.localeCompare(b));
-
-export const useInventoryData = (products: Product[], stockMovements: StockMovement[]) => {
+/**
+ * Хук для работы с остатками. 
+ * ВНИМАНИЕ: Теперь он принимает готовые данные из View v_inventory_summary,
+ * а не считает их из истории движений на фронтенде.
+ */
+export const useInventoryData = (products: Product[], inventorySummary: any[]) => {
+  // Основной расчет мапы остатков на основе данных из View
   const stockDataMap = useMemo(() => {
     const map: Record<string, Record<string, any>> = {};
     
-    const sorted = [...stockMovements].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    
-    sorted.forEach(m => {
-      if (!map[m.productId]) map[m.productId] = {};
+    for (let i = 0; i < inventorySummary.length; i++) {
+      const entry = inventorySummary[i];
+      const productId = entry.productId;
       
-      const normOptions = normalizeOptions(m.configuration);
-      const key = normOptions.length > 0 ? normOptions.join('|') : 'BASE';
+      if (!map[productId]) map[productId] = {};
       
-      if (!map[m.productId][key]) {
-        map[m.productId][key] = { 
-          stock: 0, reserved: 0, incoming: 0, 
-          optionsInfo: normOptions, 
-          totalValueKZT: 0, totalSalesValueKZT: 0 
-        };
-      }
+      // Конфигурация из View уже нормализована (массив строк)
+      const configArray = entry.configuration || [];
+      const key = configArray.length === 0 ? 'BASE' : configArray.sort().join('|');
       
-      const target = map[m.productId][key];
-      const qty = Number(m.quantity) || 0;
-      const movementCost = Number(m.totalCostKZT || (m as any).totalCostKzt) || (Number(m.unitCostKZT || (m as any).unitCostKzt) * qty) || 0;
-      const movementSales = Number(m.totalSalesPriceKZT || (m as any).totalSalesPriceKzt) || (Number(m.salesPriceKZT || (m as any).salesPriceKzt) * qty) || 0;
-
-      if (m.statusType === 'Physical') {
-        if (m.type === 'In') {
-          target.stock += qty;
-          target.totalValueKZT = MoneyMath.add(target.totalValueKZT, movementCost);
-          target.totalSalesValueKZT = MoneyMath.add(target.totalSalesValueKZT, movementSales);
-        } else {
-          target.stock -= qty;
-          target.totalValueKZT = MoneyMath.subtract(target.totalValueKZT, movementCost);
-          target.totalSalesValueKZT = MoneyMath.subtract(target.totalSalesValueKZT, movementSales);
-        }
-        if (target.stock < 0.0001) { target.totalValueKZT = 0; target.totalSalesValueKZT = 0; }
-      } else if (m.statusType === 'Incoming') {
-        target.incoming += (m.type === 'In' ? qty : -qty);
-      } else if (m.statusType === 'Reserved') {
-        target.reserved += (m.type === 'In' ? qty : -qty);
-      }
-    });
+      map[productId][key] = { 
+        stock: Number(entry.stock) || 0, 
+        reserved: Number(entry.reserved) || 0, 
+        incoming: Number(entry.incoming) || 0, 
+        optionsInfo: configArray, 
+        totalValueKzt: Number(entry.totalValueKzt) || 0, 
+        totalSalesValueKzt: Number(entry.totalSalesValueKzt) || 0 
+      };
+    }
     
     return map;
-  }, [stockMovements]);
+  }, [inventorySummary]);
 
   const getDetailedBreakdown = useCallback((productId: string) => {
     const productData = stockDataMap[productId];
     if (!productData) return [];
-    return Object.values(productData).filter(c => 
-      Math.abs(c.stock) > 0.0001 || Math.abs(c.reserved) > 0.0001 || Math.abs(c.incoming) > 0.0001
-    );
+    return Object.values(productData);
   }, [stockDataMap]);
 
   const totals = useMemo(() => {
     let warehouseValue = 0; 
     let potentialRevenue = 0;
     
-    Object.values(stockDataMap).forEach(productConfigs => {
-      Object.values(productConfigs).forEach(conf => {
-        if (conf.stock > 0) {
-          warehouseValue += conf.totalValueKZT;
-          potentialRevenue += conf.totalSalesValueKZT;
-        }
-      });
-    });
+    const entries = inventorySummary;
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      if (entry.stock > 0) {
+        warehouseValue += Number(entry.totalValueKzt) || 0;
+        potentialRevenue += Number(entry.totalSalesValueKzt) || 0;
+      }
+    }
     
     return { warehouseValue, potentialRevenue };
-  }, [stockDataMap]);
+  }, [inventorySummary]);
 
   return { stockDataMap, getDetailedBreakdown, totals };
 };

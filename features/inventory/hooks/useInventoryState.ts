@@ -54,7 +54,7 @@ export const useInventoryState = (
         totalCost: number, 
         desc: string, 
         config?: string[], 
-        salesPriceKZT: number = 0,
+        salesPriceKzt: number = 0,
         optionVariants: OptionVariant[] = [],
         pricingProfiles: PricingProfile[] = [],
         exchangeRates: Record<Currency, number> = {} as Record<Currency, number>
@@ -67,8 +67,8 @@ export const useInventoryState = (
             id: `ADJ-${Date.now()}`,
             productId,
             quantity: qty,
-            unitCostKZT: unitCost,
-            salesPriceKZT: salesPriceKZT,
+            unitCostKzt: unitCost,
+            salesPriceKzt: salesPriceKzt,
             configuration: config,
             description: desc
         };
@@ -107,8 +107,8 @@ export const useInventoryState = (
             date: new Date().toISOString(),
             type: 'Out',
             quantity: movementToRevert.quantity,
-            totalCostKZT: movementToRevert.totalCostKZT,
-            totalSalesPriceKZT: (movementToRevert.totalSalesPriceKZT || 0),
+            totalCostKzt: movementToRevert.totalCostKzt,
+            totalSalesPriceKzt: (movementToRevert.totalSalesPriceKzt || 0),
             description: `Отмена ввода остатков (исходный док: ${movementToRevert.id})`,
         };
 

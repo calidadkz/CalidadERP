@@ -1,32 +1,35 @@
-import React from 'react';
+
+import React, { lazy, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { StoreProvider } from './features/system/context/GlobalStore';
 import { Layout } from './components/system/Layout';
 import { AuthProvider, useAuth } from './features/system/context/AuthContext';
 import { LoginPage } from './features/auth/components/LoginPage';
 import { PermissionsService } from './services/PermissionsService';
-import { ShieldAlert, ArrowLeft, RefreshCw, LogOut, AlertTriangle } from 'lucide-react';
+import { ShieldAlert, ArrowLeft, RefreshCw, LogOut, AlertTriangle, Loader2 } from 'lucide-react';
 
-// Pages
-import { InventoryPage } from './features/inventory/InventoryPage';
-import { NomenclaturePage } from './features/nomenclature/NomenclaturePage';
-import { FinancePage } from './features/finance/FinancePage';
-import { FinanceCategoriesPage } from './features/finance/FinanceCategoriesPage';
-import { ProcurementPage } from './features/procurement/ProcurementPage';
-import { SalesPage } from './features/sales/SalesPage';
-import { ReceivingPage } from './features/receiving/ReceivingPage';
-import { ShipmentPage } from './features/shipment/ShipmentPage';
-import { BundlesPage } from './features/bundles/BundlesPage';
-import { PreCalculationsPage } from './features/pre-calculations/PreCalculationsPage';
-import { HSCodesPage } from './features/products/pages/HSCodesPage';
-import { CurrencyRatesPage } from './features/finance/pages/CurrencyRatesPage';
-import { CounterpartyManagerPage } from './features/counterparties/pages/CounterpartyManagerPage';
-import { CategoriesPage } from './features/products/pages/CategoriesPage';
-import { DiscrepancyPage } from './features/warehouse/pages/DiscrepancyPage';
-import { HistoryPage } from './features/history/pages/HistoryPage';
-import { RecycleBinPage } from './features/system/pages/RecycleBinPage';
-import { PricingManagerPage } from './features/products/pages/PricingManagerPage';
-import { PermissionsManager } from './components/system/PermissionsManager';
+// Lazy-loaded Pages
+const InventoryPage = lazy(() => import('./features/inventory/InventoryPage').then(module => ({ default: module.InventoryPage })));
+const NomenclaturePage = lazy(() => import('./features/nomenclature/NomenclaturePage').then(module => ({ default: module.NomenclaturePage })));
+const FinancePage = lazy(() => import('./features/finance/FinancePage').then(module => ({ default: module.FinancePage })));
+const FinanceCategoriesPage = lazy(() => import('./features/finance/FinanceCategoriesPage').then(module => ({ default: module.FinanceCategoriesPage })));
+const ProcurementPage = lazy(() => import('./features/procurement/ProcurementPage').then(module => ({ default: module.ProcurementPage })));
+const SalesPage = lazy(() => import('./features/sales/SalesPage').then(module => ({ default: module.SalesPage })));
+const ReceivingPage = lazy(() => import('./features/receiving/ReceivingPage').then(module => ({ default: module.ReceivingPage })));
+const ShipmentPage = lazy(() => import('./features/shipment/ShipmentPage').then(module => ({ default: module.ShipmentPage })));
+const BundlesPage = lazy(() => import('./features/bundles/BundlesPage').then(module => ({ default: module.BundlesPage })));
+const PreCalculationsRouter = lazy(() => import('./features/pre-calculations/PreCalculationsRouter').then(module => ({ default: module.PreCalculationsRouter })));
+const BatchesPage = lazy(() => import('./features/batches/BatchesPage').then(module => ({ default: module.BatchesPage })));
+const BatchDetailPage = lazy(() => import('./features/batches/BatchDetailPage').then(module => ({ default: module.BatchDetailPage })));
+const HSCodesPage = lazy(() => import('./features/products/pages/HSCodesPage').then(module => ({ default: module.HSCodesPage })));
+const CurrencyRatesPage = lazy(() => import('./features/finance/pages/CurrencyRatesPage').then(module => ({ default: module.CurrencyRatesPage })));
+const CounterpartyManagerPage = lazy(() => import('./features/counterparties/pages/CounterpartyManagerPage').then(module => ({ default: module.CounterpartyManagerPage })));
+const CategoriesPage = lazy(() => import('./features/products/pages/CategoriesPage').then(module => ({ default: module.CategoriesPage })));
+const DiscrepancyPage = lazy(() => import('./features/warehouse/pages/DiscrepancyPage').then(module => ({ default: module.DiscrepancyPage })));
+const HistoryPage = lazy(() => import('./features/history/pages/HistoryPage').then(module => ({ default: module.HistoryPage })));
+const RecycleBinPage = lazy(() => import('./features/system/pages/RecycleBinPage').then(module => ({ default: module.RecycleBinPage })));
+const PricingManagerPage = lazy(() => import('./features/products/pages/PricingManagerPage').then(module => ({ default: module.PricingManagerPage })));
+const PermissionsManager = lazy(() => import('./components/system/PermissionsManager').then(module => ({ default: module.PermissionsManager })));
 
 const NoAccessStub = ({ onBack }: { onBack: () => void }) => (
     <div className="h-full flex flex-col items-center justify-center p-12 text-center">
@@ -73,6 +76,13 @@ const InitErrorScreen = ({ message, onRetry, onSignOut }: { message: string, onR
     </div>
 );
 
+const ModuleLoader = () => (
+    <div className="flex-1 flex flex-col items-center justify-center p-12 bg-white/50 animate-in fade-in duration-500">
+        <Loader2 className="animate-spin text-blue-500 mb-4" size={32}/>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Загрузка модуля...</p>
+    </div>
+);
+
 const AppContent = () => {
     const { session, user, isLoading, isFirstLoad, initError, retryInit, signOut } = useAuth();
     const navigate = useNavigate();
@@ -111,7 +121,7 @@ const AppContent = () => {
             {!hasAccess ? (
                 <NoAccessStub onBack={() => navigate('/inventory')} />
             ) : (
-                <React.Suspense fallback={<div className="p-12 text-center text-slate-400 animate-pulse">Загрузка модуля...</div>}>
+                <Suspense fallback={<ModuleLoader />}>
                     <Routes>
                         <Route path="/inventory/*" element={<InventoryPage />} />
                         <Route path="/nomenclature" element={<NomenclaturePage />} />
@@ -119,15 +129,17 @@ const AppContent = () => {
                         <Route path="/bundles" element={<BundlesPage />} />
                         <Route path="/options" element={<BundlesPage />} />
                         <Route path="/categories" element={<CategoriesPage />} />
-                        <Route path="/pre-calculations" element={<PreCalculationsPage />} />
+                        <Route path="/pre-calculations/*" element={<PreCalculationsRouter />} />
+                        <Route path="/batches" element={<BatchesPage />} />
+                        <Route path="/batches/:id" element={<BatchDetailPage />} />
                         <Route path="/procurement" element={<ProcurementPage />} />
                         <Route path="/receiving" element={<ReceivingPage />} />
                         <Route path="/sales" element={<SalesPage />} />
                         <Route path="/shipment" element={<ShipmentPage />} />
                         <Route path="/discrepancy" element={<DiscrepancyPage />} />
-                        <Route path="/finance_calendar" element={<FinancePage initialView="plan" />} />
-                        <Route path="/finance_statements" element={<FinancePage initialView="fact" />} />
-                        <Route path="/finance_accounts" element={<FinancePage initialView="treasury" />} />
+                        <Route path="/finance_calendar" element={<FinancePage view="plan" />} />
+                        <Route path="/finance_statements" element={<FinancePage view="fact" />} />
+                        <Route path="/finance_accounts" element={<FinancePage view="treasury" />} />
                         <Route path="/finance_categories" element={<FinanceCategoriesPage />} />
                         <Route path="/rates" element={<CurrencyRatesPage />} />
                         <Route path="/counterparties" element={<CounterpartyManagerPage />} />
@@ -137,7 +149,7 @@ const AppContent = () => {
                         <Route path="/recycle_bin" element={<RecycleBinPage />} />
                         <Route path="*" element={<Navigate to="/inventory" replace />} />
                     </Routes>
-                </React.Suspense>
+                </Suspense>
             )}
         </Layout>
     );

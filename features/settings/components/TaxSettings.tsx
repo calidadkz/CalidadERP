@@ -1,33 +1,31 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
+import { useStore } from '@/features/system/context/GlobalStore';
 import { Percent, Save } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
+import { GeneralSettings } from '@/types';
 
-interface TaxSettingsData {
-    vatRate: number;
-    simplifiedTaxRate: number;
-}
+type TaxFormData = Pick<GeneralSettings, 'ndsRate' | 'kpn20Rate' | 'kpn4Rate' | 'resaleMarkup'>;
 
 const SettingsInput = ({ id, label, helpText, control, name, unit, disabled }: any) => (
-    <div className="grid grid-cols-3 items-center gap-4">
-        <div className="col-span-2">
-            <Label htmlFor={id} className="font-semibold">{label}</Label>
+    <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-4">
+        <div className="md:col-span-2">
+            <label htmlFor={id} className="block text-sm font-semibold text-slate-700">{label}</label>
             <p className="text-xs text-slate-500 mt-1">{helpText}</p>
         </div>
         <div className="relative">
             <Controller
                 name={name}
                 control={control}
-                render={({ field }) => (
-                    <Input
-                        {...field}
+                render={({ field: { value, onChange, onBlur } }) => (
+                    <input
                         id={id}
                         type="number"
-                        className="font-mono text-right pr-8"
+                        step="0.1"
+                        value={value ?? ''}
+                        onBlur={onBlur}
+                        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+                        className="w-full h-10 px-3 py-2 bg-white border border-slate-200 rounded-md text-sm font-mono text-right pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-50 disabled:text-slate-400"
                         disabled={disabled}
                     />
                 )}
@@ -38,60 +36,106 @@ const SettingsInput = ({ id, label, helpText, control, name, unit, disabled }: a
 );
 
 export const TaxSettings: React.FC = () => {
-    const { control, handleSubmit, formState: { isDirty, isSubmitting } } = useForm<TaxSettingsData>({
-        // Здесь должны быть значения по умолчанию, загруженные из API
+    const { state, actions } = useStore();
+    const { generalSettings } = state;
+
+    const { control, handleSubmit, formState: { isDirty, isSubmitting }, reset } = useForm<TaxFormData>({
         defaultValues: {
-            vatRate: 12,
-            simplifiedTaxRate: 3,
+            ndsRate: generalSettings?.ndsRate ?? 12,
+            kpn20Rate: generalSettings?.kpn20Rate ?? 20,
+            kpn4Rate: generalSettings?.kpn4Rate ?? 3,
+            resaleMarkup: generalSettings?.resaleMarkup ?? 1,
         }
     });
 
-    const onSubmit = (data: TaxSettingsData) => {
-        console.log("Saving tax settings:", data);
-        // Здесь будет логика сохранения данных
+    // Обновляем форму, если системные настройки подгрузились позже
+    React.useEffect(() => {
+        if (generalSettings) {
+            reset({
+                ndsRate: generalSettings.ndsRate,
+                kpn20Rate: generalSettings.kpn20Rate,
+                kpn4Rate: generalSettings.kpn4Rate,
+                resaleMarkup: generalSettings.resaleMarkup,
+            });
+        }
+    }, [generalSettings, reset]);
+
+    const onSubmit = async (data: TaxFormData) => {
+        try {
+            // В GlobalStore updateGeneralSetting обновляет по одному ключу
+            Object.entries(data).forEach(([key, value]) => {
+                actions.updateGeneralSetting(key as keyof GeneralSettings, value);
+            });
+            
+            // Здесь должна быть логика сохранения в БД, если GlobalStore это делает сам при вызове updateGeneralSetting
+            // В текущей реализации GlobalStore.tsx сохранение в БД при вызове updateGeneralSetting не реализовано (только локальное состояние)
+            // Но в StoreProvider.load() настройки грузятся из PRE_CALCULATIONS
+            
+            alert('Настройки налогов обновлены локально. Не забудьте сохранить проект (если требуется).');
+        } catch (error) {
+            console.error("Error saving tax settings:", error);
+            alert('Ошибка при сохранении настроек.');
+        }
     };
 
-    // В реальном приложении, права на запись будут проверяться через useAccess
-    const canWrite = true; 
+    const canWrite = true; // Можно добавить проверку прав через useAccess
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex justify-between items-start">
-                    <div>
-                        <CardTitle className="flex items-center gap-2">
-                            <Percent size={18} className="text-slate-500" />
-                            Налоги и Сборы
-                        </CardTitle>
-                    </div>
-                    {canWrite && (
-                         <Button size="sm" onClick={handleSubmit(onSubmit)} disabled={!isDirty || isSubmitting}>
-                            <Save size={14} className="mr-2" />
-                            Сохранить
-                        </Button>
-                    )}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div className="flex items-center gap-2">
+                    <Percent size={18} className="text-blue-600" />
+                    <h3 className="text-lg font-bold text-slate-800 tracking-tight">Налоги и Сборы</h3>
                 </div>
-            </CardHeader>
-            <CardContent className="space-y-6 pt-4">
+                {canWrite && (
+                    <button 
+                        onClick={handleSubmit(onSubmit)} 
+                        disabled={!isDirty || isSubmitting}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-xs font-black uppercase tracking-widest rounded-xl shadow-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+                    >
+                        <Save size={14} className="mr-2" />
+                        Сохранить
+                    </button>
+                )}
+            </div>
+            <div className="p-6 space-y-6">
                 <SettingsInput
-                    id="vat-rate"
-                    name="vatRate"
+                    id="nds-rate"
+                    name="ndsRate"
                     label="Ставка НДС"
-                    helpText="Основная ставка налога на добавленную стоимость."
+                    helpText="Основная ставка налога на добавленную стоимость для ОСН."
                     control={control}
                     unit="%"
                     disabled={!canWrite}
                 />
                  <SettingsInput
-                    id="simplified-tax-rate"
-                    name="simplifiedTaxRate"
-                    label="Ставка Упрощенного режима"
-                    helpText="Единый налог для упрощенного режима налогообложения."
+                    id="kpn20-rate"
+                    name="kpn20Rate"
+                    label="КПН ОСН (20%)"
+                    helpText="Корпоративный подоходный налог для общеустановленного режима от прибыли."
                     control={control}
                     unit="%"
                     disabled={!canWrite}
                 />
-            </CardContent>
-        </Card>
+                <SettingsInput
+                    id="kpn4-rate"
+                    name="kpn4Rate"
+                    label="Налог на Упрощенном режиме"
+                    helpText="Единый налог (КПН/ИПН) от всей выручки для упрощенного режима."
+                    control={control}
+                    unit="%"
+                    disabled={!canWrite}
+                />
+                <SettingsInput
+                    id="resale-markup"
+                    name="resaleMarkup"
+                    label="Наценка при перепродаже"
+                    helpText="Наценка при продаже товара между своими компаниями (напр. с ОСН на УСН)."
+                    control={control}
+                    unit="%"
+                    disabled={!canWrite}
+                />
+            </div>
+        </div>
     );
 };

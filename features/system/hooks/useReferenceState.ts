@@ -20,33 +20,33 @@ export const useReferenceState = () => {
     const [trash, setTrash] = useState<TrashItem[]>([]);
     const [exchangeRates, setExchangeRates] = useState<Record<Currency, number>>(KZT_RATES);
 
-    const addLog = async (action: ActionType, entity: string, entityId: string, description: string) => {
-        const newLog: Partial<LogEntry> = {
+    const addLog = async (action: ActionType, entity: string, entityId: string, details: string) => {
+        const newLog: any = {
+            id: ApiService.generateId('LOG'),
             timestamp: new Date().toISOString(),
-            user: 'Admin', // TODO: get current user
+            user: 'Admin',
             action,
-            entity,
-            entityId,
-            description
+            documentType: entity,
+            documentId: entityId,
+            description: details
         };
         try {
             const savedLog = await ApiService.create<LogEntry>(TableNames.LOGS, newLog);
             setLogs(prev => [savedLog, ...prev]);
         } catch (e) {
             console.error("Failed to save log:", e);
-            const apiError = e as { code: string, message: string, details: any };
-            if (apiError.code === 'PGRST204') {
-                console.error("Supabase schema cache might be outdated. Could not find a required column.");
-            } else {
-                // Handle other types of errors if necessary
-            }
         }
     };
 
     const moveToTrash = async (businessLogicId: string, objectType: TrashItem['type'], displayName: string, sourceData: any) => {
         try {
             const cleanData = JSON.parse(JSON.stringify(sourceData));
+            
+            const existing = await ApiService.fetchAll<TrashItem>(TableNames.TRASH, { originalId: businessLogicId, type: objectType });
+            if (existing && existing.length > 0) return existing[0];
+
             const initialEntry = {
+                id: ApiService.generateUUID(),
                 originalId: businessLogicId,
                 type: objectType,
                 name: displayName,
@@ -67,8 +67,32 @@ export const useReferenceState = () => {
 
     const restoreFromTrash = async (trashRecord: TrashItem): Promise<void> => {
         try {
+            // Для OptionVariant, если он не удален физически, просто убираем запись из корзины
+            if (trashRecord.type === 'OptionVariant') {
+                const existing = optionVariants.find(v => v.id === trashRecord.originalId);
+                if (existing) {
+                    await ApiService.delete(TableNames.TRASH, trashRecord.id);
+                    setTrash(prev => prev.filter(item => item.id !== trashRecord.id));
+                    addLog('Update', trashRecord.type, trashRecord.originalId, 'Восстановлено (снята пометка)');
+                    return;
+                }
+            }
+
             const reconstructedObject = { ...trashRecord.data };
             reconstructedObject.id = trashRecord.originalId;
+
+            if (['Order', 'SalesOrder', 'PlannedPayment'].includes(trashRecord.type)) {
+                let tableName = '';
+                if (trashRecord.type === 'Order') tableName = TableNames.SUPPLIER_ORDERS;
+                else if (trashRecord.type === 'SalesOrder') tableName = TableNames.SALES_ORDERS;
+                else tableName = TableNames.PLANNED_PAYMENTS;
+
+                await ApiService.update(tableName, trashRecord.originalId, { isDeleted: false });
+                await ApiService.delete(TableNames.TRASH, trashRecord.id);
+                setTrash(prev => prev.filter(item => item.id !== trashRecord.id));
+                addLog('Create', trashRecord.type, trashRecord.originalId, 'Восстановлено (снята пометка)');
+                return;
+            }
 
             let tableName = '';
             switch (trashRecord.type) {
@@ -110,6 +134,21 @@ export const useReferenceState = () => {
 
     const permanentlyDelete = async (trashRecord: TrashItem) => {
         try {
+            if (['Order', 'SalesOrder', 'PlannedPayment', 'OptionVariant'].includes(trashRecord.type)) {
+                if (trashRecord.type === 'Order') {
+                    await ApiService.deleteByField(TableNames.SUPPLIER_ORDER_ITEMS, 'supplierOrderId', trashRecord.originalId);
+                    await ApiService.delete(TableNames.SUPPLIER_ORDERS, trashRecord.originalId);
+                } else if (trashRecord.type === 'SalesOrder') {
+                    await ApiService.deleteByField(TableNames.SALES_ORDER_ITEMS, 'salesOrderId', trashRecord.originalId);
+                    await ApiService.delete(TableNames.SALES_ORDERS, trashRecord.originalId);
+                } else if (trashRecord.type === 'PlannedPayment') {
+                    await ApiService.delete(TableNames.PLANNED_PAYMENTS, trashRecord.originalId);
+                } else if (trashRecord.type === 'OptionVariant') {
+                    await ApiService.delete(TableNames.OPTION_VARIANTS, trashRecord.originalId);
+                    setOptionVariants(prev => prev.filter(v => v.id !== trashRecord.originalId));
+                }
+            }
+
             await ApiService.delete(TableNames.TRASH, trashRecord.id);
             setTrash(prev => prev.filter(item => item.id !== trashRecord.id));
             addLog('Delete', 'Permanent', trashRecord.originalId, `Удалено навсегда: ${trashRecord.name}`);
@@ -131,10 +170,8 @@ export const useReferenceState = () => {
     const updateCounterparty = async (c: Counterparty, accounts: CounterpartyAccount[]) => {
         const { updated, newAccounts } = await ApiService.updateCounterpartyWithAccounts(c, accounts);
         setCounterparties(prev => prev.map(x => (x.id === c.id ? updated : x)));
-        
         const otherAccounts = counterpartyAccounts.filter(acc => acc.counterpartyId !== c.id);
         setCounterpartyAccounts([...otherAccounts, ...newAccounts]);
-        
         addLog('Update', 'Контрагент', c.id, `Обновлен контрагент: ${c.name}`);
         return updated;
     };
@@ -192,7 +229,7 @@ export const useReferenceState = () => {
         return saved;
     };
 
-    const deleteManufacturer = async (id: string) => {
+    const deleteManufacturerFromRef = async (id: string) => {
         const item = manufacturers.find(x => x.id === id);
         if (item) {
             await moveToTrash(id, 'Manufacturer', item.name, item);
@@ -201,7 +238,7 @@ export const useReferenceState = () => {
         }
     };
 
-    const deleteOurCompany = async (id: string) => {
+    const deleteOurCompanyFromRef = async (id: string) => {
         const item = ourCompanies.find(x => x.id === id);
         if (item) {
             await moveToTrash(id, 'OurCompany', item.name, item);
@@ -210,7 +247,7 @@ export const useReferenceState = () => {
         }
     };
 
-    const deleteEmployee = async (id: string) => {
+    const deleteEmployeeFromRef = async (id: string) => {
         const item = employees.find(x => x.id === id);
         if (item) {
             await moveToTrash(id, 'Employee', item.name, item);
@@ -245,6 +282,13 @@ export const useReferenceState = () => {
     const addCategory = async (c: ProductCategory) => {
         const saved = await ApiService.create<ProductCategory>(TableNames.PRODUCT_CATEGORIES, c);
         setCategories(prev => [...prev, saved]);
+        return saved;
+    };
+
+    const updateCategory = async (c: ProductCategory) => {
+        const saved = await ApiService.update<ProductCategory>(TableNames.PRODUCT_CATEGORIES, c.id, c);
+        setCategories(prev => prev.map(x => x.id === c.id ? saved : x));
+        addLog('Update', 'Категория', c.id, `Обновлена категория: ${c.name}`);
         return saved;
     };
 
@@ -347,9 +391,8 @@ export const useReferenceState = () => {
     const deleteOptionVariant = async (id: string) => {
         const ov = optionVariants.find(x => x.id === id);
         if (ov) {
+            // Мягкое удаление: только в корзину, оригинал оставляем для подсветки
             await moveToTrash(id, 'OptionVariant', ov.name, ov);
-            await ApiService.delete(TableNames.OPTION_VARIANTS, id);
-            setOptionVariants(prev => prev.filter(x => x.id !== id));
         }
     };
 
@@ -394,8 +437,8 @@ export const useReferenceState = () => {
         optionTypes, setOptionTypes, optionVariants, setOptionVariants,
         bundles, setBundles, logs, setLogs, trash, setTrash,
         exchangeRates, setExchangeRates, addCounterparty, updateCounterparty, deleteCounterparty,
-        addManufacturer, updateManufacturer, deleteManufacturer, addOurCompany, updateOurCompany, deleteOurCompany, addEmployee, updateEmployee, deleteEmployee,
-        addCategory, addCategoriesBulk, deleteCategory, addOptionType, addOptionTypesBulk, updateOptionType, deleteOptionType,
+        addManufacturer, updateManufacturer, deleteManufacturer: deleteManufacturerFromRef, addOurCompany, updateOurCompany, deleteOurCompany: deleteOurCompanyFromRef, addEmployee, updateEmployee, deleteEmployee: deleteEmployeeFromRef,
+        addCategory, updateCategory, addCategoriesBulk, deleteCategory, addOptionType, addOptionTypeBulk: addOptionType, addOptionTypesBulk, updateOptionType, deleteOptionType,
         addOptionVariant, upsertOptionVariantsBulk, updateOptionVariant, deleteOptionVariant,
         addBundle, updateBundle, deleteBundle, moveToTrash, restoreFromTrash, permanentlyDelete,
         updateExchangeRate, addLog

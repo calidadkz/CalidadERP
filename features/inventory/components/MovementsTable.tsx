@@ -50,8 +50,8 @@ export const MovementsTable: React.FC<MovementsTableProps> = ({ movements, acces
                             <td className={`px-6 py-4 text-right font-mono font-bold text-sm ${m.type === 'In' ? 'text-emerald-700' : 'text-red-700'}`}>
                                 {m.type === 'In' ? '+' : '-'}{m.quantity}
                             </td>
-                            <td className="px-6 py-4 text-right font-mono text-xs font-black">{f(m.unitCostKZT)}</td>
-                            <td className="px-6 py-4 text-right font-mono text-xs font-black text-emerald-600">{f(m.salesPriceKZT || 0)}</td>
+                            <td className="px-6 py-4 text-right font-mono text-xs font-black">{f(m.unitCostKzt)}</td>
+                            <td className="px-6 py-4 text-right font-mono text-xs font-black text-emerald-600">{f(m.salesPriceKzt || 0)}</td>
                             <td className="px-6 py-4">
                                 <div className="text-xs text-slate-500 font-bold">{m.documentType} #{m.documentId ? m.documentId.slice(-6) : '---'}</div>
                                 <div className="text-[10px] text-slate-400 italic">{m.description}</div>

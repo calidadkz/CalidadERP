@@ -15,7 +15,7 @@ export const ManualPlanModal: React.FC<ManualPlanModalProps> = ({ onClose, onSub
     const [direction, setDirection] = useState<'Incoming' | 'Outgoing'>('Outgoing');
     const [cpId, setCpId] = useState('');
     const [amt, setAmt] = useState(0);
-    const [curr, setCurr] = useState(Currency.KZT);
+    const [curr, setCurr] = useState(Currency.Kzt);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [cfId, setCfId] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -30,7 +30,7 @@ export const ManualPlanModal: React.FC<ManualPlanModalProps> = ({ onClose, onSub
         const cashFlowItem = state.cashFlowItems.find(item => item.id === cfId);
 
         const p: PlannedPayment = {
-            id: new ApiService().generateUUID(),
+            id: ApiService.generateUUID(),
             direction: direction,
             sourceDocId: 'MANUAL',
             sourceDocType: 'Manual',
@@ -42,8 +42,8 @@ export const ManualPlanModal: React.FC<ManualPlanModalProps> = ({ onClose, onSub
             dueDate: date,
             isPaid: false,
             cashFlowItemId: cfId,
-            cashFlowCategory: cashFlowItem?.category || CashFlowCategory.OPERATING,
-        };
+            // Удалено: cashFlowCategory
+        } as PlannedPayment;
         onSubmit(p);
     };
 
@@ -96,7 +96,7 @@ export const ManualPlanModal: React.FC<ManualPlanModalProps> = ({ onClose, onSub
                                 <label className="block text-[9px] font-black text-blue-500 uppercase mb-1.5 ml-1 tracking-widest flex items-center gap-1">Статья ДДС <span className="text-red-500">*</span></label>
                                 <select className="w-full border border-blue-100 p-3 rounded-xl text-[10px] font-black bg-blue-50/30 text-blue-700 outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" value={cfId} onChange={e => setCfId(e.target.value)}>
                                     <option value="">-- ВЫБЕРИТЕ СТАТЬЮ --</option>
-                                    {state.cashFlowItems.filter(i => i.type === (direction === 'Outgoing' ? 'Outgoing' : 'Incoming')).map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                                    {state.cashFlowItems.filter(i => i.type === (direction === 'Outgoing' ? 'Expense' : 'Income')).map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
                                 </select>
                             </div>
                         </div>

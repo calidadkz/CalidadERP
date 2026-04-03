@@ -4,8 +4,8 @@ import { MoneyMath } from './MoneyMath';
 import { ApiService } from './api';
 
 export interface StockLot {
-    unitCostKZT: number;
-    salesPriceKZT: number;
+    unitCostKzt: number;
+    salesPriceKzt: number;
     quantityRemaining: number;
     date: string;
     configKey: string;
@@ -59,9 +59,9 @@ export class InventoryService {
         docId: string,
         item: { productId: string; sku: string; productName: string; qty: number; configuration?: string[] },
         statusType: MovementStatus = 'Physical',
-        unitCostKZT: number = 0,
+        unitCostKzt: number = 0,
         description?: string,
-        salesPriceKZT: number = 0
+        salesPriceKzt: number = 0
     ): StockMovement {
         return {
             id: ApiService.generateUUID(),
@@ -71,9 +71,9 @@ export class InventoryService {
             productName: item.productName,
             type,
             quantity: item.qty,
-            unitCostKZT,
-            totalCostKZT: MoneyMath.multiply(item.qty, unitCostKZT),
-            salesPriceKZT,
+            unitCostKzt,
+            totalCostKzt: MoneyMath.multiply(item.qty, unitCostKzt),
+            salesPriceKzt,
             statusType,
             documentType: docType,
             documentId: docId,
@@ -93,8 +93,8 @@ export class InventoryService {
             .sort((a, b) => a.date.localeCompare(b.date));
         
         const lots: StockLot[] = ins.map(m => ({
-            unitCostKZT: Number(m.unitCostKZT) || 0,
-            salesPriceKZT: Number(m.salesPriceKZT) || 0,
+            unitCostKzt: Number(m.unitCostKzt) || 0,
+            salesPriceKzt: Number(m.salesPriceKzt) || 0,
             quantityRemaining: Number(m.quantity) || 0,
             date: m.date,
             configKey: (m.configuration || []).sort().join('|') || 'BASE'
@@ -126,15 +126,15 @@ export class InventoryService {
     static calculateFIFODeduction(productId: string, qty: number, movements: StockMovement[], config?: string[]) {
         const lots = this.getAvailableLots(productId, movements, config);
         let remainingToShip = qty;
-        let totalCostKZT = 0;
-        let totalSalesKZT = 0;
+        let totalCostKzt = 0;
+        let totalSalesKzt = 0;
 
         for (const lot of lots) {
             if (remainingToShip <= 0) break;
             const take = Math.min(lot.quantityRemaining, remainingToShip);
             
-            totalCostKZT = MoneyMath.add(totalCostKZT, MoneyMath.multiply(take, lot.unitCostKZT));
-            totalSalesKZT = MoneyMath.add(totalSalesKZT, MoneyMath.multiply(take, lot.salesPriceKZT));
+            totalCostKzt = MoneyMath.add(totalCostKzt, MoneyMath.multiply(take, lot.unitCostKzt));
+            totalSalesKzt = MoneyMath.add(totalSalesKzt, MoneyMath.multiply(take, lot.salesPriceKzt));
             
             remainingToShip -= take;
         }
@@ -143,14 +143,14 @@ export class InventoryService {
             console.warn(`FIFO: Not enough lots for product ${productId}. Remaining: ${remainingToShip}`);
         }
 
-        const avgCost = qty > 0 ? totalCostKZT / qty : 0;
-        const avgSale = qty > 0 ? totalSalesKZT / qty : 0;
+        const avgCost = qty > 0 ? totalCostKzt / qty : 0;
+        const avgSale = qty > 0 ? totalSalesKzt / qty : 0;
 
         return {
-            totalCostKZT,
-            totalSalesKZT,
-            unitCostKZT: avgCost,
-            unitSalesKZT: avgSale
+            totalCostKzt,
+            totalSalesKzt,
+            unitCostKzt: avgCost,
+            unitSalesKzt: avgSale
         };
     }
 }

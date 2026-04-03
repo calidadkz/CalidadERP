@@ -16,28 +16,28 @@ export const CurrencyRatesPage: React.FC = () => {
 
     // Локальное состояние для строковых значений инпутов (чтобы можно было стирать всё и ставить запятые)
     const [inputValues, setInputValues] = useState<Record<Currency, string>>({
-        [Currency.USD]: exchangeRates[Currency.USD]?.toString() || '0',
-        [Currency.EUR]: exchangeRates[Currency.EUR]?.toString() || '0',
-        [Currency.CNY]: exchangeRates[Currency.CNY]?.toString() || '0',
-        [Currency.RUB]: exchangeRates[Currency.RUB]?.toString() || '0',
-        [Currency.KZT]: '1'
+        [Currency.Usd]: exchangeRates[Currency.Usd]?.toString() || '0',
+        [Currency.Eur]: exchangeRates[Currency.Eur]?.toString() || '0',
+        [Currency.Cny]: exchangeRates[Currency.Cny]?.toString() || '0',
+        [Currency.Rub]: exchangeRates[Currency.Rub]?.toString() || '0',
+        [Currency.Kzt]: '1'
     });
 
     // Синхронизация при загрузке данных
     useEffect(() => {
         setInputValues({
-            [Currency.USD]: exchangeRates[Currency.USD]?.toString() || '0',
-            [Currency.EUR]: exchangeRates[Currency.EUR]?.toString() || '0',
-            [Currency.CNY]: exchangeRates[Currency.CNY]?.toString() || '0',
-            [Currency.RUB]: exchangeRates[Currency.RUB]?.toString() || '0',
-            [Currency.KZT]: '1'
+            [Currency.Usd]: exchangeRates[Currency.Usd]?.toString() || '0',
+            [Currency.Eur]: exchangeRates[Currency.Eur]?.toString() || '0',
+            [Currency.Cny]: exchangeRates[Currency.Cny]?.toString() || '0',
+            [Currency.Rub]: exchangeRates[Currency.Rub]?.toString() || '0',
+            [Currency.Kzt]: '1'
         });
     }, [exchangeRates]);
 
     // Проверка, есть ли отличия между инпутами и сохраненными в БД курсами
     const hasUnsavedChanges = useMemo(() => {
         return (Object.keys(inputValues) as Currency[]).some((curr) => {
-            if (curr === Currency.KZT) return false;
+            if (curr === Currency.Kzt) return false;
             const val = inputValues[curr];
             const numVal = parseFloat(val.replace(',', '.'));
             return !isNaN(numVal) && numVal !== exchangeRates[curr];
@@ -47,7 +47,7 @@ export const CurrencyRatesPage: React.FC = () => {
     // Проверка, нужен ли глобальный пересчет
     const [needGlobalSync, setNeedGlobalSync] = useState(false);
 
-    const currencies = [Currency.USD, Currency.EUR, Currency.CNY, Currency.RUB];
+    const currencies = [Currency.Usd, Currency.Eur, Currency.Cny, Currency.Rub];
 
     const handleInputChange = (c: Currency, val: string) => {
         // Разрешаем только цифры, точки и запятые
@@ -256,15 +256,15 @@ export const CurrencyRatesPage: React.FC = () => {
                 <div className="grid grid-cols-3 gap-8 relative z-10">
                     <div className="p-5 bg-slate-800/50 rounded-2xl border border-white/5 backdrop-blur-sm">
                         <span className="block text-[10px] text-slate-500 uppercase font-black mb-2 tracking-widest">USD / CNY</span>
-                        <span className="text-2xl font-mono font-black text-blue-400 tracking-tighter">{(parseFloat(inputValues[Currency.USD].replace(',', '.')) / parseFloat(inputValues[Currency.CNY].replace(',', '.')) || 0).toFixed(4)}</span>
+                        <span className="text-2xl font-mono font-black text-blue-400 tracking-tighter">{(parseFloat(inputValues[Currency.Usd].replace(',', '.')) / parseFloat(inputValues[Currency.Cny].replace(',', '.')) || 0).toFixed(4)}</span>
                     </div>
                     <div className="p-5 bg-slate-800/50 rounded-2xl border border-white/5 backdrop-blur-sm">
                         <span className="block text-[10px] text-slate-500 uppercase font-black mb-2 tracking-widest">EUR / USD</span>
-                        <span className="text-2xl font-mono font-black text-emerald-400 tracking-tighter">{(parseFloat(inputValues[Currency.EUR].replace(',', '.')) / parseFloat(inputValues[Currency.USD].replace(',', '.')) || 0).toFixed(4)}</span>
+                        <span className="text-2xl font-mono font-black text-emerald-400 tracking-tighter">{(parseFloat(inputValues[Currency.Eur].replace(',', '.')) / parseFloat(inputValues[Currency.Usd].replace(',', '.')) || 0).toFixed(4)}</span>
                     </div>
                     <div className="p-5 bg-slate-800/50 rounded-2xl border border-white/5 backdrop-blur-sm">
                         <span className="block text-[10px] text-slate-500 uppercase font-black mb-2 tracking-widest">CNY / RUB</span>
-                        <span className="text-2xl font-mono font-black text-purple-400 tracking-tighter">{(parseFloat(inputValues[Currency.CNY].replace(',', '.')) / parseFloat(inputValues[Currency.RUB].replace(',', '.')) || 0).toFixed(4)}</span>
+                        <span className="text-2xl font-mono font-black text-purple-400 tracking-tighter">{(parseFloat(inputValues[Currency.Cny].replace(',', '.')) / parseFloat(inputValues[Currency.Rub].replace(',', '.')) || 0).toFixed(4)}</span>
                     </div>
                 </div>
             </div>

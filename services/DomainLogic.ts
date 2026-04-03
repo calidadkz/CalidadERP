@@ -15,14 +15,14 @@ export class FinanceService {
     allStacks: CurrencyLot[]
   ): { 
     effectiveRate: number; 
-    totalKZT: number; 
+    totalKzt: number; 
     updatedStacks: CurrencyLot[]; 
     consumedSegments: { amount: number, rate: number, date: string }[] 
   } {
-    if (currency === Currency.KZT) {
+    if (currency === Currency.Kzt) {
       return { 
         effectiveRate: 1, 
-        totalKZT: amount, 
+        totalKzt: amount, 
         updatedStacks: allStacks, 
         consumedSegments: [{ amount, rate: 1, date: new Date().toISOString() }] 
       };
@@ -39,7 +39,7 @@ export class FinanceService {
     const otherStacks = allStacks.filter(s => !relevantStacks.find(as => as.id === s.id));
     
     let remainingToConsume = amount;
-    let totalKZT = 0;
+    let totalKzt = 0;
     const consumedSegments: { amount: number, rate: number, date: string }[] = [];
     const processingStacks = relevantStacks.map(s => ({ ...s }));
 
@@ -50,7 +50,7 @@ export class FinanceService {
         const take = Math.min(lot.amountRemaining, remainingToConsume);
         const cost = MoneyMath.multiply(take, lot.rate);
         
-        totalKZT = MoneyMath.add(totalKZT, cost);
+        totalKzt = MoneyMath.add(totalKzt, cost);
         consumedSegments.push({ amount: take, rate: lot.rate, date: lot.date });
         
         lot.amountRemaining = MoneyMath.subtract(lot.amountRemaining, take);
@@ -60,15 +60,15 @@ export class FinanceService {
 
     if (remainingToConsume > 0.0001) {
       const marketRate = KZT_RATES[currency] || 1;
-      totalKZT = MoneyMath.add(totalKZT, MoneyMath.multiply(remainingToConsume, marketRate));
+      totalKzt = MoneyMath.add(totalKzt, MoneyMath.multiply(remainingToConsume, marketRate));
       consumedSegments.push({ amount: remainingToConsume, rate: marketRate, date: new Date().toISOString() });
     }
 
-    const effectiveRate = amount > 0 ? totalKZT / amount : 0;
+    const effectiveRate = amount > 0 ? totalKzt / amount : 0;
 
     return {
       effectiveRate,
-      totalKZT,
+      totalKzt,
       updatedStacks: [...otherStacks, ...processingStacks],
       consumedSegments
     };
@@ -76,8 +76,8 @@ export class FinanceService {
 
   static getCrossRate(from: Currency, to: Currency): number {
     if (from === to) return 1;
-    const rateToUSD = EXCHANGE_RATES_TO_USD[from];
-    const rateTargetToUSD = EXCHANGE_RATES_TO_USD[to];
-    return rateToUSD / rateTargetToUSD;
+    const rateToUsd = EXCHANGE_RATES_TO_USD[from];
+    const rateTargetToUsd = EXCHANGE_RATES_TO_USD[to];
+    return rateToUsd / rateTargetToUsd;
   }
 }

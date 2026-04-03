@@ -1,22 +1,30 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import { TableNames } from '../../../constants';
 import { ApiService } from '../../../services/api';
 import { useAuth } from './AuthContext';
 import { 
-    Product, Counterparty, CounterpartyAccount, Manufacturer, ProductCategory, OptionType, OptionVariant, 
+    Product, Counterparty, CounterpartyAccount, Manufacturer, OurCompany, Employee, ProductCategory, OptionType, OptionVariant, 
     Bundle, LogItem, TrashItem, Currency, PricingProfile, 
     SupplierOrder, SalesOrder, Reception, Shipment, PlannedPayment,
     ActualPayment, InternalTransaction, BankAccount, CurrencyLot, StockMovement, Discrepancy,
     OrderItem, SalesOrderItem, ReceptionItem, ReceptionExpense, ShipmentItem, PaymentAllocation,
-    CashFlowItem, HSCode, ActionType, OurCompany, Employee, ProductType
+    CashFlowItem, HSCode, ActionType, ProductType
 } from '../../../types';
-import { PreCalculation, PreCalculationItem, PreCalculationPackage, GeneralSettings, DetailedListItem, PackingListItem } from '../../../types/pre-calculations';
+import { PreCalculationDocument, PreCalculationItem, PackingListItem, GeneralSettings } from '../../../types/pre-calculations';
 import { useReferenceState } from '../hooks/useReferenceState';
 import { useInventoryState } from '../../inventory/hooks/useInventoryState';
 import { useOrderState } from '../../procurement/hooks/useOrderState';
 import { useFinanceState } from '../../finance/hooks/useFinanceState';
 import { usePreCalculations } from '../../pre-calculations/hooks/usePreCalculations';
+
+const DEFAULT_RATES: Record<Currency, number> = {
+    [Currency.Kzt]: 1,
+    [Currency.Usd]: 450,
+    [Currency.Cny]: 63,
+    [Currency.Eur]: 480,
+    [Currency.Rub]: 5
+};
 
 interface AppState {
     products: Product[];
@@ -53,8 +61,9 @@ interface AppState {
     isProcessing: boolean;
     defaultCurrency: Currency;
     generalSettings: GeneralSettings;
-    detailedListItems: DetailedListItem[];
+    detailedListItems: PreCalculationItem[];
     packingListItems: PackingListItem[];
+    inventorySummary: any[];
 }
 
 interface AppActions {
@@ -71,6 +80,7 @@ interface AppActions {
     addEmployee: (e: Employee) => Promise<Employee>;
     updateEmployee: (e: Employee) => Promise<Employee>;
     addCategory: (c: ProductCategory) => Promise<ProductCategory>;
+    updateCategory: (c: ProductCategory) => Promise<ProductCategory>;
     addCategoriesBulk: (cats: ProductCategory[]) => Promise<ProductCategory[]>;
     deleteCategory: (id: string) => Promise<void>;
     addCashFlowItem: (c: CashFlowItem) => Promise<CashFlowItem>;
@@ -94,7 +104,7 @@ interface AppActions {
     moveToTrash: (businessId: string, type: TrashItem['type'], name: string, data: unknown) => Promise<TrashItem>;
     restoreFromTrash: (item: TrashItem) => Promise<void>;
     permanentlyDelete: (item: TrashItem) => Promise<void>;
-    adjustStock: (pId: string, qty: number, cost: number, desc: string, config?: string[], salesPriceKZT?: number) => Promise<void>;
+    adjustStock: (pId: string, qty: number, cost: number, desc: string, config?: string[], salesPriceKzt?: number) => Promise<void>;
     revertInitialStockEntry: (movementId: string) => Promise<void>;
     saveReception: (r: Reception) => Promise<void>;
     saveShipment: (s: Shipment) => Promise<void>;
@@ -103,8 +113,10 @@ interface AppActions {
     addOrder: (o: SupplierOrder, plans: PlannedPayment[]) => Promise<void>;
     createOrder: (o: SupplierOrder, plans: PlannedPayment[]) => Promise<void>;
     updateOrder: (o: SupplierOrder, plans: PlannedPayment[]) => Promise<void>;
+    deleteOrder: (id: string) => Promise<void>;
     createSalesOrder: (o: SalesOrder, plans: PlannedPayment[]) => Promise<void>;
     updateSalesOrder: (o: SalesOrder, plans: PlannedPayment[]) => Promise<void>;
+    deleteSalesOrder: (id: string) => Promise<void>;
     addPlannedPayment: (p: PlannedPayment) => Promise<void>;
     executePayment: (p: ActualPayment) => Promise<void>;
     allocatePayment: (pId: string, al: PaymentAllocation[]) => Promise<void>;
@@ -118,14 +130,27 @@ interface AppActions {
     writeOff: (d: Discrepancy) => Promise<void>;
     updateGeneralSetting: (key: keyof GeneralSettings, value: string | number) => void;
     addDetailedListItem: () => void;
-    updateDetailedListItem: (id: string, key: keyof DetailedListItem, value: any) => void;
+    updateDetailedListItem: (id: string, key: keyof PreCalculationItem, value: any) => void;
     deleteDetailedListItem: (id: string) => void;
     addPackingListItem: () => void;
     updatePackingListItem: (id: string, key: keyof PackingListItem, value: any) => void;
     deletePackingListItem: (id: string) => void;
+    deletePreCalculation: (id: string) => Promise<void>;
+    refreshOperationalData: () => Promise<void>;
+    refreshInventorySummary: () => Promise<void>;
 }
 
 const StoreContext = createContext<{ state: AppState; actions: AppActions } | null>(null);
+
+const unique = <T extends { id: string | number }>(arr: T[]): T[] => {
+    const seen = new Set();
+    return arr.filter(item => {
+        if (!item || !item.id) return false;
+        const duplicate = seen.has(item.id);
+        seen.add(item.id);
+        return !duplicate;
+    });
+};
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { session } = useAuth();
@@ -134,6 +159,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const finance = useFinanceState(references.addLog);
     const preCalculations = usePreCalculations(); 
     const [pricingProfiles, setPricingProfiles] = useState<PricingProfile[]>([]);
+    const [inventorySummary, setInventorySummary] = useState<any[]>([]);
     
     const orders = useOrderState(
         references.addLog, 
@@ -144,101 +170,78 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         references.optionVariants,
         pricingProfiles,
         references.exchangeRates,
-        inventory.stockMovements
+        inventory.stockMovements,
+        references.moveToTrash
     );
 
     const [isLoading, setIsLoading] = useState(true);
-    const isInitialLoading = React.useRef(false);
+    const isInitialLoading = useRef(false);
 
-    const load = useCallback(async () => {
-        if (!session || isInitialLoading.current) return;
-        isInitialLoading.current = true;
-        setIsLoading(true);
+    const loadInventorySummary = useCallback(async () => {
         try {
-            const batch1 = await Promise.all([
+            const data = await ApiService.fetchAll<any>(TableNames.INVENTORY_SUMMARY, 'product_id');
+            setInventorySummary(data || []);
+        } catch (e) {
+            console.error("FAILED TO LOAD INVENTORY SUMMARY", e);
+        }
+    }, []);
+
+    // Стабилизируем сеттеры, чтобы они не вызывали бесконечный цикл
+    const { setProducts, setDiscrepancies } = inventory;
+    const { setCounterparties, setCounterpartyAccounts, setManufacturers, setOurCompanies, setEmployees, setCategories, setCashFlowItems, setHscodes, setOptionTypes, setOptionVariants, setBundles, setExchangeRates, setTrash } = references;
+    const { setPlannedPayments, setActualPayments, setInternalTransactions, setBankAccounts, setCurrencyStacks } = finance;
+    const { setOrders, setSalesOrders, setReceptions, setShipments } = orders;
+
+    const loadReferences = useCallback(async () => {
+        if (!session) return;
+        try {
+            const [
+                products, counterparties, counterpartyAccounts, 
+                ourCompanies, employees, categories, optionTypes,
+                optionVariants, bundles, exchangeRatesResult, fetchedPricingProfiles,
+                pricingProfileCategories, hsCodes, cashFlowItems, trashItems
+            ] = await Promise.all([
                 ApiService.fetchAll<Product>(TableNames.PRODUCTS),
                 ApiService.fetchAll<Counterparty>(TableNames.COUNTERPARTIES),
                 ApiService.fetchAll<CounterpartyAccount>(TableNames.COUNTERPARTY_ACCOUNTS),
-                ApiService.fetchAll<Manufacturer>(TableNames.MANUFACTURERS),
                 ApiService.fetchAll<OurCompany>(TableNames.OUR_COMPANIES),
                 ApiService.fetchAll<Employee>(TableNames.EMPLOYEES),
                 ApiService.fetchAll<ProductCategory>(TableNames.PRODUCT_CATEGORIES),
-                ApiService.fetchAll<OptionType>(TableNames.OPTION_TYPES)
-            ]);
-
-            const batch2 = await Promise.all([
+                ApiService.fetchAll<OptionType>(TableNames.OPTION_TYPES),
                 ApiService.fetchAll<OptionVariant>(TableNames.OPTION_VARIANTS),
                 ApiService.fetchAll<Bundle>(TableNames.BUNDLES),
-                ApiService.fetchAll<LogItem>(TableNames.LOGS),
-                ApiService.fetchAll<TrashItem>(TableNames.TRASH),
                 ApiService.fetchAll<{ currency: Currency; rate: number }>(TableNames.EXCHANGE_RATES, 'currency'),
-                ApiService.fetchAll<PricingProfile>(TableNames.PRICING_PROFILES)
-            ]);
-
-            const batch3 = await Promise.all([
+                ApiService.fetchAll<PricingProfile>(TableNames.PRICING_PROFILES),
                 ApiService.fetchAll<any>('pricing_profile_categories', 'profile_id'),
-                ApiService.fetchAll<SupplierOrder>(TableNames.SUPPLIER_ORDERS),
-                ApiService.fetchAll<SalesOrder>(TableNames.SALES_ORDERS),
-                ApiService.fetchAll<Reception>(TableNames.RECEPTIONS),
-                ApiService.fetchAll<Shipment>(TableNames.SHIPMENTS),
-                ApiService.fetchAll<PlannedPayment>(TableNames.PLANNED_PAYMENTS)
-            ]);
-
-            const batch4 = await Promise.all([
-                ApiService.fetchAll<ActualPayment>(TableNames.ACTUAL_PAYMENTS),
-                ApiService.fetchAll<InternalTransaction>(TableNames.INTERNAL_TRANSACTIONS),
-                ApiService.fetchAll<BankAccount>(TableNames.BANK_ACCOUNTS),
-                ApiService.fetchAll<CurrencyLot>(TableNames.CURRENCY_LOTS),
-                ApiService.fetchAll<StockMovement>(TableNames.STOCK_MOVEMENTS),
-                ApiService.fetchAll<Discrepancy>(TableNames.DISCREPANCIES)
-            ]);
-
-            const batch5 = await Promise.all([
-                ApiService.fetchAll<OrderItem>(TableNames.SUPPLIER_ORDER_ITEMS, 'supplier_order_id'),
-                ApiService.fetchAll<SalesOrderItem>(TableNames.SALES_ORDER_ITEMS),
-                ApiService.fetchAll<ReceptionItem>(TableNames.RECEPTION_ITEMS),
-                ApiService.fetchAll<ReceptionExpense>(TableNames.RECEPTION_EXPENSES),
-                ApiService.fetchAll<ShipmentItem>(TableNames.SHIPMENT_ITEMS, 'shipment_id'),
-                ApiService.fetchAll<PaymentAllocation>(TableNames.PAYMENT_ALLOCATIONS, 'actual_payment_id'),
-                ApiService.fetchAll<CashFlowItem>(TableNames.CASH_FLOW_ITEMS),
                 ApiService.fetchAll<HSCode>(TableNames.HS_CODES),
-                ApiService.fetchAll<PreCalculation>(TableNames.PRE_CALCULATIONS) 
+                ApiService.fetchAll<CashFlowItem>(TableNames.CASH_FLOW_ITEMS),
+                ApiService.fetchAll<TrashItem>(TableNames.TRASH),
             ]);
 
-            const batch6 = await Promise.all([
-                ApiService.fetchAll<PreCalculationItem>(TableNames.PRE_CALCULATION_ITEMS),
-                ApiService.fetchAll<PreCalculationPackage>(TableNames.PRE_CALCULATION_PACKAGES)
-            ]);
-
-            const [products, counterparties, counterpartyAccounts, manufacturers, ourCompanies, employees, categories, optionTypes] = batch1;
-            const [optionVariants, bundles, logs, trash, exchangeRatesResult, fetchedPricingProfiles] = batch2; 
-            const [pricingProfileCategories, supplierOrders, salesOrders, receptions, shipments, plannedPayments] = batch3;
-            const [actualPayments, internalTransactions, bankAccounts, currencyLots, stockMovements, discrepancies] = batch4;
-            const [supplierOrderItems, salesOrderItems, receptionItems, receptionExpenses, shipmentItems, paymentAllocations, cashFlowItems, hsCodes, fetchedPreCalculations] = batch5; 
-            const [preCalculationItems, preCalculationPackages] = batch6;
-
-            inventory.setProducts(products);
-            references.setCounterparties(counterparties);
-            references.setCounterpartyAccounts(counterpartyAccounts);
-            references.setManufacturers(manufacturers);
-            references.setOurCompanies(ourCompanies);
-            references.setEmployees(employees);
-            references.setCategories(categories);
-            references.setCashFlowItems(cashFlowItems);
-            references.setHscodes(hsCodes);
-            references.setOptionTypes(optionTypes);
-            references.setOptionVariants(optionVariants);
-            references.setBundles(bundles);
-            references.setLogs(logs);
-            references.setTrash(trash);
+            setProducts(unique(products));
+            setCounterparties(unique(counterparties));
+            setCounterpartyAccounts(unique(counterpartyAccounts));
+            setManufacturers([]); 
+            setOurCompanies(unique(ourCompanies));
+            setEmployees(unique(employees));
+            setCategories(unique(categories));
+            setCashFlowItems(unique(cashFlowItems));
+            setHscodes(unique(hsCodes));
+            setOptionTypes(unique(optionTypes));
+            setOptionVariants(unique(optionVariants));
+            setBundles(unique(bundles));
+            setTrash(unique(trashItems));
             
             if (fetchedPricingProfiles) {
                 const mapped = fetchedPricingProfiles.map(p => {
-                    const profileCategories = pricingProfileCategories.filter((l: any) => l.profile_id === p.id).map((l: any) => l.category_id) || [];
+                    const profileCategories = pricingProfileCategories
+                        .filter((l: any) => l.profileId === p.id)
+                        .map((l: any) => l.categoryId) || [];
+                        
                     let type = ProductType.MACHINE;
                     if (profileCategories.length > 0) {
-                        const firstCat = categories.find(c => c.id === profileCategories[0]);
-                        if (firstCat) type = firstCat.type;
+                        const firstCat = (categories as any[]).find((c: any) => c.id === profileCategories[0]);
+                        if (firstCat) type = (firstCat as any).type;
                     }
                     return {
                         ...ApiService.keysToCamel(p),
@@ -246,83 +249,101 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                         type
                     };
                 });
-                setPricingProfiles(mapped); 
+                setPricingProfiles(unique(mapped)); 
             }
 
-            orders.setOrders(supplierOrders.map(o => ({ ...o, items: supplierOrderItems.filter(i => i.supplierOrderId === o.id) })));
-            orders.setSalesOrders(salesOrders.map(o => ({ ...o, items: salesOrderItems.filter(i => i.salesOrderId === o.id) })));
-            orders.setReceptions(receptions.map(r => ({ ...r, items: receptionItems.filter(i => i.receptionId === r.id), expenses: receptionExpenses.filter(e => e.receptionId === r.id) })));
-            orders.setShipments(shipments.map(s => ({ ...s, items: shipmentItems.filter(i => i.shipmentId === s.id) })));
+            if (exchangeRatesResult.length > 0) {
+                const rates = exchangeRatesResult.reduce((acc, curr) => {
+                    acc[curr.currency] = curr.rate;
+                    return acc;
+                }, { ...DEFAULT_RATES } as Record<Currency, number>);
+                setExchangeRates(rates);
+            }
             
-            finance.setPlannedPayments(plannedPayments);
-            finance.setActualPayments(actualPayments.map(p => {
-                const acc = bankAccounts.find(a => a.id === p.bankAccountId);
+            await loadInventorySummary();
+        } catch (e) {
+            console.error("REFERENCE LOAD ERROR", e);
+        }
+    }, [session, setProducts, setCounterparties, setCounterpartyAccounts, setManufacturers, setOurCompanies, setEmployees, setCategories, setCashFlowItems, setHscodes, setOptionTypes, setOptionVariants, setBundles, setExchangeRates, setTrash, loadInventorySummary]);
+
+    const loadOperational = useCallback(async () => {
+        if (!session) return;
+        try {
+            const [
+                supplierOrders, salesOrders, receptions, shipments, plannedPayments,
+                actualPayments, internalTransactions, bankAccounts, currencyLots, 
+                discrepancies, supplierOrderItems, salesOrderItems, 
+                receptionItems, receptionExpenses, shipmentItems, paymentAllocations
+            ] = await Promise.all([
+                ApiService.fetchAll<SupplierOrder>(TableNames.SUPPLIER_ORDERS),
+                ApiService.fetchAll<SalesOrder>(TableNames.SALES_ORDERS),
+                ApiService.fetchAll<Reception>(TableNames.RECEPTIONS),
+                ApiService.fetchAll<Shipment>(TableNames.SHIPMENTS),
+                ApiService.fetchAll<PlannedPayment>(TableNames.PLANNED_PAYMENTS),
+                ApiService.fetchAll<ActualPayment>(TableNames.ACTUAL_PAYMENTS),
+                ApiService.fetchAll<InternalTransaction>(TableNames.INTERNAL_TRANSACTIONS),
+                ApiService.fetchAll<BankAccount>(TableNames.BANK_ACCOUNTS),
+                ApiService.fetchAll<CurrencyLot>(TableNames.CURRENCY_LOTS),
+                ApiService.fetchAll<Discrepancy>(TableNames.DISCREPANCIES),
+                ApiService.fetchAll<OrderItem>(TableNames.SUPPLIER_ORDER_ITEMS, 'supplier_order_id'),
+                ApiService.fetchAll<SalesOrderItem>(TableNames.SALES_ORDER_ITEMS),
+                ApiService.fetchAll<ReceptionItem>(TableNames.RECEPTION_ITEMS),
+                ApiService.fetchAll<ReceptionExpense>(TableNames.RECEPTION_EXPENSES),
+                ApiService.fetchAll<ShipmentItem>(TableNames.SHIPMENT_ITEMS, 'shipment_id'),
+                ApiService.fetchAll<PaymentAllocation>(TableNames.PAYMENT_ALLOCATIONS, 'actual_payment_id'),
+            ]);
+
+            setOrders(supplierOrders.map(o => ({ ...o, items: supplierOrderItems.filter(i => i.supplierOrderId === o.id) })));
+            setSalesOrders(salesOrders.map(o => ({ ...o, items: salesOrderItems.filter(i => i.salesOrderId === o.id) })));
+            setReceptions(receptions.map(r => ({ ...r, items: receptionItems.filter(i => i.receptionId === r.id), expenses: receptionExpenses.filter(e => e.receptionId === r.id) })));
+            setShipments(shipments.map(s => ({ ...s, items: shipmentItems.filter(i => i.shipmentId === s.id) })));
+            
+            setPlannedPayments(unique(plannedPayments));
+            setActualPayments(actualPayments.map(p => {
+                const acc = (bankAccounts as BankAccount[]).find(a => a.id === p.bankAccountId);
                 return { 
                     ...p, 
                     allocations: paymentAllocations.filter(a => a.actualPaymentId === p.id),
                     fromAccount: p.fromAccount || (acc ? `${acc.bank} ${acc.number}` : 'Unknown Account')
                 };
             }));
-            finance.setInternalTransactions(internalTransactions);
-            finance.setBankAccounts(bankAccounts);
-            finance.setCurrencyStacks(currencyLots);
-            
-            inventory.setStockMovements(stockMovements);
-            inventory.setDiscrepancies(discrepancies);
-
-            // Initialize preCalculations state using fetched data
-            if (fetchedPreCalculations.length > 0) {
-                const firstPreCalculation = fetchedPreCalculations[0];
-                preCalculations.updateGeneralSetting('shippingChinaUsdPerM3', firstPreCalculation.shippingChinaUsd);
-                preCalculations.updateGeneralSetting('exchangeRateForShipping', firstPreCalculation.exchangeRateUsdKzt);
-                preCalculations.updateGeneralSetting('deliveryAlmatyKaragandaKzt', firstPreCalculation.shippingKaragandaKzt);
-                preCalculations.updateGeneralSetting('svhKzt', firstPreCalculation.svhKzt);
-                preCalculations.updateGeneralSetting('brokerKzt', firstPreCalculation.brokerKzt);
-                preCalculations.updateGeneralSetting('customsFeesKzt', firstPreCalculation.customsFeesKzt);
-                preCalculations.updateGeneralSetting('ndsRate', firstPreCalculation.vatRate || 0);
-                preCalculations.updateGeneralSetting('kpn20Rate', firstPreCalculation.citRateStandard || 0);
-                preCalculations.updateGeneralSetting('kpn4Rate', firstPreCalculation.citRateSimplified || 0);
-                preCalculations.updateGeneralSetting('resaleMarkup', firstPreCalculation.intercompanyMarkupPercent || 0);
-            }
-            // Assuming that detailedListItems and packingListItems can be set directly
-            preCalculations.setDetailedListItems(preCalculationItems);
-            preCalculations.setPackingListItems(preCalculationPackages);
-
-            if (exchangeRatesResult.length > 0) {
-                const rates = exchangeRatesResult.reduce((acc, curr) => {
-                    acc[curr.currency] = curr.rate;
-                    return acc;
-                }, {} as Record<Currency, number>);
-                references.setExchangeRates(rates);
-            }
+            setInternalTransactions(unique(internalTransactions));
+            setBankAccounts(unique(bankAccounts));
+            setCurrencyStacks(unique(currencyLots));
+            setDiscrepancies(unique(discrepancies));
         } catch (e) {
-            console.error("CRITICAL LOAD ERROR", e);
-        } finally {
-            setIsLoading(false);
-            isInitialLoading.current = false;
+            console.error("OPERATIONAL LOAD ERROR", e);
         }
-    }, [
-        session,
-        setIsLoading,
-        setPricingProfiles,
-        references,
-        inventory,
-        finance,
-        preCalculations.updateGeneralSetting, 
-        preCalculations.setDetailedListItems,
-        preCalculations.setPackingListItems,
-        orders,
-    ]);
+    }, [session, setOrders, setSalesOrders, setReceptions, setShipments, setPlannedPayments, setActualPayments, setInternalTransactions, setBankAccounts, setCurrencyStacks, setDiscrepancies]);
+
+    const load = useCallback(async () => {
+        if (!session || isInitialLoading.current) return;
+        isInitialLoading.current = true;
+        setIsLoading(true);
+        await loadReferences();
+        await loadOperational();
+        setIsLoading(false);
+        isInitialLoading.current = false;
+    }, [session, loadReferences, loadOperational]);
 
     useEffect(() => { if (session) load(); else setIsLoading(false); }, [session, load]);
 
-    const state: AppState = {
+    const clients = useMemo(() => references.counterparties.filter(c => c.type === 'Client' as any), [references.counterparties]);
+    const suppliers = useMemo(() => references.counterparties.filter(c => c.type === 'Supplier' as any), [references.counterparties]);
+    
+    // Manufacturers теперь вычисляются системно из Counterparties
+    const manufacturers = useMemo(() => 
+        references.counterparties.filter(c => c.roles?.includes('Manufacturer')), 
+        [references.counterparties]
+    );
+
+    const state: AppState = useMemo(() => ({
         products: inventory.products,
         counterparties: references.counterparties,
-        clients: references.counterparties.filter(c => c.type === 'Client' as any),
-        suppliers: references.counterparties.filter(c => c.type === 'Supplier' as any),
+        clients,
+        suppliers,
         counterpartyAccounts: references.counterpartyAccounts,
-        manufacturers: references.manufacturers,
+        manufacturers,
         ourCompanies: references.ourCompanies,
         employees: references.employees,
         categories: references.categories,
@@ -349,13 +370,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         discrepancies: inventory.discrepancies,
         isLoading: isLoading,
         isProcessing: finance.isProcessing,
-        defaultCurrency: Currency.KZT,
+        defaultCurrency: Currency.Kzt,
         generalSettings: preCalculations.generalSettings,
-        detailedListItems: preCalculations.detailedListItems,
-        packingListItems: preCalculations.packingListItems,
-    };
+        detailedListItems: preCalculations.items,
+        packingListItems: preCalculations.packingList,
+        inventorySummary: inventorySummary
+    }), [
+        inventory.products, inventory.stockMovements, inventory.discrepancies,
+        references.counterparties, references.counterpartyAccounts, manufacturers,
+        references.ourCompanies, references.employees, references.categories,
+        references.cashFlowItems, references.hscodes, references.optionTypes,
+        references.optionVariants, references.bundles, references.logs, references.trash,
+        references.exchangeRates, pricingProfiles, clients, suppliers,
+        orders.orders, orders.salesOrders, orders.receptions, orders.shipments,
+        finance.plannedPayments, finance.actualPayments, finance.internalTransactions,
+        finance.bankAccounts, finance.currencyStacks,
+        isLoading, finance.isProcessing,
+        preCalculations.generalSettings, preCalculations.items, preCalculations.packingList,
+        inventorySummary
+    ]);
 
-    const actions: AppActions = {
+    const actions: AppActions = useMemo(() => ({
         addProduct: inventory.addProduct,
         updateProduct: inventory.updateProduct,
         deleteProduct: inventory.deleteProduct,
@@ -369,6 +404,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addEmployee: references.addEmployee,
         updateEmployee: references.updateEmployee,
         addCategory: references.addCategory,
+        updateCategory: references.updateCategory,
         addCategoriesBulk: references.addCategoriesBulk,
         deleteCategory: references.deleteCategory,
         addCashFlowItem: references.addCashFlowItem,
@@ -392,55 +428,75 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         moveToTrash: references.moveToTrash,
         restoreFromTrash: references.restoreFromTrash,
         permanentlyDelete: references.permanentlyDelete,
-        adjustStock: inventory.adjustStock,
+        adjustStock: (pId, qty, cost, desc, config, salesPriceKzt) => 
+            inventory.adjustStock(pId, qty, cost, desc, config, salesPriceKzt, references.optionVariants, pricingProfiles, references.exchangeRates),
         revertInitialStockEntry: inventory.revertInitialStockEntry,
         saveReception: orders.saveReception,
         saveShipment: orders.saveShipment,
         deleteShipment: orders.deleteShipment,
-        revertShipment: orders.revertShipment,
-        addOrder: orders.addOrder,
-        createOrder: orders.addOrder,
-        updateOrder: orders.updateOrder,
-        createSalesOrder: orders.createSalesOrder,
-        updateSalesOrder: orders.updateSalesOrder,
-        addPlannedPayment: finance.addPlannedPayment,
-        executePayment: finance.executePayment,
-        allocatePayment: finance.allocatePayment,
-        addInternalTransaction: finance.addInternalTransaction,
-        addBankAccount: finance.addBankAccount,
-        updateDiscrepancy: inventory.updateDiscrepancy,
-        writeOffDiscrepancy: inventory.writeOffDiscrepancy,
-        writeOff: inventory.writeOffDiscrepancy,
-        updateGeneralSetting: preCalculations.updateGeneralSetting,
-        addDetailedListItem: preCalculations.addDetailedListItem,
-        updateDetailedListItem: preCalculations.updateDetailedListItem,
-        deleteDetailedListItem: preCalculations.deleteDetailedListItem,
-        addPackingListItem: preCalculations.addPackingListItem,
-        updatePackingListItem: preCalculations.updatePackingListItem,
-        deletePackingListItem: preCalculations.deletePackingListItem,
-        addPricingProfile: async (pp) => {
-            const { applicableCategoryIds, type, ...data } = pp;
-            const saved = await ApiService.create<Omit<PricingProfile, 'type'>>(TableNames.PRICING_PROFILES, data);
-            if (applicableCategoryIds?.length) {
-                await supabase.from('pricing_profile_categories').insert(applicableCategoryIds.map(cid => ({ profile_id: saved.id, category_id: cid })));
-            }
-            setPricingProfiles(prev => [...prev.filter(p => p.id !== saved.id), { ...saved, applicableCategoryIds: applicableCategoryIds || [], type: type || ProductType.MACHINE }]);
-        },
+        revertShipment: id => orders.revertShipment(id),
+        addOrder: (o, p) => orders.addOrder(o, p),
+        createOrder: (o, p) => orders.addOrder(o, p),
+        updateOrder: (o, p) => orders.updateOrder(o, p),
+        deleteOrder: id => orders.deleteOrder(id),
+        createSalesOrder: (o, p) => orders.createSalesOrder(o, p),
+        updateSalesOrder: (o, p) => orders.updateSalesOrder(o, p),
+        deleteSalesOrder: id => orders.deleteSalesOrder(id),
+        addPlannedPayment: p => finance.addPlannedPayment(p),
+        executePayment: p => finance.executePayment(p),
+        allocatePayment: (id, al) => finance.allocatePayment(id, al),
+        addInternalTransaction: tx => finance.addInternalTransaction(tx),
+        addBankAccount: (acc, rate) => finance.addBankAccount(acc, rate),
         updatePricingProfile: async (pp) => {
-            const { applicableCategoryIds, type, ...data } = pp;
-            const updated = await ApiService.update<Omit<PricingProfile, 'type'>>(TableNames.PRICING_PROFILES, pp.id, data);
-            await supabase.from('pricing_profile_categories').delete().eq('profile_id', pp.id);
-            if (applicableCategoryIds?.length) {
-                await supabase.from('pricing_profile_categories').insert(applicableCategoryIds.map(cid => ({ profile_id: pp.id, category_id: cid })));
+            const { applicableCategoryIds, ...dbData } = pp;
+            const updated = await ApiService.update<PricingProfile>(TableNames.PRICING_PROFILES, pp.id, dbData);
+            await ApiService.deleteByField('pricing_profile_categories', 'profile_id', pp.id);
+            if (applicableCategoryIds && applicableCategoryIds.length > 0) {
+                await ApiService.createMany('pricing_profile_categories', applicableCategoryIds.map(cId => ({ profile_id: pp.id, category_id: cId })));
             }
-            setPricingProfiles(prev => prev.map(p => p.id === pp.id ? { ...updated, applicableCategoryIds, type } : p));
+            setPricingProfiles(prev => prev.map(p => p.id === pp.id ? { ...updated, applicableCategoryIds: applicableCategoryIds || [] } : p));
+        },
+        addPricingProfile: async (pp) => {
+            const { applicableCategoryIds, ...dbData } = pp;
+            const created = await ApiService.create<PricingProfile>(TableNames.PRICING_PROFILES, dbData);
+            if (applicableCategoryIds && applicableCategoryIds.length > 0) {
+                await ApiService.createMany('pricing_profile_categories', applicableCategoryIds.map(cId => ({ profile_id: created.id, category_id: cId })));
+            }
+            setPricingProfiles(prev => [...prev, { ...created, applicableCategoryIds: applicableCategoryIds || [] }]);
         },
         deletePricingProfile: async (id) => {
-            await supabase.from('pricing_profile_categories').delete().eq('profile_id', id);
             await ApiService.delete(TableNames.PRICING_PROFILES, id);
+            await ApiService.deleteByField('pricing_profile_categories', 'profile_id', id);
             setPricingProfiles(prev => prev.filter(p => p.id !== id));
-        }
-    };
+        },
+        updateDiscrepancy: d => inventory.updateDiscrepancy(d),
+        writeOffDiscrepancy: d => inventory.writeOffDiscrepancy(d),
+        writeOff: d => inventory.writeOffDiscrepancy(d),
+        updateGeneralSetting: (k, v) => preCalculations.updateGeneralSetting(k, v),
+        addDetailedListItem: () => preCalculations.addItem({} as any),
+        updateDetailedListItem: (id, k, v) => preCalculations.updateItem(id, k, v),
+        deleteDetailedListItem: id => preCalculations.deleteItem(id),
+        addPackingListItem: () => preCalculations.addPackingItem(),
+        updatePackingListItem: (id, k, v) => preCalculations.updatePackingItem(id, k, v),
+        deletePackingListItem: id => preCalculations.deletePackingItem(id),
+        deletePreCalculation: async (id) => {
+            const pc = await ApiService.fetchOne<any>(TableNames.PRE_CALCULATIONS, id);
+            if (pc) {
+                const items = await ApiService.fetchAll<any>(TableNames.PRE_CALC_ITEMS, { preCalculationId: id });
+                const packages = await ApiService.fetchAll<any>(TableNames.PRE_CALC_PACKAGES, { preCalculationId: id });
+                const fullData = { ...pc, items, packages };
+                await references.moveToTrash(id, 'PreCalculation' as any, pc.name, fullData);
+                await ApiService.deleteByField(TableNames.PRE_CALC_ITEMS, 'preCalculationId', id);
+                await ApiService.deleteByField(TableNames.PRE_CALC_PACKAGES, 'preCalculationId', id);
+                await ApiService.delete(TableNames.PRE_CALCULATIONS, id);
+                references.addLog('Delete', 'PreCalculation', id, `Предрасчет "${pc.name}" перемещен в корзину`);
+            }
+        },
+        refreshOperationalData: loadOperational,
+        refreshInventorySummary: loadInventorySummary
+    }), [
+        inventory, references, finance, preCalculations, orders, pricingProfiles, loadOperational, loadInventorySummary
+    ]);
 
     return <StoreContext.Provider value={{ state, actions }}>{children}</StoreContext.Provider>;
 };

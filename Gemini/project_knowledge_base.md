@@ -14,7 +14,15 @@ This is the entry point for the AI Assistant to understand the ERP system. Use t
 
 ---
 
-## 🛠️ 2. Business Logic & Modules
+## 🔑 2. Environment & Infrastructure
+*   **Supabase Project URL:** `https://umtlyxasirwpxizxcfbp.supabase.co`
+*   **Supabase Anon Key:** `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtdGx5eGFzaXJ3cHhpenhjZmJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzMDY4NDcsImV4cCI6MjA4Mzg4Mjg0N30.HoAI6K-8FDI8l1u7gS-3C1f9xhC4IItkcNhFvIZt5oQ`
+*   **Supabase Service Role Key:** `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtdGx5eGFzaXJ3cHhpenhjZmJwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODMwNjg0NywiZXhwIjoyMDgzODgyODQ3fQ.KuLH51owhnwLgTzge6cZAc4IfDB6ITxPicgH9nMGKGw`
+*   *Usage:* Use these for maintenance scripts (introspection) and service-level operations.
+
+---
+
+## 🛠️ 3. Business Logic & Modules
 Detailed descriptions of how each functional block works are located in `Gemini/Project modules description/`.
 
 **Key Modules:**
@@ -26,23 +34,32 @@ Detailed descriptions of how each functional block works are located in `Gemini/
 
 ---
 
-## 📈 3. Formulas & Calculations
+## 📝 4. Prompts & Specifications (Промпты и ТЗ)
+Located in `Gemini/Prompts/`.
+*   *Purpose:* Detailed functional requirements and prompts for various modules. Essential for restoring or extending functionality.
+*   *Distinction:* While overlapping with "Project modules description", these files serve as the technical "Source of Truth" for implementation details and AI-driven development.
+*   **Example:** [`preCalculations.md`](../Prompts/preCalculations.md) — Comprehensive logic for the Pre-calculations module.
+
+---
+
+## 📈 5. Formulas & Calculations
 *   **Source of Truth:** `Предрасчет.txt` (Root directory).
 *   **Status:** ⚠️ *Do not use formulas from this file until the user provides the detailed prompt for the Pre-calculations module.*
 *   **Contents:** Margin calculations (IP vs TOO), Logistics costs (China to KZ), VAT (НДС), and Bank commissions.
 
 ---
 
-## 🎨 4. Development Standards
+## 🎨 6. Development Standards
 *   **UI/UX Standards:** [`ui_standards.md`](../Project%20modules%20description/ui_standards.md) — Guidelines for icons, colors (e.g., blue for totals), and layout consistency.
 *   **System Overview:** [`system_overview.md`](../Project%20modules%20description/system_overview.md) — Global architecture and state management principles.
 
 ---
 
-## 🔄 5. Maintenance Scripts
+## 🔄 7. Maintenance Scripts
 Located in `Gemini/scripts/`:
 *   `generate_app_map.ts`: Run this to update the file structure map.
 *   `introspect.ts`: Run this to refresh the database schema snapshot.
+    *   *AI Note:* To run TypeScript ES Modules, use `NODE_OPTIONS='--loader ts-node/esm' node <script_path.ts>`.
 
 ---
 *Note: This document is the primary context source for the AI. Always check here first when starting a new task.*

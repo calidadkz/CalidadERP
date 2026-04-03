@@ -1,10 +1,13 @@
+
 export interface GeneralSettings {
   shippingChinaUsdPerM3: number;
   exchangeRateForShipping: number;
-  deliveryAlmatyKaragandaKzt: number;
+  deliveryAlmatyKaragandaKztPerM3: number; // Изменено с deliveryAlmatyKaragandaKzt
   svhKzt: number;
   brokerKzt: number;
   customsFeesKzt: number;
+  exchangeRateUsd: number; 
+  exchangeRateCny: number;
   ndsRate: number;
   kpn20Rate: number;
   kpn4Rate: number;
@@ -12,143 +15,84 @@ export interface GeneralSettings {
   salesBonusRate: number;
 }
 
-export interface DetailedListItem {
+export interface PreCalculationItem {
   id: string;
+  productId?: string;
+  orderId?: string;
+  clientName?: string;
+
   name: string;
-  options?: string[];
-  supplierName: string;
-  manufacturer: string;
-  hsCode: string;
+  sku?: string;
+  type: 'MACHINE' | 'PART';
+  manufacturer?: string;
+  hsCode?: string;
+  options?: PreCalculationItemOption[];
+
   quantity: number;
+  supplierName: string;
+  revenueKzt: number;
+  isRevenueConfirmed: boolean;
+  
+  // Прочие расходы
+  pnrKzt: number;
+  deliveryLocalKzt: number;
+  salesBonusKzt: number;
+  
+  marginPercentage: number;
+  taxRegime: 'Общ.' | 'Упр.';
+
+  purchasePrice: number;
+  purchasePriceCurrency: 'USD' | 'CNY';
+  purchasePriceKzt: number;
+
   volumeM3: number;
-  ignoreDimensions: boolean;
+  weightKg: number;
+  packages: { lengthMm: number; widthMm: number; heightMm: number }[];
+  useDimensions: boolean;
+
+  deliveryChinaKzt: number;
+  deliveryAlmatyKaragandaPerItemKzt: number;
+  svhPerItemKzt: number;
+  brokerPerItemKzt: number;
+  customsFeesPerItemKzt: number;
+
+  customsNdsKzt: number;
+  totalNdsKzt: number;
+  ndsDifferenceKzt: number;
+  kpnKzt: number;
+
+  preSaleCostKzt: number;
+  fullCostKzt: number;
+  profitKzt: number;
+}
+
+export interface PreCalculationItemOption {
+  typeId: string;
+  typeName: string;
+  variantId: string;
+  variantName: string;
+}
+
+export interface PackingListItem {
+  description: string | number | readonly string[];
+  id: string;
+  placeNumber: number;
   lengthMm: number;
   widthMm: number;
   heightMm: number;
   weightKg: number;
-  deliveryToClientKzt: number;
-  orderId?: string;
-  clientName?: string;
-  contractNumber?: string;
-  revenueKzt: number;
-  isRevenueConfirmed: boolean;
-  prepaymentKzt: number;
-  isPrepaymentConfirmed: boolean;
-  taxRegime: 'Общ.' | 'Упр.';
-  // Calculated fields (as in PreCalculationItem)
-  purchaseKzt?: number;
-  logisticsCnKzt?: number;
-  logisticsLocalKzt?: number;
-  svhPerItemKzt: number; // Updated name to match PreCalculationItem
-  brokerPerItemKzt: number; // Updated name to match PreCalculationItem
-  customsFeesPerItemKzt: number; // Updated name to match PreCalculationItem
-  totalNdsKzt: number;
-  customsNdsKzt?: number; // Optional as in PreCalculationItem
-  ndsDifferenceKzt?: number; // Optional as in PreCalculationItem
-  kpnKzt?: number; // Optional as in PreCalculationItem
-  profitKzt?: number; // Optional as in PreCalculationItem
-  marginPercentage?: number; // Optional as in PreCalculationItem
-  fullCostKzt?: number; // Added from PreCalculationItem
-  preSaleCostKzt?: number; // Added from PreCalculationItem
-  salesBonusKzt?: number; // Added from PreCalculationItem
-  commissioningKzt?: number; // Added from PreCalculationItem
-
-  // New properties from PreCalculationItem that are not in DetailedListItem but are required
-  productName: string; // From PreCalculationItem
-  type: string; // From PreCalculationItem, e.g., 'Stock'
-  supplierPriceUsd: number; // From PreCalculationItem
-  sellingPriceKzt: number; // From PreCalculationItem
+  volumeM3: number;
+  items: {
+    detailedItemId: any; preCalculationItemId: string; quantity: number 
+  }[];
 }
 
-export interface PackingListItem {
-  id: string;
-  preCalculationId?: string; // Added from PreCalculationPackage
-  packageNumber: number;
-  lengthMm?: number;
-  widthMm?: number;
-  heightMm?: number;
-  weightKg?: number;
-  volumeM3?: number;
-  description?: string;
-  items: { detailedItemId: string; quantity: number }[];
-  createdAt?: string; // Added from PreCalculationPackage
-}
-
-export interface PreCalculation {
-  id: string;
-  name: string;
-  date?: string;
-  status: string;
-  taxScheme: string;
-  exchangeRateUsdKzt: number;
-  shippingChinaUsd: number;
-  shippingKaragandaKzt: number;
-  svhKzt: number;
-  brokerKzt: number;
-  customsFeesKzt: number;
-  customsVatKzt: number;
-  totalVolumeM3?: number;
-  totalWeightKg?: number;
-  notes?: string;
-  updatedAt?: string;
-  exchangeRateCnyKzt?: number;
-  citRateStandard?: number;
-  citRateSimplified?: number;
-  vatRate?: number;
-  intercompanyMarkupPercent?: number;
-
-  // New fields to align with usePreCalculations hook and its internal states
-  generalSettings?: GeneralSettings; // Assuming this will be part of the PreCalculation object from DB if it saves the settings
-  detailedListItems?: DetailedListItem[]; 
-  packingListItems?: PackingListItem[]; 
-}
-
-export interface PreCalculationItem {
-  id: string;
-  preCalculationId?: string;
-  productId?: string;
-  productName: string;
-  sku?: string;
-  orderId?: string;
-  clientId?: string;
-  clientName?: string;
-  type: string;
-  quantity: number;
-  supplierPriceUsd: number;
-  sellingPriceKzt: number;
-  lengthMm?: number;
-  widthMm?: number;
-  heightMm?: number;
-  weightKg?: number;
-  volumeM3?: number;
-  purchaseKzt?: number;
-  logisticsCnKzt?: number;
-  logisticsLocalKzt?: number;
-  svhKzt?: number;
-  brokerKzt?: number;
-  customsFeesKzt?: number;
-  customsVatKzt?: number;
-  pnrKzt?: number;
-  deliveryLocalKzt?: number;
-  advertisingKzt?: number;
-  bonusKzt?: number;
-  taxKzt?: number;
-  vatKzt?: number;
-  totalExpensesKzt?: number;
-  profitKzt?: number;
-  marginPercent?: number;
-}
-
-export interface PreCalculationPackage {
-  id: string;
-  preCalculationId?: string;
-  packageNumber: number;
-  lengthMm?: number;
-  widthMm?: number;
-  heightMm?: number;
-  weightKg?: number;
-  volumeM3?: number;
-  description?: string;
-  items?: any; // You might want to define a more specific type for this JSONB array
-  createdAt?: string;
+export interface PreCalculationDocument {
+    id: string;
+    name: string;
+    date: string;
+    status: 'draft' | 'finalized';
+    settings: GeneralSettings;
+    items: PreCalculationItem[];
+    packingList: PackingListItem[];
 }

@@ -27,8 +27,8 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ expenses, setExpenses,
             id: ApiService.generateId(), 
             type: 'Доставка Китай', 
             amount: 0, 
-            currency: Currency.KZT, 
-            exchangeRateToKZT: 1, 
+            currency: Currency.Kzt, 
+            exchangeRateToKzt: 1, 
             allocationMethod: ExpenseAllocationMethod.BY_VALUE 
         }]);
     };

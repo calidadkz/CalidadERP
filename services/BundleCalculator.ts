@@ -1,90 +1,68 @@
-
-import { Currency, OptionVariant, Product } from '../types';
+import { Product, OptionVariant, Currency, MachineConfigEntry } from '../types';
 
 export class BundleCalculator {
-  static getVariantRawInfo(variant: OptionVariant, machine?: Product) {
-    let price = variant.price;
-    if (machine && machine.machineConfig) {
-      const typeConfig = machine.machineConfig.find(mc => mc.typeId === variant.typeId);
-      if (typeConfig && typeConfig.priceOverrides && typeConfig.priceOverrides[variant.id] !== undefined) {
-        price = typeConfig.priceOverrides[variant.id];
-      }
-    }
-    return { price, currency: variant.currency };
-  }
-
-  static getRelativePrice(
-    typeId: string, 
-    variant: OptionVariant, 
-    optionVariants: OptionVariant[], 
-    machine?: Product
-  ) {
-    if (!machine) return { diff: 0, currency: variant.currency };
-
-    const typeConfig = machine.machineConfig?.find(mc => mc.typeId === typeId);
-    const defaultVarId = typeConfig?.defaultVariantId;
-    
-    const currentRaw = this.getVariantRawInfo(variant, machine);
-
-    if (!defaultVarId) {
-      return { diff: currentRaw.price, currency: currentRaw.currency };
-    }
-
-    const defaultVariant = optionVariants.find(v => v.id === defaultVarId);
-    const defaultRaw = defaultVariant ? this.getVariantRawInfo(defaultVariant, machine) : { price: 0, currency: Currency.USD };
-
-    // Упрощение: предполагаем одну валюту внутри группы для расчета разницы. 
-    // Если валюты разные, нужно привести к базовой валюте станка через exchangeRates (передается извне)
-    return { diff: currentRaw.price - defaultRaw.price, currency: currentRaw.currency };
+  static getDefaultIds(configEntry: MachineConfigEntry | undefined): string[] {
+    if (!configEntry) return [];
+    return Array.from(new Set([
+      configEntry.defaultVariantId,
+      ...(configEntry.defaultVariantIds || [])
+    ].filter((id): id is string => !!id)));
   }
 
   static calculateTotals(
-    machine: Product, 
-    selectedOptions: Record<string, string[]>, 
-    optionVariants: OptionVariant[],
-    exchangeRates: Record<Currency, number>
+    machine: Product,
+    selectedOptions: Record<string, string[]>,
+    allVariants: OptionVariant[],
+    exchangeRates: Record<string, number>
   ) {
-    let totalPurchaseInBase = machine.basePrice;
-    
-    const getCrossRate = (from: Currency, to: Currency) => {
-        if (from === to) return 1;
-        return (exchangeRates[from] || 1) / (exchangeRates[to] || 1);
-    };
+    if (!machine) return { purchaseTotal: 0, totalVolumeM3: 0 };
 
-    const machineVolume = machine.packages?.reduce((sum, p) => sum + (p.volumeM3 || 0), 0) || 0;
-    let totalVolumeM3 = machineVolume;
+    let purchaseTotal = Number(machine.basePrice) || 0;
+    const packagesVolume = (machine.packages || []).reduce((sum, p) => sum + (Number(p.volumeM3) || 0), 0);
+    let totalVolumeM3 = Number(machine.workingVolumeM3) || packagesVolume || 0;
 
-    Object.entries(selectedOptions).forEach(([typeId, variantIds]) => {
-      const config = machine.machineConfig?.find(mc => mc.typeId === typeId);
-      const defaultVarId = config?.defaultVariantId;
+    const machineRate = (exchangeRates && exchangeRates[machine.currency]) || 1;
 
-      variantIds.forEach(varId => {
-        const variant = optionVariants.find(v => v.id === varId);
-        if (!variant) return;
+    if (machine.machineConfig && Array.isArray(machine.machineConfig)) {
+      machine.machineConfig.forEach(group => {
+        if (!group || !group.typeId) return;
 
-        totalVolumeM3 += variant.volumeM3 || 0;
+        const defaultIds = this.getDefaultIds(group);
+        let groupBaseCost = 0;
+        let groupBaseVolume = 0;
 
-        const raw = this.getVariantRawInfo(variant, machine);
-        const rateToMachine = getCrossRate(raw.currency, machine.currency);
-        const varCostInBase = raw.price * rateToMachine;
-
-        if (defaultVarId) {
-          if (varId !== defaultVarId) {
-            const defVar = optionVariants.find(v => v.id === defaultVarId);
-            const defRaw = defVar ? this.getVariantRawInfo(defVar, machine) : { price: 0, currency: Currency.USD };
-            const defRateToMachine = getCrossRate(defRaw.currency, machine.currency);
-            const defCostInBase = defRaw.price * defRateToMachine;
-            totalPurchaseInBase += (varCostInBase - defCostInBase);
+        defaultIds.forEach(defId => {
+          const defV = allVariants.find(v => v.id === defId);
+          if (defV) {
+            const price = group.priceOverrides?.[defId] ?? defV.price;
+            const defRate = (exchangeRates && exchangeRates[defV.currency]) || 1;
+            groupBaseCost += (Number(price) || 0) * (defRate / machineRate);
+            groupBaseVolume += (Number(defV.volumeM3) || 0);
           }
-        } else {
-          totalPurchaseInBase += varCostInBase;
-        }
-      });
-    });
+        });
 
-    const rateToKZT = exchangeRates[machine.currency] || 1;
-    const salesTotal = Math.round(totalPurchaseInBase * rateToKZT * (1 + (machine.markupPercentage || 30) / 100));
-    
-    return { purchaseTotal: totalPurchaseInBase, salesTotal, totalVolumeM3 };
+        const selectedInGroup = selectedOptions[group.typeId] || [];
+        let groupCurrentCost = 0;
+        let groupCurrentVolume = 0;
+
+        selectedInGroup.forEach(vid => {
+          const v = allVariants.find(av => av.id === vid);
+          if (v) {
+            const price = group.priceOverrides?.[vid] ?? v.price;
+            const vRate = (exchangeRates && exchangeRates[v.currency]) || 1;
+            groupCurrentCost += (Number(price) || 0) * (vRate / machineRate);
+            groupCurrentVolume += (Number(v.volumeM3) || 0);
+          }
+        });
+
+        purchaseTotal += (groupCurrentCost - groupBaseCost);
+        totalVolumeM3 += (groupCurrentVolume - groupBaseVolume);
+      });
+    }
+
+    return {
+      purchaseTotal: isNaN(purchaseTotal) ? 0 : Math.max(0, purchaseTotal),
+      totalVolumeM3: isNaN(totalVolumeM3) ? 0 : Math.max(0, totalVolumeM3)
+    };
   }
 }

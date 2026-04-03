@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { SupplierOrder, OrderItem, SalesOrder, Reception, Shipment, PlannedPayment, OrderStatus, Product, StockMovement, ShipmentItem, ReceptionItem, ReceptionExpense, Currency, SalesOrderItem, OptionVariant, PricingProfile } from '@/types';
+import { SupplierOrder, OrderItem, SalesOrder, Reception, Shipment, PlannedPayment, OrderStatus, Product, StockMovement, ShipmentItem, ReceptionItem, ReceptionExpense, Currency, SalesOrderItem, OptionVariant, PricingProfile, TrashItem } from '@/types';
 import { ApiService } from '@/services/api';
 import { TableNames } from '@/constants';
 import { InventoryMediator } from '@/services/InventoryMediator';
@@ -14,7 +14,8 @@ export const useOrderState = (
     optionVariants: OptionVariant[] = [],
     pricingProfiles: PricingProfile[] = [],
     exchangeRates: Record<Currency, number> = {} as any,
-    currentStockMovements: StockMovement[]
+    currentStockMovements: StockMovement[],
+    moveToTrash: (id: string, type: TrashItem['type'], name: string, data: any) => Promise<any>
 ) => {
     const [orders, setOrders] = useState<SupplierOrder[]>([]);
     const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
@@ -23,6 +24,25 @@ export const useOrderState = (
 
     const handleNewMovements = (mvs: StockMovement[]) => {
         setStockMovements(prev => [...mvs, ...prev]);
+    };
+
+    // Helper to sync Pre-calculation items when Sales Order items are changed
+    const syncPreCalcItems = async (salesOrder: SalesOrder, items: any[]) => {
+        for (const i of items) {
+            if (!i.preCalcItemId) continue;
+            try {
+                // Используем upsert вместо update, чтобы не падать, если итем еще не в БД
+                // И не используем .single() через ApiService.update, если это вызывает проблемы
+                await ApiService.update(TableNames.PRE_CALCULATION_ITEMS, i.preCalcItemId, {
+                    orderId: salesOrder.id,
+                    clientName: salesOrder.clientName,
+                    sellingPriceKzt: Number(i.priceKzt) || 0,
+                    isRevenueConfirmed: true
+                });
+            } catch (e) {
+                console.warn(`Could not sync pre-calc item ${i.preCalcItemId}:`, e);
+            }
+        }
     };
 
     const addOrder = async (o: SupplierOrder, plans: PlannedPayment[]) => {
@@ -60,6 +80,8 @@ export const useOrderState = (
 
     const updateOrder = async (o: SupplierOrder, plans: PlannedPayment[]) => {
         try {
+            if (o.isDeleted) throw new Error("Заказ помечен на удаление и недоступен для редактирования");
+
             const { items, ...orderData } = o;
             orderData.totalItemCount = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
             
@@ -91,6 +113,39 @@ export const useOrderState = (
         }
     };
 
+    const deleteOrder = async (id: string) => {
+        try {
+            const order = orders.find(o => o.id === id);
+            if (!order) return;
+
+            const hasPayments = order.paidAmountForeign > 0;
+            if (hasPayments) {
+                alert("Нельзя удалить заказ, по которому уже проведены фактические оплаты.");
+                return;
+            }
+
+            await ApiService.update(TableNames.SUPPLIER_ORDERS, id, { isDeleted: true });
+            
+            const relatedPlans = await ApiService.fetchAll<PlannedPayment>(TableNames.PLANNED_PAYMENTS, { sourceDocId: id });
+            if (relatedPlans && relatedPlans.length > 0) {
+                for (const p of relatedPlans) {
+                    await ApiService.update(TableNames.PLANNED_PAYMENTS, p.id, { isDeleted: true });
+                    await moveToTrash(p.id, 'PlannedPayment', `ПП от заказа ${id}`, p);
+                }
+            }
+
+            await moveToTrash(id, 'Order', order.name || `Заказ ${id}`, order);
+
+            setOrders(prev => prev.map(o => o.id === id ? { ...o, isDeleted: true } : o));
+            setPlannedPayments(prev => prev.map(p => p.sourceDocId === id ? { ...p, isDeleted: true } : p));
+
+            addLog('Delete', 'Order', id, 'Заказ и его ПП помечены на удаление');
+        } catch (e: any) {
+            console.error("[ORDER_STATE] Error deleting order:", e);
+            alert("Ошибка при удалении заказа: " + e.message);
+        }
+    };
+
     const createSalesOrder = async (o: SalesOrder, plans: PlannedPayment[]) => {
          try {
             const { items, ...data } = o;
@@ -112,33 +167,42 @@ export const useOrderState = (
             }));
             const savedPlans = await ApiService.createMany<PlannedPayment>(TableNames.PLANNED_PAYMENTS, plansToSave);
             
+            // SYNC PRE-CALC
+            await syncPreCalcItems(saved, savedItems);
+
             const fullSalesOrder = { ...saved, items: savedItems };
             await InventoryMediator.processEvent('SalesOrder', 'Confirmed', fullSalesOrder, products, optionVariants, pricingProfiles, exchangeRates, currentStockMovements, handleNewMovements);
             
             setSalesOrders(prev => [fullSalesOrder, ...prev]);
             setPlannedPayments(prev => [...savedPlans, ...prev]);
             
-            addLog('Create', 'Заказ клиента', saved.id, `Сумма: ${saved.totalAmount} KZT`);
+            addLog('Create', 'Заказ клиента', saved.id, `Сумма: ${saved.totalAmount} Kzt`);
          } catch (e: any) {
              console.error("[ORDER_STATE] Error creating sales order:", e);
-             alert("Ошибка создания заказа клиента: " + e.message);
+             throw e;
          }
     };
 
     const updateSalesOrder = async (o: SalesOrder, plans: PlannedPayment[]) => {
         try {
+            if (o.isDeleted) throw new Error("Заказ помечен на удаление и недоступен для редактирования");
+
             const { items, ...data } = o;
             const updated = await ApiService.update<SalesOrder>(TableNames.SALES_ORDERS, o.id, data);
             
             await ApiService.deleteByField(TableNames.SALES_ORDER_ITEMS, 'salesOrderId', o.id);
-            const savedItems = await ApiService.createMany<SalesOrderItem>(TableNames.SALES_ORDER_ITEMS, items.map(i => ({
+            const salesItemsToSave = items.map(i => ({
                 ...i, 
                 id: ApiService.generateUUID(),
                 salesOrderId: o.id
-            })));
+            }));
+            const savedItems = await ApiService.createMany<SalesOrderItem>(TableNames.SALES_ORDER_ITEMS, salesItemsToSave);
             
             await ApiService.deleteByField(TableNames.PLANNED_PAYMENTS, 'sourceDocId', o.id);
             const savedPlans = await ApiService.createMany<PlannedPayment>(TableNames.PLANNED_PAYMENTS, plans.map(p => ({...p, sourceDocId: o.id})));
+
+            // SYNC PRE-CALC
+            await syncPreCalcItems(updated, savedItems);
 
             setSalesOrders(prev => prev.map(order => order.id === o.id ? { ...updated, items: savedItems } : order));
             setPlannedPayments(prev => [
@@ -150,6 +214,38 @@ export const useOrderState = (
         } catch (e: any) {
             console.error("[ORDER_STATE] Error updating sales order:", e);
             alert("Ошибка обновления заказа: " + e.message);
+        }
+    };
+
+    const deleteSalesOrder = async (id: string) => {
+        try {
+            const order = salesOrders.find(o => o.id === id);
+            if (!order) return;
+
+            if (order.paidAmount > 0) {
+                alert("Нельзя удалить заказ клиента, по которому уже проведены фактические оплаты.");
+                return;
+            }
+
+            await ApiService.update(TableNames.SALES_ORDERS, id, { isDeleted: true });
+            
+            const relatedPlans = await ApiService.fetchAll<PlannedPayment>(TableNames.PLANNED_PAYMENTS, { sourceDocId: id });
+            if (relatedPlans && relatedPlans.length > 0) {
+                for (const p of relatedPlans) {
+                    await ApiService.update(TableNames.PLANNED_PAYMENTS, p.id, { isDeleted: true });
+                    await moveToTrash(p.id, 'PlannedPayment', `ПП от заказа клиента ${id}`, p);
+                }
+            }
+
+            await moveToTrash(id, 'SalesOrder', order.name || `Заказ клиента ${id}`, order);
+
+            setSalesOrders(prev => prev.map(o => o.id === id ? { ...o, isDeleted: true } : o));
+            setPlannedPayments(prev => prev.map(p => p.sourceDocId === id ? { ...p, isDeleted: true } : p));
+
+            addLog('Delete', 'SalesOrder', id, 'Заказ клиента и его ПП помечены на удаление');
+        } catch (e: any) {
+            console.error("[ORDER_STATE] Error deleting sales order:", e);
+            alert("Ошибка при удалении заказа клиента: " + e.message);
         }
     };
 
@@ -191,7 +287,7 @@ export const useOrderState = (
                     const totalReceivedSoFar = (Number(order.receivedItemCount) || 0) + savedItems.reduce((s, i) => s + Number(i.qtyFact), 0);
                     const newStatus = totalReceivedSoFar >= order.totalItemCount ? OrderStatus.CLOSED : OrderStatus.PARTIALLY_RECEIVED;
                     
-                    await ApiService.update(TableNames.SUPPLIER_ORDERS, order.id, { received_item_count: totalReceivedSoFar, status: newStatus });
+                    await ApiService.update(TableNames.SUPPLIER_ORDERS, order.id, { receivedItemCount: totalReceivedSoFar, status: newStatus });
                     setOrders(oPrev => oPrev.map(o => o.id === order.id ? { ...o, status: newStatus, receivedItemCount: totalReceivedSoFar } : o));
                 }
             }
@@ -220,18 +316,18 @@ export const useOrderState = (
                 id: ApiService.generateUUID(), 
                 shipmentId: savedSh.id 
             }));
-            const savedItems = await ApiService.createMany<ShipmentItem>(TableNames.SHIPMENT_ITEMS, shipmentItems);
+            const shipmentItemsSaved = await ApiService.createMany<ShipmentItem>(TableNames.SHIPMENT_ITEMS, shipmentItems);
             
-            const fullShipment = { ...savedSh, items: savedItems };
+            const fullShipment = { ...savedSh, items: shipmentItemsSaved };
 
             if (s.status === 'Posted') {
                 await InventoryMediator.processEvent('Shipment', 'Posted', fullShipment, products, optionVariants, pricingProfiles, exchangeRates, currentStockMovements, handleNewMovements);
                 const order = salesOrders.find(o => o.id === s.salesOrderId);
                 if (order) {
-                    const totalShippedSoFar = (Number(order.shippedItemCount) || 0) + shipmentItems.reduce((sum, i) => sum + (Number(i.qtyShipped) || 0), 0);
+                    const totalShippedSoFar = (Number(order.shippedItemCount) || 0) + shipmentItemsSaved.reduce((sum, i) => sum + (Number(i.qtyShipped) || 0), 0);
                     const newStatus = totalShippedSoFar >= order.totalItemCount ? OrderStatus.CLOSED : OrderStatus.CONFIRMED;
                     
-                    await ApiService.update(TableNames.SALES_ORDERS, order.id, { shipped_item_count: totalShippedSoFar, status: newStatus });
+                    await ApiService.update(TableNames.SALES_ORDERS, order.id, { shippedItemCount: totalShippedSoFar, status: newStatus });
                     setSalesOrders(oPrev => oPrev.map(o => o.id === order.id ? { ...o, shippedItemCount: totalShippedSoFar, status: newStatus } : o));
                 }
             }
@@ -254,7 +350,7 @@ export const useOrderState = (
             if (order) {
                 const removedQty = shipment.items.reduce((sum, i) => sum + (Number(i.qtyShipped) || 0), 0);
                 const newShippedCount = Math.max(0, (Number(order.shippedItemCount) || 0) - removedQty);
-                await ApiService.update(TableNames.SALES_ORDERS, order.id, { shipped_item_count: newShippedCount, status: OrderStatus.CONFIRMED });
+                await ApiService.update(TableNames.SALES_ORDERS, order.id, { shippedItemCount: newShippedCount, status: OrderStatus.CONFIRMED });
                 setSalesOrders(oPrev => oPrev.map(o => o.id === order.id ? { ...o, shippedItemCount: newShippedCount, status: OrderStatus.CONFIRMED } : o));
             }
 
@@ -270,7 +366,7 @@ export const useOrderState = (
 
     return {
         orders, setOrders, salesOrders, setSalesOrders, shipments, setShipments, receptions, setReceptions,
-        addOrder, updateOrder, createSalesOrder, updateSalesOrder, saveReception, saveShipment, revertShipment,
+        addOrder, updateOrder, deleteOrder, createSalesOrder, updateSalesOrder, deleteSalesOrder, saveReception, saveShipment, revertShipment,
         deleteShipment: async (id: string) => {
             await ApiService.delete(TableNames.SHIPMENTS, id);
             setShipments(prev => prev.filter(s => s.id !== id));

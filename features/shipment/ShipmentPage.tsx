@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Shipment, ShipmentItem, SalesOrder } from '@/types';
+import { Shipment, ShipmentItem } from '@/types';
 import { useStore } from '../system/context/GlobalStore';
 import { Truck, RotateCcw, Trash2, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useAccess } from '../auth/hooks/useAccess';
@@ -35,8 +35,8 @@ export const ShipmentPage: React.FC = () => {
                     productId: i.productId, 
                     productName: i.productName, 
                     sku: i.sku,
-                    qtyShipped: Math.max(0, i.quantity - alreadyShipped),
-                    priceKZT: i.priceKZT || 0,
+                    qtyShipped: Math.max(0, (Number(i.quantity) || 0) - alreadyShipped),
+                    priceKzt: Number(i.priceKzt) || 0,
                     configuration: i.configuration || []
                 };
             });
@@ -68,7 +68,7 @@ export const ShipmentPage: React.FC = () => {
                 const orderItem = order.items.find(oi => oi.productId === item.productId && ([...(oi.configuration || [])].sort().join('|') || 'BASE') === normConfig);
                 if (orderItem) {
                     const alreadyShipped = getAlreadyShippedForOrder(order.id, item.productId, item.configuration || []);
-                    if ((alreadyShipped + item.qtyShipped) > orderItem.quantity) {
+                    if ((alreadyShipped + item.qtyShipped) > Number(orderItem.quantity)) {
                         setErrorModal({ title: 'Превышение заказа', msg: `Позиция "${item.productName}": вы пытаетесь отгрузить больше, чем заказано.` });
                         return;
                     }
@@ -89,27 +89,42 @@ export const ShipmentPage: React.FC = () => {
         setEditingId(null);
     };
 
-    const getBusinessDisplayId = (id: string) => id ? `#${id.slice(-6).toUpperCase()}` : '—';
-
     if (view === 'form') {
         const order = state.salesOrders.find(o => o.id === selectedOrderId);
         if (!order) { setView('list'); return null; }
 
         return (
-            <div className="space-y-6 animate-in fade-in duration-300">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => setView('list')} className="p-2 hover:bg-slate-200 rounded-xl transition-all text-slate-400"><ArrowLeft size={24}/></button>
-                    <div><h2 className="text-2xl font-bold text-slate-800 uppercase tracking-tight">{editingId ? 'Изменение накладной' : 'Новая отгрузка'}</h2><p className="text-slate-500 text-sm font-medium mt-1">Основание: {getBusinessDisplayId(selectedOrderId)}</p></div>
+            <div className="h-[calc(100vh-2rem)] flex flex-col space-y-3 p-3 bg-slate-50/50 overflow-hidden">
+                <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm shrink-0">
+                    <button onClick={() => setView('list')} className="p-2 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-xl transition-all active:scale-95"><ArrowLeft size={18}/></button>
+                    <div className="flex-1">
+                        <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight leading-none">{editingId ? 'Изменение накладной' : 'Новая отгрузка'}</h2>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{order.clientName}</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <input type="date" value={shipDate} onChange={e => setShipDate(e.target.value)} className="text-[11px] font-black text-slate-700 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 outline-none focus:border-blue-500" />
+                    </div>
                 </div>
-                <ShipmentForm 
-                    order={order} shipItems={shipItems} setShipItems={setShipItems} products={state.products} stockMovements={state.stockMovements} shipments={state.shipments}
-                    showStockInfo={access.canSee('fields', 'col_stock_info')} showPriceInfo={access.canSee('fields', 'col_price')}
-                    canDraft={access.canWrite('actions', 'draft')} canPost={access.canWrite('actions', 'post')}
-                    onCancel={() => setView('list')} onSubmit={handleSubmitShipment}
-                />
+                <div className="flex-1 min-h-0">
+                    <ShipmentForm 
+                        order={order} shipItems={shipItems} setShipItems={setShipItems} products={state.products} stockMovements={state.stockMovements} shipments={state.shipments}
+                        showStockInfo={access.canSee('fields', 'col_stock_info')} showPriceInfo={access.canSee('fields', 'col_price')}
+                        canDraft={access.canWrite('actions', 'draft')} canPost={access.canWrite('actions', 'post')}
+                        onCancel={() => setView('list')} onSubmit={handleSubmitShipment}
+                    />
+                </div>
                 {errorModal && (
                     <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
-                        <div className="bg-white rounded-[2rem] shadow-2xl max-w-md w-full p-8 text-center border-4 border-red-500/20"><AlertCircle size={64} className="text-red-600 mx-auto mb-4"/><h3 className="text-xl font-black text-slate-800 mb-2 uppercase tracking-tight">{errorModal.title}</h3><p className="text-slate-600 font-medium mb-8 leading-relaxed">{errorModal.msg}</p><button onClick={() => setErrorModal(null)} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg">Понятно</button></div>
+                        <div className="bg-white rounded-[2rem] shadow-2xl max-w-sm w-full p-8 text-center border border-slate-100 animate-in zoom-in-95 duration-200">
+                            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <AlertCircle size={32} />
+                            </div>
+                            <h3 className="text-xl font-black text-slate-800 mb-2 uppercase tracking-tight">{errorModal.title}</h3>
+                            <p className="text-slate-500 font-medium mb-8 leading-relaxed text-[13px]">{errorModal.msg}</p>
+                            <button onClick={() => setErrorModal(null)} className="w-full bg-slate-900 text-white py-3 rounded-xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all text-xs">Понятно</button>
+                        </div>
                     </div>
                 )}
             </div>
@@ -117,9 +132,23 @@ export const ShipmentPage: React.FC = () => {
     }
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="flex justify-between items-center">
-                <div><h2 className="text-2xl font-bold text-slate-800 flex items-center"><Truck className="mr-3 text-orange-600" size={28}/> Отгрузка</h2><p className="text-slate-500 text-sm font-medium mt-1">Управление физическим отпуском товаров со склада</p></div>
+        <div className="h-[calc(100vh-2rem)] flex flex-col space-y-4 p-2 overflow-y-auto custom-scrollbar animate-in fade-in duration-300">
+            <div className="flex justify-between items-center bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-sm shrink-0">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-100 text-orange-600 rounded-xl">
+                        <Truck size={20}/>
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">Отгрузка</h2>
+                        <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-none mt-1">Ожидающие и история</p>
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    <div className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 text-right">
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block leading-none mb-1">Накладных</span>
+                        <span className="text-sm font-black text-slate-700 leading-none">{state.shipments.length}</span>
+                    </div>
+                </div>
             </div>
 
             <PendingShipments orders={state.salesOrders} shipments={state.shipments} onSelect={handleOrderSelect} />
@@ -132,16 +161,38 @@ export const ShipmentPage: React.FC = () => {
             />
 
             {stornoConfirmId && (
-                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 animate-in zoom-in-95">
-                        <div className="p-8 text-center"><div className="w-20 h-20 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-6"><RotateCcw size={40}/></div><h3 className="text-2xl font-black text-slate-800 mb-3 uppercase tracking-tight">Подтвердите Сторно</h3><p className="text-slate-500 font-medium mb-8 leading-relaxed">Отмена накладной вернет товар на склад и переведет документ в статус Черновик.</p><div className="flex flex-col gap-3"><button onClick={() => { actions.revertShipment(stornoConfirmId); setStornoConfirmId(null); }} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl">Да, отменить отгрузку</button><button onClick={() => setStornoConfirmId(null)} className="w-full bg-slate-100 text-slate-600 py-4 rounded-2xl font-bold uppercase tracking-widest">Отмена</button></div></div>
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[2rem] shadow-2xl max-w-sm w-full overflow-hidden border border-slate-100 animate-in zoom-in-95">
+                        <div className="p-8 text-center">
+                            <div className="w-16 h-16 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <RotateCcw size={32}/>
+                            </div>
+                            <h3 className="text-xl font-black text-slate-800 mb-2 uppercase tracking-tight">Сторно?</h3>
+                            <p className="text-slate-500 font-medium mb-8 leading-relaxed text-[13px]">Товар вернется на склад, накладная станет черновиком.</p>
+                            <div className="flex flex-col gap-2">
+                                <button onClick={() => { actions.revertShipment(stornoConfirmId); setStornoConfirmId(null); }} className="w-full bg-red-600 text-white py-3 rounded-xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all text-xs">Да, отменить отгрузку</button>
+                                <button onClick={() => setStornoConfirmId(null)} className="w-full bg-slate-100 text-slate-500 py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-slate-200 transition-all text-xs">Назад</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
 
             {deleteConfirmId && (
-                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 animate-in zoom-in-95"><div className="p-8 text-center"><div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6"><Trash2 size={40} /></div><h3 className="text-2xl font-black text-slate-800 mb-3 uppercase tracking-tight">Удалить черновик?</h3><p className="text-slate-500 font-medium mb-8 leading-relaxed">Вы действительно хотите безвозвратно удалить черновик накладной?</p><div className="flex flex-col gap-3"><button onClick={() => { actions.deleteShipment(deleteConfirmId); setDeleteConfirmId(null); }} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl">Удалить документ</button><button onClick={() => setDeleteConfirmId(null)} className="w-full bg-slate-100 text-slate-600 py-4 rounded-2xl font-bold uppercase tracking-widest">Отмена</button></div></div></div>
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[2rem] shadow-2xl max-w-sm w-full overflow-hidden border border-slate-100 animate-in zoom-in-95">
+                        <div className="p-8 text-center">
+                            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Trash2 size={32} />
+                            </div>
+                            <h3 className="text-xl font-black text-slate-800 mb-2 uppercase tracking-tight">Удалить черновик?</h3>
+                            <p className="text-slate-500 font-medium mb-8 leading-relaxed text-[13px]">Черновик накладной будет удален безвозвратно.</p>
+                            <div className="flex flex-col gap-2">
+                                <button onClick={() => { actions.deleteShipment(deleteConfirmId); setDeleteConfirmId(null); }} className="w-full bg-red-600 text-white py-3 rounded-xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all text-xs">Удалить</button>
+                                <button onClick={() => setDeleteConfirmId(null)} className="w-full bg-slate-100 text-slate-500 py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-slate-200 transition-all text-xs">Отмена</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

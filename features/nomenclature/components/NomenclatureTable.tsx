@@ -5,6 +5,7 @@ import { ProductType } from '@/types/enums';
 import { Counterparty as Supplier } from '@/types/counterparty';
 import { Search, Cpu, Settings, Briefcase, Pencil, Trash2, Eye, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react';
 import { useAccess } from '@/features/auth/hooks/useAccess';
+import { ImageModal } from '@/components/ui/ImageModal';
 
 interface NomenclatureTableProps {
     products: Product[];
@@ -39,6 +40,9 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
     
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
+    
+    // Image modal state
+    const [modalImage, setModalImage] = useState<{ src: string, alt: string } | null>(null);
 
     const handleSort = (key: keyof Product) => {
         let direction: 'asc' | 'desc' = 'asc';
@@ -52,18 +56,20 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
         
         // Применение фильтров
         if (filters.name_sku || filters.categoryId || filters.supplier_mfg) {
+            const searchLower = (filters.name_sku || '').toLowerCase();
+            const catLower = (filters.categoryId || '').toLowerCase();
+            const supLower = (filters.supplier_mfg || '').toLowerCase();
+
             data = data.filter(item => {
-                const searchLower = (filters.name_sku || '').toLowerCase();
-                const matchSearch = !filters.name_sku || 
+                const matchSearch = !searchLower || 
                     (item.name || '').toLowerCase().includes(searchLower) || 
                     (item.sku || '').toLowerCase().includes(searchLower);
                 
-                const matchCategory = !filters.categoryId || (categories.find(c => c.id === item.categoryId)?.name || '').toLowerCase().includes((filters.categoryId || '').toLowerCase());
+                const matchCategory = !catLower || (categories.find(c => c.id === item.categoryId)?.name || '').toLowerCase().includes(catLower);
                 
-                const searchSupMfg = (filters.supplier_mfg || '').toLowerCase();
-                const matchSupMfg = !filters.supplier_mfg || 
-                    (suppliers.find(s => s.id === item.supplierId)?.name || '').toLowerCase().includes(searchSupMfg) ||
-                    (item.manufacturer || '').toLowerCase().includes(searchSupMfg);
+                const matchSupMfg = !supLower || 
+                    (suppliers.find(s => s.id === item.supplierId)?.name || '').toLowerCase().includes(supLower) ||
+                    (item.manufacturer || '').toLowerCase().includes(supLower);
                 
                 return matchSearch && matchCategory && matchSupMfg;
             });
@@ -113,10 +119,10 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
                 <table className="min-w-full divide-y divide-gray-200 table-fixed border-separate border-spacing-0">
                     <thead className="relative z-10">
                         <tr className="text-slate-500">
-                            <th onClick={() => handleSort('type')} className="sticky top-0 bg-gray-50 w-8 px-1 py-3 text-center text-[9px] font-black uppercase cursor-pointer hover:bg-gray-100 transition-colors border-b">
-                                {renderSortIcon('type') || 'Тип'}
+                            <th onClick={() => handleSort('type')} className="sticky top-0 bg-gray-50 w-12 px-1 py-3 text-center text-[9px] font-black uppercase cursor-pointer hover:bg-gray-100 transition-colors border-b">
+                                {renderSortIcon('type') || 'Фото'}
                             </th>
-                            <th onClick={() => handleSort('name')} className="sticky top-0 bg-gray-50 w-[45%] px-2 py-3 text-left text-[10px] font-black uppercase cursor-pointer hover:bg-gray-100 transition-colors border-b">
+                            <th onClick={() => handleSort('name')} className="sticky top-0 bg-gray-50 w-[42%] px-2 py-3 text-left text-[10px] font-black uppercase cursor-pointer hover:bg-gray-100 transition-colors border-b">
                                 Наименование {renderSortIcon('name')}
                             </th>
                             <th onClick={() => handleSort('categoryId')} className="sticky top-0 bg-gray-50 w-[15%] px-1.5 py-3 text-left text-[10px] font-black uppercase cursor-pointer hover:bg-gray-100 transition-colors border-b">
@@ -189,8 +195,17 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
                             const category = categories.find(c => c.id === product.categoryId);
                             return (
                                 <tr key={product.id} className="hover:bg-slate-50/50 group transition-all">
-                                    <td className="px-1 py-3 text-center">
-                                        {product.type === ProductType.MACHINE ? <Cpu className="text-blue-500 mx-auto" size={14} /> : product.type === ProductType.PART ? <Settings className="text-orange-500 mx-auto" size={14} /> : <Briefcase className="text-purple-500 mx-auto" size={14}/>}
+                                    <td className="px-1 py-2 text-center">
+                                        <div 
+                                            className={`w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden mx-auto shadow-sm transition-transform hover:scale-110 active:scale-95 ${product.imageUrl ? 'cursor-zoom-in' : ''}`}
+                                            onClick={() => product.imageUrl && setModalImage({ src: product.imageUrl, alt: product.name })}
+                                        >
+                                            {product.imageUrl ? (
+                                                <img src={product.imageUrl} alt={product.sku} className="w-full h-full object-contain" />
+                                            ) : (
+                                                product.type === ProductType.MACHINE ? <Cpu className="text-blue-400" size={12} /> : product.type === ProductType.PART ? <Settings className="text-orange-400" size={12} /> : <Briefcase className="text-purple-400" size={12}/>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-2 py-3">
                                         <div className="flex flex-col gap-1 overflow-hidden">
@@ -200,6 +215,7 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
                                             >
                                                 {product.name}
                                             </div>
+                                            <div className="text-[9px] font-mono text-slate-400 uppercase tracking-tighter">{product.sku}</div>
                                         </div>
                                     </td>
                                     <td className="px-1.5 py-3">
@@ -307,6 +323,15 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
                         </button>
                     </div>
                 </div>
+            )}
+            
+            {modalImage && (
+                <ImageModal 
+                    src={modalImage.src} 
+                    alt={modalImage.alt} 
+                    isOpen={!!modalImage} 
+                    onClose={() => setModalImage(null)} 
+                />
             )}
         </div>
     );

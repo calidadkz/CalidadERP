@@ -217,340 +217,6 @@
       ]
     },
     {
-      "name": "pre_calculations",
-      "columns": [
-        {
-          "column_name": "id",
-          "data_type": "text",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
-          "column_name": "name",
-          "data_type": "text",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
-          "column_name": "date",
-          "data_type": "timestamp with time zone",
-          "is_nullable": "YES",
-          "column_default": "now()"
-        },
-        {
-          "column_name": "status",
-          "data_type": "text",
-          "is_nullable": "NO",
-          "column_default": "'Draft'::text"
-        },
-        {
-          "column_name": "tax_scheme",
-          "data_type": "text",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
-          "column_name": "exchange_rate_usd_kzt",
-          "data_type": "numeric",
-          "is_nullable": "NO",
-          "column_default": "450"
-        },
-        {
-          "column_name": "shipping_china_usd",
-          "data_type": "numeric",
-          "is_nullable": "NO",
-          "column_default": "0"
-        },
-        {
-          "column_name": "shipping_karaganda_kzt",
-          "data_type": "numeric",
-          "is_nullable": "NO",
-          "column_default": "0"
-        },
-        {
-          "column_name": "svh_kzt",
-          "data_type": "numeric",
-          "is_nullable": "NO",
-          "column_default": "0"
-        },
-        {
-          "column_name": "broker_kzt",
-          "data_type": "numeric",
-          "is_nullable": "NO",
-          "column_default": "0"
-        },
-        {
-          "column_name": "customs_fees_kzt",
-          "data_type": "numeric",
-          "is_nullable": "NO",
-          "column_default": "0"
-        },
-        {
-          "column_name": "customs_vat_kzt",
-          "data_type": "numeric",
-          "is_nullable": "NO",
-          "column_default": "0"
-        },
-        {
-          "column_name": "total_volume_m3",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "total_weight_kg",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "notes",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "updated_at",
-          "data_type": "timestamp with time zone",
-          "is_nullable": "YES",
-          "column_default": "now()"
-        },
-        {
-          "column_name": "exchange_rate_cny_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "63"
-        },
-        {
-          "column_name": "cit_rate_standard",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "20"
-        },
-        {
-          "column_name": "cit_rate_simplified",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "3"
-        },
-        {
-          "column_name": "vat_rate",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "16"
-        },
-        {
-          "column_name": "intercompany_markup_percent",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "1"
-        }
-      ]
-    },
-    {
-      "name": "pre_calculation_items",
-      "columns": [
-        {
-          "column_name": "id",
-          "data_type": "text",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
-          "column_name": "pre_calculation_id",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "product_id",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "product_name",
-          "data_type": "text",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
-          "column_name": "sku",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "order_id",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "client_id",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "client_name",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "type",
-          "data_type": "text",
-          "is_nullable": "NO",
-          "column_default": "'Stock'::text"
-        },
-        {
-          "column_name": "quantity",
-          "data_type": "integer",
-          "is_nullable": "NO",
-          "column_default": "1"
-        },
-        {
-          "column_name": "supplier_price_usd",
-          "data_type": "numeric",
-          "is_nullable": "NO",
-          "column_default": "0"
-        },
-        {
-          "column_name": "selling_price_kzt",
-          "data_type": "numeric",
-          "is_nullable": "NO",
-          "column_default": "0"
-        },
-        {
-          "column_name": "length_mm",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "width_mm",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "height_mm",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "weight_kg",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "volume_m3",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "purchase_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "logistics_cn_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "logistics_local_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "svh_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "broker_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "customs_fees_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "customs_vat_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "pnr_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "delivery_local_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "advertising_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "bonus_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "tax_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "vat_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "total_expenses_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "profit_kzt",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "margin_percent",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        }
-      ]
-    },
-    {
       "name": "packing_places",
       "columns": [
         {
@@ -700,6 +366,12 @@
           "data_type": "ARRAY",
           "is_nullable": "YES",
           "column_default": "'{}'::text[]"
+        },
+        {
+          "column_name": "pre_calc_item_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
         }
       ]
     },
@@ -717,160 +389,6 @@
           "data_type": "text",
           "is_nullable": "NO",
           "column_default": null
-        }
-      ]
-    },
-    {
-      "name": "pre_calculation_packages",
-      "columns": [
-        {
-          "column_name": "id",
-          "data_type": "uuid",
-          "is_nullable": "NO",
-          "column_default": "gen_random_uuid()"
-        },
-        {
-          "column_name": "pre_calculation_id",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "package_number",
-          "data_type": "integer",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
-          "column_name": "length_mm",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "width_mm",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "height_mm",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "weight_kg",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "volume_m3",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "description",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "items",
-          "data_type": "jsonb",
-          "is_nullable": "YES",
-          "column_default": "'[]'::jsonb"
-        },
-        {
-          "column_name": "created_at",
-          "data_type": "timestamp with time zone",
-          "is_nullable": "YES",
-          "column_default": "now()"
-        }
-      ]
-    },
-    {
-      "name": "manufacturers",
-      "columns": [
-        {
-          "column_name": "id",
-          "data_type": "text",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
-          "column_name": "name",
-          "data_type": "text",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
-          "column_name": "country",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "description",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "legal_address",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "bin_iin",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "iik",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "bik",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "kbe",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "bank_name",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "director",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "legal_email",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "updated_at",
-          "data_type": "timestamp with time zone",
-          "is_nullable": "YES",
-          "column_default": "now()"
         }
       ]
     },
@@ -1099,6 +617,101 @@
       ]
     },
     {
+      "name": "sales_orders",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "date",
+          "data_type": "date",
+          "is_nullable": "YES",
+          "column_default": "CURRENT_DATE"
+        },
+        {
+          "column_name": "client_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "status",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "total_amount",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "shipped_item_count",
+          "data_type": "integer",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "total_item_count",
+          "data_type": "integer",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "client_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "paid_amount",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "contract_url",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "contract_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "additional_documents",
+          "data_type": "jsonb",
+          "is_nullable": "YES",
+          "column_default": "'[]'::jsonb"
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "is_deleted",
+          "data_type": "boolean",
+          "is_nullable": "YES",
+          "column_default": "false"
+        }
+      ]
+    },
+    {
       "name": "option_variants",
       "columns": [
         {
@@ -1193,6 +806,12 @@
         },
         {
           "column_name": "description",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "image_url",
           "data_type": "text",
           "is_nullable": "YES",
           "column_default": null
@@ -1560,6 +1179,125 @@
       ]
     },
     {
+      "name": "pre_calculations",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "date",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "status",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": "'Draft'::text"
+        },
+        {
+          "column_name": "shipping_china_usd",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "150"
+        },
+        {
+          "column_name": "exchange_rate_shipping",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "450"
+        },
+        {
+          "column_name": "shipping_karaganda_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "200000"
+        },
+        {
+          "column_name": "svh_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "100000"
+        },
+        {
+          "column_name": "broker_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "104000"
+        },
+        {
+          "column_name": "customs_fees_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "52000"
+        },
+        {
+          "column_name": "exchange_rate_usd_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "450"
+        },
+        {
+          "column_name": "exchange_rate_cny_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "63"
+        },
+        {
+          "column_name": "vat_rate",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "12"
+        },
+        {
+          "column_name": "cit_rate_standard",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "20"
+        },
+        {
+          "column_name": "cit_rate_simplified",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "4"
+        },
+        {
+          "column_name": "intercompany_markup_percent",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "25"
+        },
+        {
+          "column_name": "sales_bonus_rate",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "notes",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
       "name": "employees",
       "columns": [
         {
@@ -1636,6 +1374,286 @@
         },
         {
           "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "pre_calculation_items",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "pre_calculation_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "product_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "order_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "client_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "product_name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "sku",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "type",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": "'PART'::text"
+        },
+        {
+          "column_name": "manufacturer",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "hs_code",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "quantity",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": "1"
+        },
+        {
+          "column_name": "supplier_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "supplier_price_usd",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "purchase_currency",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": "'USD'::text"
+        },
+        {
+          "column_name": "selling_price_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
+          "column_default": "0"
+        },
+        {
+          "column_name": "is_revenue_confirmed",
+          "data_type": "boolean",
+          "is_nullable": "YES",
+          "column_default": "false"
+        },
+        {
+          "column_name": "pnr_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "delivery_local_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "margin_percent",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "tax_regime",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": "'Общ.'::text"
+        },
+        {
+          "column_name": "volume_m3",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "weight_kg",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "use_dimensions",
+          "data_type": "boolean",
+          "is_nullable": "YES",
+          "column_default": "true"
+        },
+        {
+          "column_name": "purchase_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "delivery_china_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "logistics_local_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "customs_nds_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "total_nds_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "nds_difference_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "kpn_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "sales_bonus_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "full_cost_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "profit_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "options",
+          "data_type": "jsonb",
+          "is_nullable": "YES",
+          "column_default": "'[]'::jsonb"
+        }
+      ]
+    },
+    {
+      "name": "pre_calculation_packages",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "pre_calculation_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "package_number",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "length_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "width_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "height_mm",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "weight_kg",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "volume_m3",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "items",
+          "data_type": "jsonb",
+          "is_nullable": "YES",
+          "column_default": "'[]'::jsonb"
+        },
+        {
+          "column_name": "created_at",
           "data_type": "timestamp with time zone",
           "is_nullable": "YES",
           "column_default": "now()"
@@ -1839,6 +1857,18 @@
           "data_type": "numeric",
           "is_nullable": "NO",
           "column_default": null
+        },
+        {
+          "column_name": "cash_flow_item_id",
+          "data_type": "uuid",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "target_bank_account_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
         }
       ]
     },
@@ -1916,6 +1946,12 @@
           "data_type": "uuid",
           "is_nullable": "YES",
           "column_default": null
+        },
+        {
+          "column_name": "is_deleted",
+          "data_type": "boolean",
+          "is_nullable": "YES",
+          "column_default": "false"
         }
       ]
     },
@@ -2277,6 +2313,12 @@
           "data_type": "text",
           "is_nullable": "YES",
           "column_default": null
+        },
+        {
+          "column_name": "roles",
+          "data_type": "ARRAY",
+          "is_nullable": "YES",
+          "column_default": "'{}'::text[]"
         }
       ]
     },
@@ -2291,12 +2333,6 @@
         },
         {
           "column_name": "counterparty_id",
-          "data_type": "text",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
-          "column_name": "name",
           "data_type": "text",
           "is_nullable": "NO",
           "column_default": null
@@ -2342,6 +2378,59 @@
           "data_type": "timestamp with time zone",
           "is_nullable": "NO",
           "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "batches",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "pre_calculation_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "status",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": "'active'::text"
+        },
+        {
+          "column_name": "date",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "total_planned_profit",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "total_actual_profit",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
         }
       ]
     },
@@ -2431,6 +2520,36 @@
           "data_type": "numeric",
           "is_nullable": "YES",
           "column_default": "0"
+        },
+        {
+          "column_name": "contract_url",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "contract_name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "additional_documents",
+          "data_type": "jsonb",
+          "is_nullable": "YES",
+          "column_default": "'[]'::jsonb"
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "is_deleted",
+          "data_type": "boolean",
+          "is_nullable": "YES",
+          "column_default": "false"
         }
       ]
     },
@@ -2541,7 +2660,7 @@
       ]
     },
     {
-      "name": "sales_orders",
+      "name": "batch_item_actuals",
       "columns": [
         {
           "column_name": "id",
@@ -2550,58 +2669,87 @@
           "column_default": null
         },
         {
-          "column_name": "date",
-          "data_type": "date",
-          "is_nullable": "YES",
-          "column_default": "CURRENT_DATE"
-        },
-        {
-          "column_name": "client_id",
+          "column_name": "batch_id",
           "data_type": "text",
           "is_nullable": "YES",
           "column_default": null
         },
         {
-          "column_name": "status",
+          "column_name": "pre_calculation_item_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "actual_revenue_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        },
+        {
+          "column_name": "actual_purchase_kzt",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        }
+      ]
+    },
+    {
+      "name": "batch_expenses",
+      "columns": [
+        {
+          "column_name": "id",
           "data_type": "text",
           "is_nullable": "NO",
           "column_default": null
         },
         {
-          "column_name": "total_amount",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "shipped_item_count",
-          "data_type": "integer",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "total_item_count",
-          "data_type": "integer",
-          "is_nullable": "YES",
-          "column_default": "0"
-        },
-        {
-          "column_name": "updated_at",
-          "data_type": "timestamp with time zone",
-          "is_nullable": "YES",
-          "column_default": "now()"
-        },
-        {
-          "column_name": "client_name",
+          "column_name": "batch_id",
           "data_type": "text",
           "is_nullable": "YES",
           "column_default": null
         },
         {
-          "column_name": "paid_amount",
-          "data_type": "numeric",
+          "column_name": "category",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "description",
+          "data_type": "text",
           "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "amount_kzt",
+          "data_type": "numeric",
+          "is_nullable": "NO",
           "column_default": "0"
+        },
+        {
+          "column_name": "date",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "payment_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "planned_payment_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "document_ids",
+          "data_type": "ARRAY",
+          "is_nullable": "YES",
+          "column_default": null
         }
       ]
     },
@@ -2787,6 +2935,12 @@
           "data_type": "jsonb",
           "is_nullable": "YES",
           "column_default": "'[]'::jsonb"
+        },
+        {
+          "column_name": "image_url",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
         }
       ]
     },
@@ -3020,15 +3174,62 @@
           "column_default": null
         }
       ]
+    },
+    {
+      "name": "batch_documents",
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "batch_id",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "name",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "url",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "type",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "size",
+          "data_type": "integer",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "uploaded_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "uploaded_by",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
+        }
+      ]
     }
   ],
   "foreignKeys": [
-    {
-      "fk_table_name": "pricing_profiles",
-      "fk_column_name": "supplier_id",
-      "pk_table_name": "suppliers",
-      "pk_column_name": "id"
-    },
     {
       "fk_table_name": "pricing_profile_categories",
       "fk_column_name": "profile_id",
@@ -3049,12 +3250,6 @@
     },
     {
       "fk_table_name": "products",
-      "fk_column_name": "supplier_id",
-      "pk_table_name": "suppliers",
-      "pk_column_name": "id"
-    },
-    {
-      "fk_table_name": "products",
       "fk_column_name": "pricing_profile_id",
       "pk_table_name": "pricing_profiles",
       "pk_column_name": "id"
@@ -3069,12 +3264,6 @@
       "fk_table_name": "bundles",
       "fk_column_name": "base_product_id",
       "pk_table_name": "products",
-      "pk_column_name": "id"
-    },
-    {
-      "fk_table_name": "supplier_orders",
-      "fk_column_name": "supplier_id",
-      "pk_table_name": "suppliers",
       "pk_column_name": "id"
     },
     {
@@ -3105,12 +3294,6 @@
       "fk_table_name": "reception_expenses",
       "fk_column_name": "reception_id",
       "pk_table_name": "receptions",
-      "pk_column_name": "id"
-    },
-    {
-      "fk_table_name": "sales_orders",
-      "fk_column_name": "client_id",
-      "pk_table_name": "clients",
       "pk_column_name": "id"
     },
     {
@@ -3216,12 +3399,6 @@
       "pk_column_name": "id"
     },
     {
-      "fk_table_name": "supplier_orders",
-      "fk_column_name": "supplier_id",
-      "pk_table_name": "suppliers",
-      "pk_column_name": "id"
-    },
-    {
       "fk_table_name": "supplier_order_items",
       "fk_column_name": "supplier_order_id",
       "pk_table_name": "supplier_orders",
@@ -3231,12 +3408,6 @@
       "fk_table_name": "supplier_order_items",
       "fk_column_name": "product_id",
       "pk_table_name": "products",
-      "pk_column_name": "id"
-    },
-    {
-      "fk_table_name": "sales_orders",
-      "fk_column_name": "client_id",
-      "pk_table_name": "clients",
       "pk_column_name": "id"
     },
     {
@@ -3372,9 +3543,9 @@
       "pk_column_name": "id"
     },
     {
-      "fk_table_name": "packing_place_items",
-      "fk_column_name": "pre_calculation_item_id",
-      "pk_table_name": "pre_calculation_items",
+      "fk_table_name": "counterparty_accounts",
+      "fk_column_name": "counterparty_id",
+      "pk_table_name": "counterparties",
       "pk_column_name": "id"
     },
     {
@@ -3384,21 +3555,81 @@
       "pk_column_name": "id"
     },
     {
-      "fk_table_name": "packing_places",
+      "fk_table_name": "pre_calculation_packages",
       "fk_column_name": "pre_calculation_id",
       "pk_table_name": "pre_calculations",
       "pk_column_name": "id"
     },
     {
-      "fk_table_name": "counterparty_accounts",
-      "fk_column_name": "counterparty_id",
+      "fk_table_name": "sales_orders",
+      "fk_column_name": "client_id",
       "pk_table_name": "counterparties",
       "pk_column_name": "id"
     },
     {
-      "fk_table_name": "pre_calculation_packages",
+      "fk_table_name": "supplier_orders",
+      "fk_column_name": "supplier_id",
+      "pk_table_name": "counterparties",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "products",
+      "fk_column_name": "supplier_id",
+      "pk_table_name": "counterparties",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "pricing_profiles",
+      "fk_column_name": "supplier_id",
+      "pk_table_name": "counterparties",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "batches",
       "fk_column_name": "pre_calculation_id",
       "pk_table_name": "pre_calculations",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "batch_item_actuals",
+      "fk_column_name": "batch_id",
+      "pk_table_name": "batches",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "batch_item_actuals",
+      "fk_column_name": "pre_calculation_item_id",
+      "pk_table_name": "pre_calculation_items",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "batch_expenses",
+      "fk_column_name": "batch_id",
+      "pk_table_name": "batches",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "batch_expenses",
+      "fk_column_name": "payment_id",
+      "pk_table_name": "actual_payments",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "batch_expenses",
+      "fk_column_name": "planned_payment_id",
+      "pk_table_name": "planned_payments",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "batch_documents",
+      "fk_column_name": "batch_id",
+      "pk_table_name": "batches",
+      "pk_column_name": "id"
+    },
+    {
+      "fk_table_name": "payment_allocations",
+      "fk_column_name": "cash_flow_item_id",
+      "pk_table_name": "cash_flow_items",
       "pk_column_name": "id"
     }
   ]

@@ -21,8 +21,8 @@ export enum TableNames {
     BANK_ACCOUNTS = 'bank_accounts',
     CURRENCY_LOTS = 'currency_lots',
     DISCREPANCIES = 'discrepancies',
-    COUNTERPARTIES = 'counterparties', // <-- ADDED
-    COUNTERPARTY_ACCOUNTS = 'counterparty_accounts', // <-- ADDED
+    COUNTERPARTIES = 'counterparties', 
+    COUNTERPARTY_ACCOUNTS = 'counterparty_accounts', 
     LOGS = 'logs',
     PRODUCT_CATEGORIES = 'product_categories',
     OPTION_TYPES = 'option_types',
@@ -38,21 +38,33 @@ export enum TableNames {
     EMPLOYEES = 'employees',
     PRE_CALCULATIONS = 'pre_calculations',
     PRE_CALCULATION_ITEMS = 'pre_calculation_items',
-    PRE_CALCULATION_PACKAGES = 'pre_calculation_packages'
+    PRE_CALCULATION_PACKAGES = 'pre_calculation_packages',
+    BATCHES = 'batches',
+    BATCH_EXPENSES = 'batch_expenses',
+    BATCH_DOCUMENTS = 'batch_documents',
+    BATCH_ITEM_ACTUALS = 'batch_item_actuals',
+    INVENTORY_SUMMARY = 'v_inventory_summary'
 }
 
 export const KZT_RATES: Record<Currency, number> = {
-    [Currency.USD]: 450,
-    [Currency.EUR]: 490,
-    [Currency.CNY]: 63,
-    [Currency.RUB]: 5,
-    [Currency.KZT]: 1
+    [Currency.Usd]: 450,
+    [Currency.Eur]: 490,
+    [Currency.Cny]: 63,
+    [Currency.Rub]: 5,
+    [Currency.Kzt]: 1
 };
 
 export const EXCHANGE_RATES_TO_USD: Record<Currency, number> = {
-    [Currency.USD]: 1,
-    [Currency.EUR]: 1.08,
-    [Currency.CNY]: 0.14,
-    [Currency.RUB]: 0.011,
-    [Currency.KZT]: 0.0022
+    [Currency.Usd]: 1,
+    [Currency.Eur]: 1.08,
+    [Currency.Cny]: 0.14,
+    [Currency.Rub]: 0.011,
+    [Currency.Kzt]: 0.0022
+};
+
+// Google Drive Integration
+export const GOOGLE_DRIVE_CONFIG = {
+    API_KEY: 'AIzaSyDy_m-s6sN402WHOn90D-8QTnehrkVnOu8',
+    CLIENT_ID: '43671301159-6l2pab639ojq93jnkqqojf2brm0fi6qd.apps.googleusercontent.com',
+    APP_ID: '43671301159' // ID проекта из GCC (начало Client ID)
 };

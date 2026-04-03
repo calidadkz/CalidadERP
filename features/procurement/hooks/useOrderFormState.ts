@@ -7,7 +7,9 @@ import {
     Product, 
     SupplierOrder, 
     ProductType, 
-    OrderStatus 
+    OrderStatus,
+    CashFlowCategory,
+    OrderDocument
 } from '@/types';
 import { ApiService } from '@/services/api';
 
@@ -18,16 +20,24 @@ export const useOrderFormState = (
     cashFlowItems: any[],
     suppliers: any[]
 ) => {
+    // Генерируем ID сразу, если это новый заказ
+    const [orderId] = useState(initialOrder?.id || `ORDER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+    const [orderName, setOrderName] = useState(initialOrder?.name || ''); // Новое поле: Название заказа
+    
     const [supplierId, setSupplierId] = useState(initialOrder?.supplierId || '');
-    const [orderCurrency, setOrderCurrency] = useState<Currency>(initialOrder?.currency || Currency.USD);
-    const [exchangeRateToKZT, setExchangeRateToKZT] = useState(initialOrder?.totalAmountKZT_Est && initialOrder?.totalAmountForeign ? initialOrder.totalAmountKZT_Est / initialOrder.totalAmountForeign : (exchangeRates[Currency.USD] || 1));
+    const [orderCurrency, setOrderCurrency] = useState<Currency>(initialOrder?.currency || Currency.Usd);
+    const [exchangeRateToKzt, setExchangeRateToKzt] = useState(initialOrder?.totalAmountKztEst && initialOrder?.totalAmountForeign ? initialOrder.totalAmountKztEst / initialOrder.totalAmountForeign : (exchangeRates[Currency.Usd] || 1));
     const [items, setItems] = useState<OrderItem[]>(initialOrder?.items.map(i => ({...i})) || []);
     const [formPayments, setFormPayments] = useState<Partial<PlannedPayment>[]>(initialPayments.map(p => ({...p})) || []);
     const [activeFormTab, setActiveFormTab] = useState<'items' | 'payments'>('items');
 
+    const [contractUrl, setContractUrl] = useState(initialOrder?.contractUrl || '');
+    const [contractName, setContractName] = useState(initialOrder?.contractName || '');
+    const [additionalDocuments, setAdditionalDocuments] = useState<OrderDocument[]>(initialOrder?.additionalDocuments || []);
+
     useEffect(() => {
         if (!initialOrder) {
-            setExchangeRateToKZT(exchangeRates[orderCurrency] || 1);
+            setExchangeRateToKzt(exchangeRates[orderCurrency] || 1);
         }
     }, [orderCurrency, exchangeRates, initialOrder]);
 
@@ -36,12 +46,12 @@ export const useOrderFormState = (
     const unallocatedAmount = totalAmountForeign - allocatedPaymentSum;
 
     const calculateCrossRate = useCallback((productCurrency: Currency) => {
-        const rateToKZT = exchangeRates[productCurrency] || 1;
-        return rateToKZT / (exchangeRateToKZT || 1);
-    }, [exchangeRates, exchangeRateToKZT]);
+        const rateToKzt = exchangeRates[productCurrency] || 1;
+        return rateToKzt / (exchangeRateToKzt || 1);
+    }, [exchangeRates, exchangeRateToKzt]);
 
     const handleAddPaymentStep = useCallback(() => {
-        const defaultArticleId = cashFlowItems.find(i => i.name === 'Оплата за товар' && i.type === 'Expense')?.id;
+        const defaultArticle = cashFlowItems.find(i => i.name === 'Оплата за товар' && i.type === 'Expense');
         setFormPayments(prev => [...prev, { 
             id: ApiService.generateId(),
             amountDue: Math.max(0, unallocatedAmount), 
@@ -49,7 +59,8 @@ export const useOrderFormState = (
             currency: orderCurrency,
             amountPaid: 0,
             isPaid: false,
-            cashFlowItemId: defaultArticleId
+            cashFlowItemId: defaultArticle?.id,
+            cashFlowCategory: CashFlowCategory.OPERATING
         }]);
     }, [unallocatedAmount, orderCurrency, cashFlowItems]);
 
@@ -62,12 +73,17 @@ export const useOrderFormState = (
     }, [supplierId, items, allocatedPaymentSum, totalAmountForeign, formPayments]);
 
     return {
+        orderId,
+        orderName, setOrderName, // Возвращаем состояние названия заказа
         supplierId, setSupplierId,
         orderCurrency, setOrderCurrency,
-        exchangeRateToKZT, setExchangeRateToKZT,
+        exchangeRateToKzt, setExchangeRateToKzt,
         items, setItems,
         formPayments, setFormPayments,
         activeFormTab, setActiveFormTab,
+        contractUrl, setContractUrl,
+        contractName, setContractName,
+        additionalDocuments, setAdditionalDocuments,
         totalAmountForeign,
         unallocatedAmount,
         calculateCrossRate,

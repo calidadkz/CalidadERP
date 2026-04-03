@@ -77,7 +77,7 @@ export const OrderItemsTab: React.FC<OrderItemsTabProps> = ({
             const crossRate = calculateCrossRate(p.currency);
             setItems(prev => [...prev, {
                 productId: p.id, productName: p.name, sku: p.sku, productType: p.type, quantity: itemQty,
-                productBasePrice: p.basePrice, productCurrency: p.currency, exchange_rate_to_order_currency: crossRate,
+                productBasePrice: p.basePrice, productCurrency: p.currency, exchangeRateToOrderCurrency: crossRate,
                 priceForeign: p.basePrice * crossRate, totalForeign: p.basePrice * crossRate * itemQty, configuration: []
             }]);
         } else {
@@ -86,7 +86,7 @@ export const OrderItemsTab: React.FC<OrderItemsTabProps> = ({
             setItems(prev => [...prev, {
                 productId: configMachine.id, productName: configMachine.name, sku: configMachine.sku, productType: ProductType.MACHINE,
                 quantity: itemQty, productBasePrice: customData.price, productCurrency: customData.currency,
-                exchange_rate_to_order_currency: crossRate, priceForeign: customData.price * crossRate,
+                exchangeRateToOrderCurrency: crossRate, priceForeign: customData.price * crossRate,
                 totalForeign: customData.price * crossRate * itemQty, configuration: customData.config || []
             }]);
         }
@@ -152,8 +152,8 @@ export const OrderItemsTab: React.FC<OrderItemsTabProps> = ({
                                 <td className="px-6 py-3"><div className="font-black text-slate-800 text-xs leading-tight">{item.productName}</div><div className="text-[9px] text-slate-400 font-mono mt-0.5 uppercase">{item.sku}</div>{item.configuration && item.configuration.length > 0 && (<div className="flex flex-wrap gap-1 mt-1">{item.configuration.map((c, i) => <span key={i} className="text-[8px] bg-blue-50 px-1 py-0.5 rounded-[4px] text-blue-600 border border-blue-100 font-bold">{c}</span>)}</div>)}</td>
                                 <td className="px-4 py-3 text-right"><input type="number" className="w-14 bg-slate-50 border-none p-1.5 rounded-lg text-right font-black text-slate-700 outline-none text-xs" value={item.quantity} onChange={e => { const u = [...items]; u[idx].quantity = parseInt(e.target.value) || 1; u[idx].totalForeign = u[idx].quantity * u[idx].priceForeign; setItems(u); }} /></td>
                                 <td className="px-4 py-3 text-right font-mono text-[10px] text-slate-400 font-bold">{f(item.productBasePrice)} {item.productCurrency}</td>
-                                <td className="px-4 py-3 text-center"><div className="text-[10px] font-mono font-black text-blue-600 bg-blue-50 py-0.5 px-1.5 rounded-lg border border-blue-100">{item.exchange_rate_to_order_currency.toFixed(4)}</div></td>
-                                <td className="px-4 py-3 text-right"><input type="number" step="0.01" className="w-28 bg-slate-50 border-none p-1.5 rounded-lg text-right font-mono font-bold text-slate-800 text-xs" value={item.priceForeign} onChange={e => { const u = [...items]; const newPriceForeign = parseFloat(e.target.value) || 0; u[idx].priceForeign = newPriceForeign; u[idx].totalForeign = u[idx].quantity * newPriceForeign; if (u[idx].productBasePrice > 0) u[idx].exchange_rate_to_order_currency = newPriceForeign / u[idx].productBasePrice; setItems(u); }} /></td>
+                                <td className="px-4 py-3 text-center"><div className="text-[10px] font-mono font-black text-blue-600 bg-blue-50 py-0.5 px-1.5 rounded-lg border border-blue-100">{item.exchangeRateToOrderCurrency.toFixed(4)}</div></td>
+                                <td className="px-4 py-3 text-right"><input type="number" step="0.01" className="w-28 bg-slate-50 border-none p-1.5 rounded-lg text-right font-mono font-bold text-slate-800 text-xs" value={item.priceForeign} onChange={e => { const u = [...items]; const newPriceForeign = parseFloat(e.target.value) || 0; u[idx].priceForeign = newPriceForeign; u[idx].totalForeign = u[idx].quantity * newPriceForeign; if (u[idx].productBasePrice > 0) u[idx].exchangeRateToOrderCurrency = newPriceForeign / u[idx].productBasePrice; setItems(u); }} /></td>
                                 <td className="px-6 py-3 text-right font-black text-slate-900 font-mono text-base">{f(item.totalForeign)} <span className="text-[9px] opacity-40">{orderCurrency}</span></td>
                                 <td className="px-4 py-3 text-center"><button onClick={() => setItems(items.filter((_, i) => i !== idx))} className="text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={14}/></button></td>
                             </tr>

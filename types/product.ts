@@ -53,6 +53,7 @@ export interface Product {
     }[];
     compatibleMachineCategoryIds?: string[];
     volumeM3?: number;
+    imageUrl?: string; // URL or path to image in storage
 }
 
 export interface ProductCategory {
@@ -67,16 +68,16 @@ export interface PricingProfile {
     type: ProductType;
     supplierId: string;
     applicableCategoryIds: string[];
-    logisticsRateUSD: number;
+    logisticsRateUsd: number;
     batchVolumeM3: number;
-    batchShippingCostKZT: number;
-    batchSvhCostKZT: number;
-    brokerCostKZT: number;
-    customsFeesKZT: number;
+    batchShippingCostKzt: number;
+    batchSvhCostKzt: number;
+    brokerCostKzt: number;
+    customsFeesKzt: number;
     vatRate: number;
     citRate: number;
     salesBonusRate: number;
-    pnrCostKZT: number;
-    deliveryKZT: number;
+    pnrCostKzt: number;
+    deliveryKzt: number;
     targetNetMarginPercent: number;
 }

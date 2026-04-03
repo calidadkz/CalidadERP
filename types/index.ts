@@ -12,3 +12,4 @@ export * from './permissions';
 export * from './bundle';
 export * from './options';
 export * from './system';
+export * from './batch';

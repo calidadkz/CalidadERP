@@ -8,88 +8,29 @@ export enum CounterpartyType {
 
 export interface Counterparty {
     id: string;
-    type: CounterpartyType;
+    type: CounterpartyType; // Оставляем для совместимости (первая роль)
+    roles?: CounterpartyType[]; // Новое поле для множественных ролей
     name: string;
+    // Contacts
+    contactPerson?: string;
+    phone?: string;
+    legalEmail?: string;
+    // Legal & Requisites
     legalAddress?: string;
     binIin?: string;
     director?: string;
-    legalEmail?: string;
-    contactPerson?: string;
-    phone?: string;
     country?: string; 
+    // Bank Details
+    iik?: string;
+    bik?: string;
+    kbe?: string;
+    bankName?: string;
+    // Other
     description?: string;
 }
 
-export interface Supplier {
-    id: string;
-    name: string;
-    country: string;
-    legalAddress?: string;
-    binIin?: string;
-    iik?: string;
-    bik?: string;
-    kbe?: string;
-    bankName?: string;
-    director?: string;
-    legalEmail?: string;
-}
-
-export interface Client {
-    id: string;
-    name: string;
-    contactPerson?: string;
-    phone?: string;
-    legalAddress?: string;
-    binIin?: string;
-    iik?: string;
-    bik?: string;
-    kbe?: string;
-    bankName?: string;
-    director?: string;
-    legalEmail?: string;
-}
-
-export interface OurCompany {
-    id: string;
-    name: string;
-    contactPerson?: string;
-    phone?: string;
-    legalAddress?: string;
-    binIin?: string;
-    iik?: string;
-    bik?: string;
-    kbe?: string;
-    bankName?: string;
-    director?: string;
-    legalEmail?: string;
-}
-
-export interface Employee {
-    id: string;
-    name: string;
-    contactPerson?: string; 
-    phone?: string;
-    legalAddress?: string; 
-    binIin?: string; 
-    iik?: string;
-    bik?: string;
-    kbe?: string;
-    bankName?: string;
-    director?: string; 
-    legalEmail?: string;
-}
-
-export interface Manufacturer {
-    id: string;
-    name: string;
-    country: string;
-    description?: string;
-    legalAddress?: string;
-    binIin?: string;
-    iik?: string;
-    bik?: string;
-    kbe?: string;
-    bankName?: string;
-    director?: string;
-    legalEmail?: string;
-}
+export type Supplier = Counterparty;
+export type Client = Counterparty;
+export type OurCompany = Counterparty;
+export type Employee = Counterparty;
+export type Manufacturer = Counterparty;

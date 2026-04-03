@@ -1,13 +1,18 @@
 # 🗺️ Application Map
 
-This document provides an overview of the project structure, generated on Mon, 16 Mar 2026 12:38:08 GMT.
+This document provides an overview of the project structure, generated on Wed, 01 Apr 2026 17:26:22 GMT.
 
 📁 **components**
+  - 📁 **pre-calculations**
+    - 📁 **components**
   - 📁 **system**
     - 📄 **Layout.tsx**
     - 📄 **PermissionsManager.tsx**
   - 📁 **ui**
+    - 📄 **FileUpload.tsx**
+    - 📄 **ImageModal.tsx**
     - 📄 **InputField.tsx**
+    - 📄 **MediaLibraryModal.tsx**
     - 📄 **StatementImportModal.tsx**
 📁 **features**
   - 📁 **auth**
@@ -15,6 +20,16 @@ This document provides an overview of the project structure, generated on Mon, 1
       - 📄 **LoginPage.tsx**
     - 📁 **hooks**
       - 📄 **useAccess.ts**
+  - 📁 **batches**
+    - 📁 **components**
+      - 📄 **BatchDocumentsTab.tsx**
+      - 📄 **BatchEconomyTab.tsx**
+      - 📄 **BatchExpensesTab.tsx**
+    - 📁 **hooks**
+      - 📄 **useBatches.ts**
+    - 📁 **pages**
+    - 📄 **BatchDetailPage.tsx**
+    - 📄 **BatchesPage.tsx**
   - 📁 **bundles**
     - 📁 **components**
       - 📄 **ConfiguratorBuilder.tsx**
@@ -23,9 +38,10 @@ This document provides an overview of the project structure, generated on Mon, 1
       - 📄 **TemplatesGallery.tsx**
     - 📁 **hooks**
       - 📄 **useBundleConfigurator.ts**
-    - 📁 **tabs**
     - 📄 **BundlesPage.tsx**
   - 📁 **counterparties**
+    - 📁 **components**
+      - 📄 **CounterpartyCreateModal.tsx**
     - 📁 **pages**
       - 📄 **CounterpartyManagerPage.tsx**
   - 📁 **finance**
@@ -63,6 +79,7 @@ This document provides an overview of the project structure, generated on Mon, 1
       - 📄 **NomenclatureTable.tsx**
       - 📄 **ProductModal.tsx**
     - 📁 **hooks**
+      - 📄 **useGoogleDrivePicker.ts**
       - 📄 **useNomenclatureCRUD.ts**
       - 📄 **useNomenclatureImportExport.ts**
       - 📄 **useNomenclatureState.ts**
@@ -74,19 +91,21 @@ This document provides an overview of the project structure, generated on Mon, 1
     - 📄 **NomenclaturePage.tsx**
   - 📁 **pre-calculations**
     - 📁 **components**
-      - 📁 **tabs**
-        - 📄 **GlobalExpensesTab.tsx**
-        - 📄 **PackingListTab.tsx**
-        - 📄 **PreCalculationItemsTab.tsx**
-      - 📄 **OrderPicker.tsx**
-      - 📄 **PreCalculationHeader.tsx**
-      - 📄 **PreCalculationModal.tsx**
-      - 📄 **PreCalculationSummary.tsx**
+      - 📁 **detailed-list**
+        - 📄 **AddItemModal.tsx**
+        - 📄 **DetailedList.tsx**
+      - 📁 **general-settings**
+        - 📄 **GeneralSettings.tsx**
+      - 📁 **list**
+        - 📄 **PreCalculationList.tsx**
+      - 📁 **packing-list**
+        - 📄 **PackingList.tsx**
     - 📁 **hooks**
-      - 📄 **usePreCalculation.ts**
-      - 📄 **usePreCalculationLogic.ts**
-      - 📄 **usePreCalculationState.ts**
-    - 📄 **PreCalculationsPage.tsx**
+      - 📄 **usePreCalculations.ts**
+    - 📁 **pages**
+      - 📄 **PreCalculationEditorPage.tsx**
+      - 📄 **PreCalculationsListPage.tsx**
+    - 📄 **PreCalculationsRouter.tsx**
   - 📁 **procurement**
     - 📁 **components**
       - 📄 **OrderForm.tsx**
@@ -114,10 +133,8 @@ This document provides an overview of the project structure, generated on Mon, 1
     - 📁 **hooks**
       - 📄 **useReceivingLogic.ts**
     - 📄 **ReceivingPage.tsx**
-  - 📁 **reports**
   - 📁 **sales**
     - 📁 **components**
-      - 📄 **QuickClientModal.tsx**
       - 📄 **SalesItemsTab.tsx**
       - 📄 **SalesOrderForm.tsx**
       - 📄 **SalesOrdersList.tsx**
@@ -131,13 +148,11 @@ This document provides an overview of the project structure, generated on Mon, 1
       - 📄 **TaxSettings.tsx**
     - 📁 **pages**
       - 📄 **SettingsPage.tsx**
-    - 📄 **TaxSettings.tsx**
   - 📁 **shipment**
     - 📁 **components**
       - 📄 **PendingShipments.tsx**
       - 📄 **ShipmentForm.tsx**
       - 📄 **ShipmentHistory.tsx**
-      - 📄 **ShipmentSummary.tsx**
     - 📁 **hooks**
       - 📄 **useShipmentLogic.ts**
     - 📄 **ShipmentPage.tsx**
@@ -180,19 +195,24 @@ This document provides an overview of the project structure, generated on Mon, 1
     - 📄 **ui_standards.md**
   - 📁 **Project summaries**
     - 📄 **app_map.md**
-    - 📄 **project_knowledge_base.md**
+    - 📄 **db_schema_summary.md**
+    - 📄 **db_schema.json**
     - 📄 **project_summary.md**
+  - 📁 **Prompts**
+    - 📄 **preCalculations.md**
   - 📁 **scripts**
     - 📄 **generate_app_map.ts**
-    - 📄 **generate_project_summary.js**
-    - 📄 **generate_project_summary.ts**
-    - 📄 **introspect.cjs**
-    - 📄 **migrate_counterparties.cjs**
+    - 📄 **introspect.ts**
     - 📄 **schema.json**
+  - 📄 **project_knowledge_base.md**
 📁 **services**
   - 📄 **api.ts**
+  - 📄 **BatchCalculator.test.ts**
+  - 📄 **BatchCalculator.ts**
   - 📄 **BundleCalculator.ts**
+  - 📄 **BundleExporter.ts**
   - 📄 **DomainLogic.ts**
+  - 📄 **firebase.ts**
   - 📄 **index.ts**
   - 📄 **InventoryMediator.ts**
   - 📄 **InventoryService.ts**
@@ -203,6 +223,7 @@ This document provides an overview of the project structure, generated on Mon, 1
   - 📄 **supabaseClient.ts**
   - 📄 **SystemRegistry.ts**
 📁 **types**
+  - 📄 **batch.ts**
   - 📄 **bundle.ts**
   - 📄 **counterparty.ts**
   - 📄 **currency.ts**

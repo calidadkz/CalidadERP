@@ -10,7 +10,6 @@ export enum CashFlowCategory {
 export interface CounterpartyAccount {
     id: string;
     counterpartyId: string;
-    name: string;
     bankName: string;
     iik: string;
     bik: string;
@@ -30,7 +29,7 @@ export interface BankAccount {
 export interface CashFlowItem {
     id: string;
     name: string;
-    type: 'Incoming' | 'Outgoing';
+    type: 'Income' | 'Expense';
     category: CashFlowCategory;
 }
 
@@ -40,7 +39,7 @@ export interface CurrencyLot {
     currency: Currency;
     amountOriginal: number;
     amountRemaining: number;
-    costInKZT: number;
+    costInKzt: number;
     rate: number;
 }
 
@@ -55,20 +54,26 @@ export interface ActualPayment {
     bankAccountId: string;
     fromAccount: string;
     exchangeRate: number;
-    totalCostKZT?: number;
-    allocations?: PaymentAllocation[];
+    totalCostKzt?: number;
+    allocations: PaymentAllocation[];
     documentNumber?: string;
     knp?: string;
     purpose?: string;
     counterpartyBinIin?: string;
     counterpartyIik?: string;
     counterpartyBik?: string;
+    counterpartyBankName?: string; // Добавлено поле для названия банка контрагента
 }
 
 export interface PaymentAllocation {
+    id: string;
     actualPaymentId: string;
-    plannedPaymentId: string;
+    plannedPaymentId?: string;
+    cashFlowItemId: string;
+    batchId?: string;
     amountCovered: number;
+    description?: string;
+    targetBankAccountId?: string; // ID нашего счета для внутренних переводов
 }
 
 export interface PlannedPayment {
@@ -83,8 +88,9 @@ export interface PlannedPayment {
     currency: Currency;
     dueDate: string;
     isPaid: boolean;
-    cashFlowItemId?: string;
+    cashFlowItemId: string;
     cashFlowCategory: CashFlowCategory;
+    isDeleted?: boolean; // Пометка на удаление
 }
 
 export interface InternalTransaction {

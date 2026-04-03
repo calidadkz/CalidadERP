@@ -2,7 +2,7 @@
 import { useState, useRef } from 'react';
 import { Product, ProductType, Currency, PricingMethod } from '@/types';
 import { useStore } from '@/features/system/context/GlobalStore';
-import { ApiService } from '@/services/api';
+import { api, ApiService } from '@/services/api';
 import { TableNames } from '@/constants';
 
 export const useNomenclatureImportExport = (selectedType: ProductType) => {
@@ -185,13 +185,18 @@ export const useNomenclatureImportExport = (selectedType: ProductType) => {
 
                     const existingProduct = state.products.find(p => p.sku === sku);
                     const product: Product = existingProduct ? { ...existingProduct } : {
-                        id: new ApiService().generateUUID(),
+                        id: ApiService.generateUUID(),
                         sku: sku,
                         name: row[h.name],
                         type: selectedType,
-                        currency: Currency.KZT,
+                        currency: Currency.Kzt,
                         basePrice: 0,
                         salesPrice: 0,
+                        markupPercentage: 0,
+                        stock: 0,
+                        reserved: 0,
+                        incoming: 0,
+                        minStock: 0,
                     };
                     
                     if (h.name > -1) product.name = row[h.name];
@@ -242,10 +247,10 @@ export const useNomenclatureImportExport = (selectedType: ProductType) => {
                 }
 
                 if (preparedProducts.length > 0) {
-                    await new ApiService().upsertMany(TableNames.PRODUCTS, preparedProducts, 'sku');
+                    await api.upsertMany(TableNames.PRODUCTS, preparedProducts, 'sku');
                 }
                 
-                const freshProducts = await new ApiService().fetchAll<Product>(TableNames.PRODUCTS);
+                const freshProducts = await api.fetchAll<Product>(TableNames.PRODUCTS);
                 (actions as any).setProducts(freshProducts);
 
                 setImportStatus({ show: true, type: 'success', msg: 'Импорт завершен', details: `Всего обработано: ${totalLines}` });
