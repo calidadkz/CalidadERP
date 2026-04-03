@@ -24,8 +24,10 @@ export const useFinanceState = (addLog: (a: any, b: any, c: any, d: any) => void
     };
 
     const addPlannedPayment = async (p: PlannedPayment) => {
-        const dataToSave = { ...p };
+        const dataToSave = { ...p } as any;
         if (dataToSave.cashFlowItemId === '') dataToSave.cashFlowItemId = undefined;
+        // cashFlowCategory — только фронт, колонки в БД нет
+        delete dataToSave.cashFlowCategory;
         const saved = await ApiService.create<PlannedPayment>(TableNames.PLANNED_PAYMENTS, dataToSave);
         setPlannedPayments(prev => [...prev, saved]);
         addLog('Create', 'План платежа', saved.id, `Плановая сумма: ${saved.amountDue} ${saved.currency}`);
@@ -137,39 +139,62 @@ export const useFinanceState = (addLog: (a: any, b: any, c: any, d: any) => void
                 cashFlowItemId: al.cashFlowItemId,
                 amountCovered: Number(al.amountCovered),
                 targetBankAccountId: al.targetBankAccountId || null
+                // existingInternalTxId — только фронт, в БД не пишем
             }));
-            
+
             await ApiService.createMany(TableNames.PAYMENT_ALLOCATIONS, allocationsToSave);
-            
             setActualPayments(prev => prev.map(p => p.id === paymentId ? { ...p, allocations: [...(p.allocations || []), ...newAllocations] } : p));
-            
-            // Логика внутренних транзакций
+
             const ap = actualPayments.find(p => p.id === paymentId);
+            let pairedTxId: string | undefined;
+            let hasInternalTransfer = false;
+
             for (const al of newAllocations) {
+                // --- Логика внутренних переводов ---
                 if (al.targetBankAccountId && ap) {
-                    const tx: InternalTransaction = {
-                        id: ApiService.generateId('INT'),
-                        date: ap.date,
-                        type: ap.currency === bankAccounts.find(a => a.id === al.targetBankAccountId)?.currency ? 'Transfer' as any : 'Exchange' as any,
-                        fromAccountId: ap.direction === 'Outgoing' ? ap.bankAccountId : al.targetBankAccountId,
-                        toAccountId: ap.direction === 'Outgoing' ? al.targetBankAccountId : ap.bankAccountId,
-                        amountSent: Number(al.amountCovered),
-                        amountReceived: Number(al.amountCovered), // В выписках суммы могут отличаться, но пока 1:1
-                        fee: 0,
-                        rate: 1
-                    };
-                    // Мы СОЗДАЕМ запись о транзакции для истории, но НЕ меняем балансы, 
-                    // так как выписки сами их изменят при обработке.
-                    await ApiService.create(TableNames.INTERNAL_TRANSACTIONS, tx);
-                    setInternalTransactions(prev => [tx, ...prev]);
+                    hasInternalTransfer = true;
+
+                    if (al.existingInternalTxId) {
+                        // Вторая сторона: привязываем к уже существующей InternalTransaction
+                        const txUpdate: Partial<InternalTransaction> = { isFullyReconciled: true };
+                        if (ap.direction === 'Outgoing') txUpdate.actualPaymentOutId = ap.id;
+                        else txUpdate.actualPaymentInId = ap.id;
+
+                        await ApiService.update(TableNames.INTERNAL_TRANSACTIONS, al.existingInternalTxId, txUpdate);
+                        pairedTxId = al.existingInternalTxId;
+                        setInternalTransactions(prev => prev.map(tx =>
+                            tx.id === al.existingInternalTxId ? { ...tx, ...txUpdate } : tx
+                        ));
+                    } else {
+                        // Первая сторона: создаём новую InternalTransaction
+                        const targetAcc = bankAccounts.find(a => a.id === al.targetBankAccountId);
+                        const txData: InternalTransaction = {
+                            id: ApiService.generateId('INT'),
+                            date: ap.date,
+                            type: (ap.currency === targetAcc?.currency ? 'Transfer' : 'Exchange') as any,
+                            fromAccountId: ap.direction === 'Outgoing' ? ap.bankAccountId : al.targetBankAccountId!,
+                            toAccountId:   ap.direction === 'Outgoing' ? al.targetBankAccountId! : ap.bankAccountId,
+                            amountSent:     Number(al.amountCovered),
+                            amountReceived: Number(al.amountCovered),
+                            fee: 0,
+                            rate: 1,
+                            isFullyReconciled: false,
+                            ...(ap.direction === 'Outgoing'
+                                ? { actualPaymentOutId: ap.id }
+                                : { actualPaymentInId: ap.id })
+                        };
+                        // Балансы НЕ меняем — их изменит обработка обеих выписок
+                        const savedTx = await ApiService.create<InternalTransaction>(TableNames.INTERNAL_TRANSACTIONS, txData);
+                        pairedTxId = savedTx.id;
+                        setInternalTransactions(prev => [savedTx, ...prev]);
+                    }
                 }
 
-                // Обновляем планы
+                // --- Обновляем PlannedPayment ---
                 if (al.plannedPaymentId) {
-                    const updatedPlans = [...plannedPayments];
-                    const planIdx = updatedPlans.findIndex(p => p.id === al.plannedPaymentId);
+                    const planIdx = plannedPayments.findIndex(p => p.id === al.plannedPaymentId);
                     if (planIdx > -1) {
-                        const pp = updatedPlans[planIdx];
+                        const pp = plannedPayments[planIdx];
                         const newPaidAmount = MoneyMath.add(Number(pp.amountPaid) || 0, Number(al.amountCovered));
                         const isPaid = newPaidAmount >= (Number(pp.amountDue) - 0.01);
                         await ApiService.update(TableNames.PLANNED_PAYMENTS, pp.id, { amountPaid: newPaidAmount, isPaid });
@@ -177,6 +202,18 @@ export const useFinanceState = (addLog: (a: any, b: any, c: any, d: any) => void
                     }
                 }
             }
+
+            // Помечаем actual_payment как внутренний перевод
+            if (hasInternalTransfer && pairedTxId) {
+                await ApiService.update(TableNames.ACTUAL_PAYMENTS, paymentId, {
+                    isInternalTransfer: true,
+                    pairedInternalTxId: pairedTxId
+                });
+                setActualPayments(prev => prev.map(p =>
+                    p.id === paymentId ? { ...p, isInternalTransfer: true, pairedInternalTxId: pairedTxId } : p
+                ));
+            }
+
             addLog('Post', 'Разноска', paymentId, `Привязано ${newAllocations.length} транша(ов)`);
         } finally { setIsProcessing(false); }
     };

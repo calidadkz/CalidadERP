@@ -80,6 +80,7 @@ export const OptionsEditor: React.FC = () => {
     const [isMassAddModalOpen, setIsMassAddModalOpen] = useState(false);
     const [massAddSearch, setMassAddSearch] = useState('');
     const [selectedMachines, setSelectedMachines] = useState<string[]>([]);
+    const [variantPriceOverrides, setVariantPriceOverrides] = useState<Record<string, number | ''>>({});
 
     const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
     const [storageImages, setStorageImages] = useState<StorageImage[]>([]);
@@ -294,7 +295,7 @@ export const OptionsEditor: React.FC = () => {
     };
 
     const toggleVariantSelection = (id: string) => { setSelectedVariantsToApply(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]); };
-    const startMassAdd = () => { if (selectedVariantsToApply.length === 0) return; setIsMassAddModalOpen(true); };
+    const startMassAdd = () => { if (selectedVariantsToApply.length === 0) return; setVariantPriceOverrides({}); setIsMassAddModalOpen(true); };
     const filteredMachinesForMassAdd = useMemo(() => {
         const firstVariant = optionVariants.find(v => v.id === selectedVariantsToApply[0]); const targetCategoryId = firstVariant?.categoryId;
         return products.filter(p => {
@@ -314,11 +315,16 @@ export const OptionsEditor: React.FC = () => {
                 let configGroup = currentConfigs.find(c => c.typeId === variant.typeId);
                 if (!configGroup) { configGroup = { typeId: variant.typeId, allowedVariantIds: [], priceOverrides: {} }; currentConfigs.push(configGroup); }
                 if (!configGroup.allowedVariantIds.includes(vId)) { configGroup.allowedVariantIds = [...configGroup.allowedVariantIds, vId]; }
+                const override = variantPriceOverrides[vId];
+                if (override !== '' && override !== undefined) {
+                    configGroup.priceOverrides = { ...configGroup.priceOverrides, [vId]: Number(override) };
+                }
             });
             return { ...product, machineConfig: currentConfigs };
         }).filter(Boolean) as Product[];
         for (const prod of updates) { await actions.updateProduct(prod); }
-        setIsMassAddModalOpen(false); setIsMassAddMode(false); setSelectedVariantsToApply([]); setSelectedMachines([]); alert(`Опции успешно добавлены к ${updates.length} станкам`);
+        setIsMassAddModalOpen(false); setIsMassAddMode(false); setSelectedVariantsToApply([]); setSelectedMachines([]); setVariantPriceOverrides({});
+        alert(`Опции успешно добавлены к ${updates.length} станкам`);
     };
 
     const filteredBOMProducts = useMemo(() => {
@@ -361,6 +367,33 @@ export const OptionsEditor: React.FC = () => {
                         <div className="p-6 border-b bg-slate-50 flex justify-between items-center">
                             <div><h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Массовое добавление опций</h3><p className="text-xs text-slate-400 font-bold mt-1">Выбрано опций: <span className="text-blue-600">{selectedVariantsToApply.length}</span>. Выберите станки для применения.</p></div>
                             <button onClick={() => setIsMassAddModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 bg-white rounded-xl border border-slate-200 shadow-sm"><X size={20}/></button>
+                        </div>
+                        {/* Выбранные варианты с индивидуальными ценами */}
+                        <div className="p-4 bg-indigo-50/40 border-b space-y-2">
+                            <div className="text-[9px] font-black text-indigo-600 uppercase tracking-widest mb-2">Выбранные варианты — индивидуальная цена (₸)</div>
+                            <div className="flex flex-wrap gap-2">
+                                {selectedVariantsToApply.map(vId => {
+                                    const v = optionVariants.find(ov => ov.id === vId);
+                                    if (!v) return null;
+                                    const overrideVal = variantPriceOverrides[vId];
+                                    return (
+                                        <div key={vId} className="flex items-center gap-2 bg-white border border-indigo-100 rounded-xl px-3 py-2 shadow-sm">
+                                            <div className="min-w-0">
+                                                <div className="text-[10px] font-black text-slate-800 truncate max-w-[140px]">{v.name}</div>
+                                                <div className="text-[8px] text-slate-400 font-mono">{v.price.toLocaleString()} {v.currency}</div>
+                                            </div>
+                                            <input
+                                                type="number"
+                                                className={`w-24 px-2 py-1.5 rounded-lg text-xs font-black text-right outline-none border transition-all ${overrideVal !== '' && overrideVal !== undefined ? 'border-indigo-400 bg-indigo-50 text-indigo-800' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
+                                                placeholder="Цена ₸"
+                                                value={overrideVal ?? ''}
+                                                onChange={e => setVariantPriceOverrides(prev => ({ ...prev, [vId]: e.target.value === '' ? '' : parseFloat(e.target.value) || 0 }))}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div className="text-[8px] text-slate-400 italic">Если оставить пустым — будет использоваться базовая цена варианта</div>
                         </div>
                         <div className="p-4 bg-white border-b flex gap-4 items-center">
                             <div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-4 focus:ring-blue-500/10" placeholder="Поиск станков по названию или артикулу..." value={massAddSearch} onChange={e => setMassAddSearch(e.target.value)}/></div>

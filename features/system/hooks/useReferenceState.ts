@@ -309,8 +309,9 @@ export const useReferenceState = () => {
     };
 
     const addCashFlowItem = async (c: CashFlowItem) => {
-        const data = { ...c };
-        delete (data as any).id;
+        const data = { ...c } as any;
+        delete data.id;
+        delete data.category; // no category column in DB
         const saved = await ApiService.create<CashFlowItem>(TableNames.CASH_FLOW_ITEMS, data);
         setCashFlowItems(prev => [...prev, saved]);
         addLog('Create', 'Статья ДДС', saved.id, `Создана статья: ${saved.name}`);

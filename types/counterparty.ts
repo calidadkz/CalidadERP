@@ -27,6 +27,7 @@ export interface Counterparty {
     bankName?: string;
     // Other
     description?: string;
+    isPaymentIntermediary?: boolean; // Kaspi Bank, маркетплейсы и т.д.
 }
 
 export type Supplier = Counterparty;

@@ -199,6 +199,7 @@ export const SalesOrdersList: React.FC<SalesOrdersListProps> = ({
                                                 <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-200">
                                                     <div className={`h-full transition-all duration-700 ${paymentPercent >= 100 ? 'bg-emerald-500' : 'bg-blue-600'}`} style={{ width: `${Math.min(100, paymentPercent)}%` }} />
                                                 </div>
+                                                <div className="text-[9px] text-slate-400 font-mono mt-0.5 whitespace-nowrap">{paidAmount.toLocaleString('ru-RU', {maximumFractionDigits: 0})} / {o.totalAmount.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₸</div>
                                             </div>
                                         </td>
                                     )}

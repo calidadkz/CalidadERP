@@ -234,11 +234,123 @@ export const OptionsTab: React.FC<OptionsTabProps> = ({ formData, optionTypes = 
                                 {(optionTypes || []).find(t => t.id === selectedOptionTypeId)?.name}
                             </h3>
                             {canWrite && (
-                                <button onClick={() => setIsAddingVariant(!isAddingVariant)} className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-black text-[10px] uppercase transition-all ${isAddingVariant ? 'bg-red-50 border-red-200 text-red-600' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-100'}`}>
+                                <button
+                                    onClick={() => {
+                                        if (isAddingVariant) {
+                                            setIsAddingVariant(false);
+                                            setEditingVariantId(null);
+                                            setVariantFormData({ name: '', supplierProductName: '', description: '', price: 0, currency: Currency.Cny, composition: [], supplierId: '', manufacturer: '', lengthMm: 0, widthMm: 0, heightMm: 0 });
+                                        } else {
+                                            setIsAddingVariant(true);
+                                        }
+                                    }}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-black text-[10px] uppercase transition-all ${isAddingVariant ? 'bg-red-50 border-red-200 text-red-600' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-100'}`}
+                                >
                                     {isAddingVariant ? <X size={14}/> : <Plus size={14}/>} {isAddingVariant ? 'ОТМЕНА' : 'ДОБАВИТЬ ВАРИАНТ'}
                                 </button>
                             )}
                         </div>
+
+                        {/* Форма добавления / редактирования варианта */}
+                        {isAddingVariant && (
+                            <div className="mx-6 mt-4 mb-2 bg-indigo-50/50 border border-indigo-100 rounded-2xl p-5 space-y-4 animate-in slide-in-from-top-2 duration-200 shrink-0">
+                                <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">
+                                    {editingVariantId ? 'Редактировать вариант' : 'Новый вариант'}
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="col-span-2">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Название *</label>
+                                        <input
+                                            className="w-full p-2.5 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white focus:ring-4 focus:ring-indigo-500/10"
+                                            placeholder="Название варианта..."
+                                            value={variantFormData.name || ''}
+                                            onChange={e => setVariantFormData({ ...variantFormData, name: e.target.value })}
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Наим. у поставщика</label>
+                                        <input
+                                            className="w-full p-2.5 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white focus:ring-4 focus:ring-indigo-500/10"
+                                            placeholder="Артикул / наименование"
+                                            value={variantFormData.supplierProductName || ''}
+                                            onChange={e => setVariantFormData({ ...variantFormData, supplierProductName: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Поставщик</label>
+                                        <select
+                                            className="w-full p-2.5 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white"
+                                            value={variantFormData.supplierId || ''}
+                                            onChange={e => setVariantFormData({ ...variantFormData, supplierId: e.target.value })}
+                                        >
+                                            <option value="">— Поставщик —</option>
+                                            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Производитель</label>
+                                        <input
+                                            className="w-full p-2.5 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white focus:ring-4 focus:ring-indigo-500/10"
+                                            placeholder="Производитель"
+                                            value={variantFormData.manufacturer || ''}
+                                            onChange={e => setVariantFormData({ ...variantFormData, manufacturer: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Цена закупки</label>
+                                        <div className="flex h-[38px]">
+                                            <input
+                                                type="number"
+                                                className="w-full p-2.5 rounded-l-xl border border-indigo-200 text-xs font-black outline-none bg-white focus:ring-4 focus:ring-indigo-500/10"
+                                                value={variantFormData.price || 0}
+                                                onChange={e => setVariantFormData({ ...variantFormData, price: parseFloat(e.target.value) || 0 })}
+                                            />
+                                            <select
+                                                className="w-20 p-2 rounded-r-xl border-y border-r border-indigo-200 text-[10px] font-black bg-slate-50 outline-none"
+                                                value={variantFormData.currency || Currency.Cny}
+                                                onChange={e => setVariantFormData({ ...variantFormData, currency: e.target.value as Currency })}
+                                            >
+                                                {Object.values(Currency).map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Габариты мм (Д × Ш × В)</label>
+                                        <div className="flex gap-1">
+                                            <input type="number" className="flex-1 p-2 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white text-center" placeholder="Д" value={variantFormData.lengthMm || ''} onChange={e => setVariantFormData({ ...variantFormData, lengthMm: parseFloat(e.target.value) || 0 })}/>
+                                            <input type="number" className="flex-1 p-2 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white text-center" placeholder="Ш" value={variantFormData.widthMm || ''} onChange={e => setVariantFormData({ ...variantFormData, widthMm: parseFloat(e.target.value) || 0 })}/>
+                                            <input type="number" className="flex-1 p-2 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white text-center" placeholder="В" value={variantFormData.heightMm || ''} onChange={e => setVariantFormData({ ...variantFormData, heightMm: parseFloat(e.target.value) || 0 })}/>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Описание</label>
+                                        <textarea
+                                            className="w-full p-2.5 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white focus:ring-4 focus:ring-indigo-500/10 resize-none"
+                                            rows={2}
+                                            placeholder="Описание варианта..."
+                                            value={variantFormData.description || ''}
+                                            onChange={e => setVariantFormData({ ...variantFormData, description: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-2 pt-1">
+                                    <button
+                                        onClick={() => { setIsAddingVariant(false); setEditingVariantId(null); setVariantFormData({ name: '', supplierProductName: '', description: '', price: 0, currency: Currency.Cny, composition: [], supplierId: '', manufacturer: '', lengthMm: 0, widthMm: 0, heightMm: 0 }); }}
+                                        className="px-4 py-2 text-slate-400 hover:text-slate-600 font-black text-xs uppercase tracking-widest transition-colors"
+                                    >
+                                        Отмена
+                                    </button>
+                                    <button
+                                        onClick={handleSaveVariant}
+                                        disabled={!variantFormData.name?.trim()}
+                                        className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 disabled:opacity-30 shadow-lg shadow-indigo-100 transition-all active:scale-95"
+                                    >
+                                        <Save size={14}/> {editingVariantId ? 'Сохранить' : 'Добавить'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Список вариантов */}
                         <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ActualPayment, Currency, PlannedPayment, BankAccount, Client, Supplier, PaymentAllocation, CashFlowItem, Batch, Counterparty, CounterpartyAccount, CounterpartyType } from '@/types';
-import { X, AlertCircle, Landmark, Wallet, Info, FileText, Plus, Trash2, Layers, Tag, UserPlus, Calendar, ChevronRight } from 'lucide-react';
+import { ActualPayment, Currency, PlannedPayment, BankAccount, Client, Supplier, PaymentAllocation, Batch, Counterparty, CounterpartyAccount, CounterpartyType } from '@/types';
+import { X, AlertCircle, Landmark, Wallet, Plus, Trash2, UserPlus, Tag, Receipt } from 'lucide-react';
 import { ApiService } from '@/services/api';
 import { TableNames } from '@/constants';
 import { CounterpartyCreateModal } from '@/features/counterparties/components/CounterpartyCreateModal';
@@ -16,448 +16,394 @@ interface PaymentModalProps {
     onSubmit: (payment: ActualPayment) => void;
 }
 
-export const PaymentModal: React.FC<PaymentModalProps> = ({ 
-    direction, plan, bankAccounts, clients: initialClients, suppliers: initialSuppliers, onClose, onSubmit 
+// Строка распределения внутри платежа
+interface AllocLine {
+    id: string;
+    plannedPaymentId?: string;
+    cashFlowItemId?: string;
+    amount: number;
+    description?: string;
+}
+
+export const PaymentModal: React.FC<PaymentModalProps> = ({
+    direction, plan, bankAccounts, clients: initialClients, suppliers: initialSuppliers, onClose, onSubmit
 }) => {
     const { state } = useStore();
-    const { plannedPayments, cashFlowItems: cfItemsDict } = state;
+    const { plannedPayments, cashFlowItems } = state;
 
+    // --- Основные поля платежа ---
     const [counterpartyId, setCounterpartyId] = useState(plan?.counterpartyId || '');
-    const [currency, setCurrency] = useState(plan?.currency || Currency.Usd);
+    const [currency, setCurrency] = useState<Currency>(plan?.currency || Currency.Usd);
     const [amount, setAmount] = useState(plan ? (plan.amountDue - (plan.amountPaid || 0)) : 0);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-    const [accountId, setAccountId] = useState(bankAccounts.find(a => a.currency === (plan?.currency || Currency.Usd))?.id || '');
-    
-    // Bank Statement / Reference Fields
+    const [accountId, setAccountId] = useState('');
+
+    // --- Доп. поля выписки (сворачиваемые) ---
+    const [showDetails, setShowDetails] = useState(false);
     const [docNum, setDocNum] = useState('');
     const [knp, setKnp] = useState('');
     const [purpose, setPurpose] = useState('');
     const [cpBin, setCpBin] = useState('');
     const [cpIik, setCpIik] = useState('');
-    const [cpBik, setCpBik] = useState('');
 
-    // Allocations State
-    const [allocations, setAllocations] = useState<Partial<PaymentAllocation>[]>([]);
-    
-    // Dictionaries for selection
+    // --- Строки распределения ---
+    const [lines, setLines] = useState<AllocLine[]>([]);
+
     const [batches, setBatches] = useState<Batch[]>([]);
     const [error, setError] = useState<string | null>(null);
-
-    // Local counterparties to handle newly created ones
     const [localClients, setLocalClients] = useState<Client[]>(initialClients);
     const [localSuppliers, setLocalSuppliers] = useState<Supplier[]>(initialSuppliers);
     const [isCounterpartyModalOpen, setIsCounterpartyModalOpen] = useState(false);
 
-    // Filtered Planned Payments available for allocation
-    const availablePlans = useMemo(() => {
-        return plannedPayments.filter(p => 
-            !p.isPaid && 
-            p.direction === direction && 
+    // Планы доступные для привязки
+    const availablePlans = useMemo(() =>
+        plannedPayments.filter(p =>
+            !p.isPaid &&
+            p.direction === direction &&
             (counterpartyId ? p.counterpartyId === counterpartyId : true) &&
             p.currency === currency
-        );
-    }, [plannedPayments, direction, counterpartyId, currency]);
+        ), [plannedPayments, direction, counterpartyId, currency]);
 
-    // Sync local lists with props
+    // Дефолтный счёт при смене валюты
+    useEffect(() => {
+        const match = bankAccounts.find(a => a.currency === currency);
+        setAccountId(match?.id || '');
+    }, [currency, bankAccounts]);
+
+    // Синхронизация списков
     useEffect(() => { setLocalClients(initialClients); }, [initialClients]);
     useEffect(() => { setLocalSuppliers(initialSuppliers); }, [initialSuppliers]);
 
-    // Initial load of dictionaries and default allocation
+    // Инициализация строк
     useEffect(() => {
-        const loadDicts = async () => {
-            const activeBatches = await ApiService.fetchAll<Batch>(TableNames.BATCHES, { status: 'active' });
-            setBatches(activeBatches);
-        };
-        loadDicts();
+        ApiService.fetchAll<Batch>(TableNames.BATCHES, { status: 'active' }).then(setBatches);
 
         if (plan) {
-            setAllocations([{
+            setLines([{
                 id: ApiService.generateId('AL'),
                 plannedPaymentId: plan.id,
                 cashFlowItemId: plan.cashFlowItemId,
-                amountCovered: plan.amountDue - (plan.amountPaid || 0),
-                description: `Оплата по плану: ${plan.sourceDocId}`
+                amount: plan.amountDue - (plan.amountPaid || 0),
             }]);
         } else {
-            setAllocations([{
-                id: ApiService.generateId('AL'),
-                cashFlowItemId: '',
-                amountCovered: 0,
-                description: ''
-            }]);
+            setLines([{ id: ApiService.generateId('AL'), cashFlowItemId: '', amount: 0 }]);
         }
     }, [plan]);
 
-    // If amount changes and there's only one allocation that IS NOT linked to a plan, sync it
+    // Автосинхронизация одиночной строки с суммой
     useEffect(() => {
-        if (allocations.length === 1 && amount > 0 && !allocations[0].plannedPaymentId) {
-            setAllocations(prev => [{ ...prev[0], amountCovered: amount }]);
+        if (lines.length === 1 && amount > 0 && !lines[0].plannedPaymentId) {
+            setLines(prev => [{ ...prev[0], amount }]);
         }
     }, [amount]);
 
-    const handleAddAllocation = () => {
-        setAllocations([...allocations, {
-            id: ApiService.generateId('AL'),
-            cashFlowItemId: '',
-            amountCovered: 0,
-            description: ''
-        }]);
-    };
-
-    const handleRemoveAllocation = (index: number) => {
-        if (allocations.length > 1) {
-            setAllocations(allocations.filter((_, i) => i !== index));
-        }
-    };
-
-    const updateAllocation = (index: number, key: keyof PaymentAllocation, value: any) => {
-        const newAllocations = [...allocations];
-        const current = { ...newAllocations[index], [key]: value };
-
-        // If linking to a plan, auto-fill some fields
-        if (key === 'plannedPaymentId' && value) {
-            const p = plannedPayments.find(pp => pp.id === value);
-            if (p) {
-                current.cashFlowItemId = p.cashFlowItemId;
-                current.amountCovered = p.amountDue - (p.amountPaid || 0);
-                current.description = `Оплата по плану: ${p.sourceDocId}`;
-                // If counterparty is not set, set it from the plan
-                if (!counterpartyId) setCounterpartyId(p.counterpartyId);
-            }
-        }
-
-        newAllocations[index] = current;
-        setAllocations(newAllocations);
-    };
-
-    const totalAllocated = allocations.reduce((sum, a) => sum + (Number(a.amountCovered) || 0), 0);
+    const totalAllocated = lines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
     const isBalanced = Math.abs(totalAllocated - amount) < 0.01;
+
+    const addLine = () => setLines(prev => [...prev, { id: ApiService.generateId('AL'), cashFlowItemId: '', amount: Math.max(0, amount - totalAllocated) }]);
+    const removeLine = (id: string) => { if (lines.length > 1) setLines(prev => prev.filter(l => l.id !== id)); };
+
+    const updateLine = (id: string, key: keyof AllocLine, value: any) => {
+        setLines(prev => prev.map(l => {
+            if (l.id !== id) return l;
+            const updated = { ...l, [key]: value };
+            if (key === 'plannedPaymentId' && value) {
+                const pp = plannedPayments.find(p => p.id === value);
+                if (pp) {
+                    updated.cashFlowItemId = pp.cashFlowItemId;
+                    updated.amount = pp.amountDue - (pp.amountPaid || 0);
+                    if (!counterpartyId) setCounterpartyId(pp.counterpartyId);
+                }
+            }
+            return updated;
+        }));
+    };
 
     const handleSave = () => {
         setError(null);
-        if (!counterpartyId) { setError("Укажите контрагента"); return; }
-        if (!accountId) { setError("Выберите счет"); return; }
-        if (amount <= 0) { setError("Укажите сумму"); return; }
-        if (!isBalanced) { setError(`Сумма распределения (${totalAllocated.toFixed(2)}) не совпадает с суммой платежа (${amount})`); return; }
-        
-        const invalidAlloc = allocations.find(a => !a.cashFlowItemId);
-        if (invalidAlloc) { setError("Выберите статью ДДС для всех частей платежа"); return; }
+        if (!counterpartyId) { setError('Укажите контрагента'); return; }
+        if (!accountId) { setError('Выберите счёт'); return; }
+        if (amount <= 0) { setError('Укажите сумму'); return; }
+        if (!isBalanced) { setError(`Сумма строк (${totalAllocated}) ≠ сумме платежа (${amount})`); return; }
+        if (lines.some(l => !l.cashFlowItemId)) { setError('Выберите статью ДДС для всех строк'); return; }
 
         const account = bankAccounts.find(a => a.id === accountId);
         if (!account) return;
-
         const cp = [...localClients, ...localSuppliers].find(c => c.id === counterpartyId);
-        const combinedName = cp?.name || 'Unknown';
 
         onSubmit({
-            id: ApiService.generateId('TX'), 
-            direction, 
-            date, 
-            counterpartyId, 
-            counterpartyName: combinedName, 
-            amount, 
+            id: ApiService.generateId('TX'),
+            direction,
+            date,
+            counterpartyId,
+            counterpartyName: cp?.name || '—',
+            amount,
             currency,
-            bankAccountId: account.id, 
-            fromAccount: `${account.bank} ${account.number}`, 
-            exchangeRate: 1, 
-            allocations: allocations as PaymentAllocation[],
-            documentNumber: docNum,
-            knp,
-            purpose,
-            counterpartyBinIin: cpBin,
-            counterpartyIik: cpIik,
-            counterpartyBik: cpBik
+            bankAccountId: account.id,
+            fromAccount: `${account.bank} ${account.number}`,
+            exchangeRate: 1,
+            allocations: lines.map(l => ({
+                id: l.id,
+                actualPaymentId: '',
+                plannedPaymentId: l.plannedPaymentId,
+                cashFlowItemId: l.cashFlowItemId || '',
+                amountCovered: Number(l.amount),
+                description: l.description,
+            } as PaymentAllocation)),
+            documentNumber: docNum || undefined,
+            knp: knp || undefined,
+            purpose: purpose || undefined,
+            counterpartyBinIin: cpBin || undefined,
+            counterpartyIik: cpIik || undefined,
         });
     };
 
     const handleCreateCounterparty = async (cp: Counterparty, accounts: CounterpartyAccount[]) => {
         const { saved } = await ApiService.createCounterpartyWithAccount(cp, accounts[0] || {});
         if (saved) {
-            if (saved.type === CounterpartyType.CLIENT) {
-                setLocalClients(prev => [...prev, saved as Client]);
-            } else {
-                setLocalSuppliers(prev => [...prev, saved as Supplier]);
-            }
+            if (saved.type === CounterpartyType.CLIENT) setLocalClients(prev => [...prev, saved as Client]);
+            else setLocalSuppliers(prev => [...prev, saved as Supplier]);
             setCounterpartyId(saved.id);
             setIsCounterpartyModalOpen(false);
         }
     };
 
-    const f = (val: number) => val.toLocaleString('ru-RU');
+    const f = (v: number) => v.toLocaleString('ru-RU');
+    const isOutgoing = direction === 'Outgoing';
 
     return (
         <>
             <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-[2px] flex items-center justify-center z-[110] p-4">
-                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
-                    {/* Header */}
+                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+
+                    {/* Шапка */}
                     <div className="px-6 py-4 border-b bg-slate-50 flex justify-between items-center flex-none">
                         <div className="flex items-center gap-3">
-                            <div className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border ${direction === 'Outgoing' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                                {direction === 'Outgoing' ? 'Расход' : 'Приход'}
+                            <div className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border ${isOutgoing ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                                {isOutgoing ? 'Расход' : 'Приход'}
                             </div>
                             <h3 className="font-black text-slate-800 uppercase tracking-tight text-sm">
-                                {plan ? 'Исполнение по плану' : 'Новый платеж'}
+                                {plan ? 'Исполнение плана' : 'Новый платёж'}
                             </h3>
                         </div>
-                        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={20}/></button>
+                        <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
                     </div>
-                    
-                    <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
                         {error && (
-                            <div className="bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-2 text-red-600 text-xs font-bold">
+                            <div className="mx-6 mt-4 bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-2 text-red-600 text-xs font-bold">
                                 <AlertCircle size={14}/> {error}
                             </div>
                         )}
 
-                        <div className="grid grid-cols-12 gap-8">
-                            {/* Left Column: Payment Details */}
-                            <div className="col-span-4 space-y-6">
-                                <div className="bg-slate-50 p-5 rounded-[2rem] border border-slate-100 space-y-4">
-                                    <div>
-                                        <div className="flex justify-between items-center mb-1.5 ml-1">
-                                            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Контрагент</label>
-                                            {!plan && (
-                                                <button 
-                                                    onClick={() => setIsCounterpartyModalOpen(true)}
-                                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                                    title="Создать контрагента"
-                                                >
-                                                    <UserPlus size={14}/>
-                                                </button>
-                                            )}
-                                        </div>
-                                        <select 
-                                            className="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-bold bg-white outline-none focus:ring-4 focus:ring-blue-500/5 disabled:bg-slate-100" 
-                                            value={counterpartyId} 
-                                            onChange={e => setCounterpartyId(e.target.value)} 
+                        {/* Основные поля — компактная строка */}
+                        <div className="px-6 pt-5 pb-4 space-y-4">
+                            <div className="grid grid-cols-12 gap-3">
+                                {/* Контрагент */}
+                                <div className="col-span-5">
+                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 tracking-widest">Контрагент</label>
+                                    <div className="flex gap-1.5">
+                                        <select
+                                            className="flex-1 border border-slate-200 p-2 rounded-xl text-xs font-bold bg-white outline-none disabled:bg-slate-50"
+                                            value={counterpartyId}
+                                            onChange={e => setCounterpartyId(e.target.value)}
                                             disabled={!!plan}
                                         >
-                                            <option value="">-- Выберите --</option>
-                                            {(direction === 'Outgoing' ? localSuppliers : localClients).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                            <option value="">— Выберите —</option>
+                                            {(isOutgoing ? localSuppliers : localClients).map(c =>
+                                                <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Дата</label>
-                                            <input type="date" className="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-bold bg-white outline-none" value={date} onChange={e => setDate(e.target.value)}/>
-                                        </div>
-                                        <div>
-                                            <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Валюта</label>
-                                            <select className="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-black bg-white outline-none" value={currency} onChange={e => setCurrency(e.target.value as Currency)} disabled={!!plan}>
-                                                {Object.values(Currency).map(c => <option key={c} value={c}>{c}</option>)}
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Общая сумма ({currency})</label>
-                                        <input 
-                                            type="number" 
-                                            className="w-full border border-slate-200 p-3 rounded-xl text-lg font-black text-slate-900 outline-none focus:ring-4 focus:ring-blue-500/5" 
-                                            value={amount || ''} 
-                                            onChange={e => setAmount(parseFloat(e.target.value) || 0)}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="bg-white p-5 rounded-[2rem] border border-slate-100 space-y-4">
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest flex items-center gap-1.5">
-                                        <Landmark size={12}/> Счет списания/зачисления
-                                    </label>
-                                    <div className="space-y-2">
-                                        {bankAccounts.filter(a => a.currency === currency).map(a => (
-                                            <div key={a.id} onClick={() => setAccountId(a.id)} 
-                                                 className={`p-3 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${accountId === a.id ? 'border-blue-500 bg-blue-50/50' : 'border-slate-50 hover:border-slate-100'}`}>
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`p-2 rounded-xl ${accountId === a.id ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                                                        <Wallet size={14}/>
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <div className="text-[11px] font-black text-slate-700 truncate">{a.bank}</div>
-                                                        <div className="text-[9px] text-slate-400 font-mono">{a.number}</div>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="text-[11px] font-black font-mono">{f(a.balance)}</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {bankAccounts.filter(a => a.currency === currency).length === 0 && (
-                                            <div className="p-4 text-center text-slate-400 text-[10px] font-bold uppercase italic border-2 border-dashed border-slate-100 rounded-2xl">
-                                                Нет счетов в {currency}
-                                            </div>
+                                        {!plan && (
+                                            <button onClick={() => setIsCounterpartyModalOpen(true)} className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 hover:bg-blue-600 hover:text-white transition-all" title="Создать контрагента">
+                                                <UserPlus size={14}/>
+                                            </button>
                                         )}
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Right Column: Allocations */}
-                            <div className="col-span-8 space-y-6">
-                                <div className="flex justify-between items-center">
-                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                        <Tag size={14} className="text-indigo-500"/> Распределение платежа
-                                    </h4>
-                                    <button 
-                                        onClick={handleAddAllocation}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all"
-                                    >
-                                        <Plus size={12}/> Добавить статью/план
-                                    </button>
+                                {/* Дата */}
+                                <div className="col-span-3">
+                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 tracking-widest">Дата</label>
+                                    <input type="date" className="w-full border border-slate-200 p-2 rounded-xl text-xs font-bold bg-white outline-none" value={date} onChange={e => setDate(e.target.value)}/>
                                 </div>
 
-                                <div className="space-y-4">
-                                    {allocations.map((alloc, idx) => (
-                                        <div key={alloc.id} className="relative bg-white border border-slate-200 rounded-[2rem] p-5 shadow-sm hover:shadow-md transition-all group overflow-hidden">
-                                            {allocations.length > 1 && (
-                                                <button 
-                                                    onClick={() => handleRemoveAllocation(idx)}
-                                                    className="absolute -right-2 -top-2 p-1.5 bg-white text-red-400 hover:text-red-600 rounded-full border border-slate-100 shadow-sm transition-all z-10"
-                                                >
-                                                    <Trash2 size={12}/>
-                                                </button>
-                                            )}
-                                            
-                                            <div className="grid grid-cols-12 gap-4">
-                                                <div className="col-span-12 flex items-center gap-4 mb-2 p-2 bg-slate-50/50 rounded-xl">
-                                                    <div className="flex-1">
-                                                        <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1">Планируемый платеж (из календаря)</label>
-                                                        <select 
-                                                            value={alloc.plannedPaymentId || ''} 
-                                                            onChange={e => updateAllocation(idx, 'plannedPaymentId', e.target.value)}
-                                                            className="w-full border border-slate-200 p-2 rounded-lg text-[10px] font-bold bg-white outline-none focus:ring-2 focus:ring-blue-500/10"
-                                                        >
-                                                            <option value="">-- Без привязки к плану (прямой платеж) --</option>
-                                                            {availablePlans.map(p => (
-                                                                <option key={p.id} value={p.id}>
-                                                                    {p.sourceDocId} | {p.amountDue - p.amountPaid} {p.currency} | {p.counterpartyName}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    {alloc.plannedPaymentId && (
-                                                        <div className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg shadow-sm">
-                                                            <Calendar size={14}/>
-                                                            <span className="text-[9px] font-black uppercase tracking-widest">Связан с планом</span>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                {/* Валюта */}
+                                <div className="col-span-2">
+                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 tracking-widest">Валюта</label>
+                                    <select className="w-full border border-slate-200 p-2 rounded-xl text-xs font-black bg-white outline-none" value={currency} onChange={e => setCurrency(e.target.value as Currency)} disabled={!!plan}>
+                                        {Object.values(Currency).map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
 
-                                                <div className="col-span-6">
-                                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1">Статья ДДС</label>
-                                                    <select 
-                                                        value={alloc.cashFlowItemId} 
-                                                        onChange={e => updateAllocation(idx, 'cashFlowItemId', e.target.value)}
-                                                        className="w-full border border-slate-100 p-2 rounded-xl text-[11px] font-bold bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500/10"
-                                                        disabled={!!alloc.plannedPaymentId}
-                                                    >
-                                                        <option value="">-- Выберите статью --</option>
-                                                        {cfItemsDict.filter(i => (direction === 'Outgoing' ? i.type === 'Expense' : i.type === 'Income'))
-                                                            .map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-                                                    </select>
-                                                </div>
+                                {/* Сумма */}
+                                <div className="col-span-2">
+                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 tracking-widest">Сумма</label>
+                                    <input
+                                        type="number"
+                                        className="w-full border border-slate-200 p-2 rounded-xl text-sm font-black text-slate-900 outline-none"
+                                        value={amount || ''}
+                                        onChange={e => setAmount(parseFloat(e.target.value) || 0)}
+                                    />
+                                </div>
+                            </div>
 
-                                                <div className="col-span-6">
-                                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1">Партия (опц.)</label>
-                                                    <select 
-                                                        value={alloc.batchId} 
-                                                        onChange={e => updateAllocation(idx, 'batchId', e.target.value)}
-                                                        className="w-full border border-slate-100 p-2 rounded-xl text-[11px] font-bold bg-slate-50 outline-none"
-                                                    >
-                                                        <option value="">-- Без партии --</option>
-                                                        {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                                                    </select>
-                                                </div>
-
-                                                <div className="col-span-4">
-                                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1">Сумма ({currency})</label>
-                                                    <input 
-                                                        type="number" 
-                                                        value={alloc.amountCovered || ''} 
-                                                        onChange={e => updateAllocation(idx, 'amountCovered', parseFloat(e.target.value) || 0)}
-                                                        className="w-full border border-slate-100 p-2 rounded-xl text-[11px] font-black font-mono bg-slate-50 outline-none"
-                                                    />
-                                                </div>
-
-                                                <div className="col-span-8">
-                                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1">Комментарий</label>
-                                                    <input 
-                                                        type="text" 
-                                                        value={alloc.description || ''} 
-                                                        onChange={e => updateAllocation(idx, 'description', e.target.value)}
-                                                        className="w-full border border-slate-100 p-2 rounded-xl text-[11px] font-medium bg-slate-50 outline-none"
-                                                        placeholder="Например: доплата по счету..."
-                                                    />
-                                                </div>
+                            {/* Счёт — горизонтальный ряд карточек */}
+                            <div>
+                                <label className="block text-[8px] font-black text-slate-400 uppercase mb-1.5 tracking-widest flex items-center gap-1"><Landmark size={10}/> Счёт</label>
+                                <div className="flex gap-2 flex-wrap">
+                                    {bankAccounts.filter(a => a.currency === currency).map(a => (
+                                        <div key={a.id} onClick={() => setAccountId(a.id)}
+                                             className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 cursor-pointer transition-all ${accountId === a.id ? 'border-blue-500 bg-blue-50' : 'border-slate-100 hover:border-slate-200'}`}>
+                                            <Wallet size={13} className={accountId === a.id ? 'text-blue-600' : 'text-slate-300'}/>
+                                            <div>
+                                                <div className="text-[10px] font-black text-slate-700">{a.bank}</div>
+                                                <div className="text-[9px] font-mono text-slate-400">{f(a.balance)} {a.currency}</div>
                                             </div>
                                         </div>
                                     ))}
-                                </div>
-
-                                {/* Balancing Footer */}
-                                <div className={`p-5 rounded-[2rem] flex items-center justify-between border-2 transition-all ${isBalanced ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100 shadow-inner'}`}>
-                                    <div className="flex flex-col">
-                                        <div className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 mb-1">
-                                            Контроль суммы
-                                        </div>
-                                        <div className="text-sm font-black text-slate-800">
-                                            {f(totalAllocated)} / {f(amount)} <span className="text-[10px] text-slate-400 ml-1">{currency}</span>
-                                        </div>
-                                    </div>
-                                    
-                                    {!isBalanced && (
-                                        <div className="flex items-center gap-3">
-                                            <div className="text-right">
-                                                <div className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Разница</div>
-                                                <div className="text-sm font-black text-amber-600 font-mono">{f(amount - totalAllocated)}</div>
-                                            </div>
-                                            <div className="p-2 bg-amber-100 text-amber-600 rounded-full animate-pulse">
-                                                <AlertCircle size={20}/>
-                                            </div>
-                                        </div>
-                                    )}
-                                    
-                                    {isBalanced && (
-                                        <div className="flex items-center gap-3">
-                                            <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-white px-3 py-1 rounded-full border border-emerald-100 shadow-sm">
-                                                Готово к сохранению
-                                            </div>
-                                            <div className="p-2 bg-emerald-100 text-emerald-600 rounded-full">
-                                                <CheckCircle2 size={20}/>
-                                            </div>
-                                        </div>
+                                    {bankAccounts.filter(a => a.currency === currency).length === 0 && (
+                                        <div className="px-3 py-2 text-[10px] text-slate-400 italic border border-dashed border-slate-200 rounded-xl">Нет счетов в {currency}</div>
                                     )}
                                 </div>
                             </div>
                         </div>
+
+                        {/* Разделитель */}
+                        <div className="border-t border-slate-100 mx-6"/>
+
+                        {/* Строки распределения */}
+                        <div className="px-6 py-4 space-y-2">
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><Tag size={10}/> Распределение</label>
+                                <button onClick={addLine} className="flex items-center gap-1 text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg hover:bg-indigo-100 transition-all">
+                                    <Plus size={11}/> Добавить строку
+                                </button>
+                            </div>
+
+                            {lines.map((line, idx) => (
+                                <div key={line.id} className="flex items-start gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                                    {/* Привязка к плану (опционально) */}
+                                    <div className="flex-1 space-y-1.5">
+                                        {availablePlans.length > 0 && (
+                                            <div className="flex items-center gap-1.5">
+                                                <Receipt size={11} className="text-slate-300 shrink-0"/>
+                                                <select
+                                                    className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold outline-none"
+                                                    value={line.plannedPaymentId || ''}
+                                                    onChange={e => updateLine(line.id, 'plannedPaymentId', e.target.value)}
+                                                >
+                                                    <option value="">— Без привязки к плану —</option>
+                                                    {availablePlans.map(p => (
+                                                        <option key={p.id} value={p.id}>
+                                                            {p.sourceDocId} • {f(p.amountDue - p.amountPaid)} {p.currency}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                {line.plannedPaymentId && (
+                                                    <span className="text-[8px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">↔ план</span>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <div className="flex items-center gap-1.5">
+                                            <Tag size={11} className="text-slate-300 shrink-0"/>
+                                            <select
+                                                className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold outline-none disabled:bg-slate-50 disabled:text-slate-400"
+                                                value={line.cashFlowItemId || ''}
+                                                onChange={e => updateLine(line.id, 'cashFlowItemId', e.target.value)}
+                                                disabled={!!line.plannedPaymentId}
+                                            >
+                                                <option value="">— Статья ДДС —</option>
+                                                {cashFlowItems
+                                                    .filter(i => isOutgoing ? i.type === 'Expense' : i.type === 'Income')
+                                                    .map(cf => <option key={cf.id} value={cf.id}>{cf.name}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Сумма */}
+                                    <input
+                                        type="number"
+                                        className="w-24 shrink-0 bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-black text-right outline-none"
+                                        value={line.amount || ''}
+                                        onChange={e => updateLine(line.id, 'amount', parseFloat(e.target.value) || 0)}
+                                    />
+
+                                    {/* Удалить */}
+                                    {lines.length > 1 && (
+                                        <button onClick={() => removeLine(line.id)} className="shrink-0 text-slate-300 hover:text-red-500 mt-1 transition-colors">
+                                            <Trash2 size={14}/>
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+
+                            {/* Баланс */}
+                            <div className={`flex items-center justify-between px-4 py-2.5 rounded-2xl border-2 transition-all ${isBalanced ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'}`}>
+                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Итого</span>
+                                <div className="text-right">
+                                    <span className={`text-sm font-black font-mono ${isBalanced ? 'text-emerald-700' : 'text-amber-700'}`}>{f(totalAllocated)}</span>
+                                    <span className="text-xs text-slate-400 ml-1">/ {f(amount)} {currency}</span>
+                                </div>
+                                {!isBalanced && (
+                                    <span className="text-[9px] font-black text-amber-600 flex items-center gap-1 ml-2">
+                                        <AlertCircle size={12}/> Δ {f(amount - totalAllocated)}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Детали выписки — сворачиваемые */}
+                        <div className="px-6 pb-4">
+                            <button
+                                onClick={() => setShowDetails(v => !v)}
+                                className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 hover:text-slate-600 transition-colors"
+                            >
+                                <span className={`transition-transform ${showDetails ? 'rotate-90' : ''}`}>▶</span>
+                                Реквизиты выписки (№ документа, КНП, БИН...)
+                            </button>
+                            {showDetails && (
+                                <div className="mt-3 grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-150">
+                                    {[
+                                        { label: '№ документа', val: docNum, set: setDocNum },
+                                        { label: 'КНП', val: knp, set: setKnp },
+                                        { label: 'БИН/ИИН', val: cpBin, set: setCpBin },
+                                        { label: 'ИИК', val: cpIik, set: setCpIik },
+                                    ].map(({ label, val, set }) => (
+                                        <div key={label}>
+                                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">{label}</label>
+                                            <input className="w-full border border-slate-100 bg-slate-50 p-2 rounded-xl text-xs font-mono outline-none" value={val} onChange={e => set(e.target.value)}/>
+                                        </div>
+                                    ))}
+                                    <div className="col-span-2">
+                                        <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Назначение платежа</label>
+                                        <input className="w-full border border-slate-100 bg-slate-50 p-2 rounded-xl text-xs outline-none" value={purpose} onChange={e => setPurpose(e.target.value)}/>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Submit Action */}
-                    <div className="p-6 border-t bg-slate-50 flex justify-end flex-none">
-                        <button 
-                            onClick={handleSave} 
+                    {/* Подвал */}
+                    <div className="px-6 py-4 border-t bg-slate-50 flex justify-end flex-none">
+                        <button
+                            onClick={handleSave}
                             disabled={!isBalanced || amount <= 0}
-                            className={`px-16 py-4 rounded-2xl text-white font-black uppercase text-sm tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-30 disabled:grayscale disabled:scale-100 ${direction === 'Outgoing' ? 'bg-slate-900 hover:bg-slate-800' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                            className={`px-12 py-3.5 rounded-2xl text-white font-black uppercase text-sm tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-30 disabled:grayscale ${isOutgoing ? 'bg-slate-900 hover:bg-slate-800' : 'bg-emerald-600 hover:bg-emerald-700'}`}
                         >
-                            Провести платеж
+                            Провести платёж
                         </button>
                     </div>
                 </div>
             </div>
 
             {isCounterpartyModalOpen && (
-                <CounterpartyCreateModal 
+                <CounterpartyCreateModal
                     onClose={() => setIsCounterpartyModalOpen(false)}
-                    initialType={direction === 'Outgoing' ? CounterpartyType.SUPPLIER : CounterpartyType.CLIENT}
+                    initialType={isOutgoing ? CounterpartyType.SUPPLIER : CounterpartyType.CLIENT}
                     onSubmit={handleCreateCounterparty}
                 />
             )}
         </>
     );
 };
-
-const CheckCircle2 = ({ size, className }: { size?: number, className?: string }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/>
-    </svg>
-);

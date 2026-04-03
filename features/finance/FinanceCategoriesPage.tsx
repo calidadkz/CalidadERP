@@ -12,7 +12,8 @@ export const FinanceCategoriesPage: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     const { cashFlowItems } = state;
-    const [activeType, setActiveType] = useState<'Incoming' | 'Outgoing'>('Outgoing');
+    // activeType используется только для UI-переключателя, фильтрация идёт по реальным значениям 'Income'/'Expense'
+    const [activeType, setActiveType] = useState<'Expense' | 'Income'>('Expense');
     const [newName, setNewName] = useState('');
     
     const [importStatus, setImportStatus] = useState<{ show: boolean, msg: string, type: 'loading' | 'success' | 'error', details?: string }>({ show: false, msg: '', type: 'loading' });
@@ -26,7 +27,7 @@ export const FinanceCategoriesPage: React.FC = () => {
         const newItem: CashFlowItem = {
             id: ApiService.generateUUID(),
             name: newName.trim(),
-            type: activeType,
+            type: activeType as 'Income' | 'Expense',
             category: CashFlowCategory.OPERATING
         };
         actions.addCashFlowItem(newItem);
@@ -90,7 +91,7 @@ export const FinanceCategoriesPage: React.FC = () => {
                     await actions.addCashFlowItem({
                         id: ApiService.generateUUID(),
                         name: name,
-                        type: type,
+                        type: type as 'Income' | 'Expense',
                         category: CashFlowCategory.OPERATING
                     });
                     added++;
@@ -110,6 +111,7 @@ export const FinanceCategoriesPage: React.FC = () => {
     };
 
     const filteredItems = cashFlowItems.filter(c => c.type === activeType);
+    // activeType: 'Expense' | 'Income' — совпадает с реальным CashFlowItem.type
 
     return (
         <>
@@ -147,15 +149,15 @@ export const FinanceCategoriesPage: React.FC = () => {
                 </div>
                 
                 <div className="flex bg-white p-1.5 rounded-[1.25rem] shadow-sm border border-slate-200 w-fit">
-                    <button 
-                        onClick={() => { setActiveType('Outgoing'); setConfirmDeleteId(null); }} 
-                        className={`flex items-center px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${activeType === 'Outgoing' ? 'bg-red-600 text-white shadow-red-200 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                    <button
+                        onClick={() => { setActiveType('Expense'); setConfirmDeleteId(null); }}
+                        className={`flex items-center px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${activeType === 'Expense' ? 'bg-red-600 text-white shadow-red-200 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                     >
                         <ArrowDownCircle size={14} className="mr-2"/> Расходы
                     </button>
-                    <button 
-                        onClick={() => { setActiveType('Incoming'); setConfirmDeleteId(null); }} 
-                        className={`flex items-center px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${activeType === 'Incoming' ? 'bg-emerald-600 text-white shadow-emerald-200 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                    <button
+                        onClick={() => { setActiveType('Income'); setConfirmDeleteId(null); }}
+                        className={`flex items-center px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${activeType === 'Income' ? 'bg-emerald-600 text-white shadow-emerald-200 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                     >
                         <ArrowUpCircle size={14} className="mr-2"/> Доходы
                     </button>
@@ -166,7 +168,7 @@ export const FinanceCategoriesPage: React.FC = () => {
                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 whitespace-nowrap">Новая статья:</div>
                         <input 
                             className="flex-1 bg-slate-50 border border-slate-100 p-3.5 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700 transition-all placeholder:text-slate-300" 
-                            placeholder={`Название статьи ${activeType === 'Outgoing' ? 'расхода' : 'дохода'}...`}
+                            placeholder={`Название статьи ${activeType === 'Expense' ? 'расхода' : 'дохода'}...`}
                             value={newName} onChange={e => setNewName(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleAdd()}
                         />

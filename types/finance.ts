@@ -62,7 +62,9 @@ export interface ActualPayment {
     counterpartyBinIin?: string;
     counterpartyIik?: string;
     counterpartyBik?: string;
-    counterpartyBankName?: string; // Добавлено поле для названия банка контрагента
+    counterpartyBankName?: string;
+    isInternalTransfer?: boolean;          // true = исключать из P&L-анализа
+    pairedInternalTxId?: string;           // ссылка на InternalTransaction
 }
 
 export interface PaymentAllocation {
@@ -73,7 +75,8 @@ export interface PaymentAllocation {
     batchId?: string;
     amountCovered: number;
     description?: string;
-    targetBankAccountId?: string; // ID нашего счета для внутренних переводов
+    targetBankAccountId?: string;      // ID нашего счета для внутренних переводов
+    existingInternalTxId?: string;     // При привязке второй стороны перевода — ID существующей InternalTransaction
 }
 
 export interface PlannedPayment {
@@ -89,8 +92,10 @@ export interface PlannedPayment {
     dueDate: string;
     isPaid: boolean;
     cashFlowItemId: string;
-    cashFlowCategory: CashFlowCategory;
-    isDeleted?: boolean; // Пометка на удаление
+    cashFlowCategory?: CashFlowCategory;
+    isDeleted?: boolean;                    // Пометка на удаление
+    paymentCounterpartyId?: string;         // Посредник (Kaspi Bank, маркетплейс) — кто будет в выписке
+    paymentCounterpartyName?: string;       // Денормализованное имя посредника
 }
 
 export interface InternalTransaction {
@@ -103,4 +108,7 @@ export interface InternalTransaction {
     amountReceived: number;
     fee: number;
     rate: number;
+    actualPaymentOutId?: string;           // actual_payment для исходящей стороны выписки
+    actualPaymentInId?: string;            // actual_payment для входящей стороны выписки
+    isFullyReconciled?: boolean;           // true когда обе стороны выписки обработаны
 }

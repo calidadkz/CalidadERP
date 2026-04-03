@@ -86,7 +86,9 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
                 dueDate: p.dueDate || new Date().toISOString().split('T')[0],
                 amountPaid: Number(p.amountPaid) || 0,
                 isPaid: (Number(p.amountPaid) || 0) >= (Number(p.amountDue) || 0) - 0.01,
-                cashFlowItemId: p.cashFlowItemId || ''
+                cashFlowItemId: p.cashFlowItemId || '',
+                paymentCounterpartyId: p.paymentCounterpartyId || undefined,
+                paymentCounterpartyName: p.paymentCounterpartyName || undefined,
             } as PlannedPayment;
         });
 
@@ -226,7 +228,15 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
                         canEditPrices={canEditPrices} 
                     />
                 ) : (
-                    <SalesPaymentsTab unallocatedAmount={unallocatedAmount} formPayments={formPayments} setFormPayments={setFormPayments} handleAddPaymentStep={handleAddPaymentStep} cashFlowItems={state.cashFlowItems} isFormWriteable={isFormWriteable} />
+                    <SalesPaymentsTab
+                        unallocatedAmount={unallocatedAmount}
+                        formPayments={formPayments}
+                        setFormPayments={setFormPayments}
+                        handleAddPaymentStep={handleAddPaymentStep}
+                        cashFlowItems={state.cashFlowItems}
+                        isFormWriteable={isFormWriteable}
+                        intermediaries={state.counterparties.filter((c: any) => c.isPaymentIntermediary)}
+                    />
                 )}
             </div>
 
