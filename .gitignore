@@ -13,6 +13,8 @@ dist-ssr
 
 # Environment variables
 .env
+.mcp.json
+.idx/mcp.json
 .env.local
 .env.development.local
 .env.test.local
