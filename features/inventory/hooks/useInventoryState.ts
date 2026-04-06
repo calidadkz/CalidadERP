@@ -30,8 +30,20 @@ export const useInventoryState = (
             const updated = await ApiService.update<Product>(TableNames.PRODUCTS, p.id, p);
             setProducts(prev => prev.map(prod => prod.id === p.id ? updated : prod));
             addLog('Update', 'Товар', p.sku, 'Обновление данных');
-        } catch(e) { 
+        } catch(e) {
             console.error("[INVENTORY_HOOK] Update product error:", e);
+            throw e;
+        }
+    };
+
+    const updateProductsBulk = async (productsToUpdate: Product[]) => {
+        if (!productsToUpdate.length) return;
+        try {
+            const updated = await ApiService.upsertMany<Product>(TableNames.PRODUCTS, productsToUpdate);
+            const updatedMap = new Map(updated.map(p => [p.id, p]));
+            setProducts(prev => prev.map(prod => updatedMap.get(prod.id) ?? prod));
+        } catch(e) {
+            console.error("[INVENTORY_HOOK] Bulk update products error:", e);
             throw e;
         }
     };
@@ -133,7 +145,7 @@ export const useInventoryState = (
         products, setProducts,
         stockMovements, setStockMovements,
         discrepancies, setDiscrepancies,
-        addProduct, updateProduct, deleteProduct, adjustStock, revertInitialStockEntry,
+        addProduct, updateProduct, updateProductsBulk, deleteProduct, adjustStock, revertInitialStockEntry,
         updateDiscrepancy, writeOffDiscrepancy
     };
 };

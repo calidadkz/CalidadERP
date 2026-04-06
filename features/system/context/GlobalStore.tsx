@@ -69,6 +69,7 @@ interface AppState {
 interface AppActions {
     addProduct: (p: Product) => Promise<void>;
     updateProduct: (p: Product) => Promise<void>;
+    updateProductsBulk: (products: Product[]) => Promise<void>;
     deleteProduct: (id: string) => Promise<void>;
     addCounterparty: (c: Counterparty, account?: Partial<CounterpartyAccount>) => Promise<Counterparty>;
     updateCounterparty: (c: Counterparty, accounts: CounterpartyAccount[]) => Promise<Counterparty>;
@@ -393,6 +394,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const actions: AppActions = useMemo(() => ({
         addProduct: inventory.addProduct,
         updateProduct: inventory.updateProduct,
+        updateProductsBulk: inventory.updateProductsBulk,
         deleteProduct: inventory.deleteProduct,
         addCounterparty: references.addCounterparty,
         updateCounterparty: references.updateCounterparty,

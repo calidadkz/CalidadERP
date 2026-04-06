@@ -3,6 +3,18 @@ import { supabase } from './supabaseClient';
 import { Counterparty, CounterpartyAccount, Currency } from '@/types';
 import { TableNames } from '@/constants';
 
+/**
+ * Выбрасывается когда запись была изменена другим пользователем
+ * до того, как текущий пользователь успел сохранить.
+ * Передай expectedUpdatedAt в ApiService.update() чтобы включить проверку.
+ */
+export class ConflictError extends Error {
+    constructor(tableName: string) {
+        super(`Запись в "${tableName}" была изменена другим пользователем. Обновите страницу и повторите.`);
+        this.name = 'ConflictError';
+    }
+}
+
 const toCamel = (s: string) => {
     return s.replace(/_([a-z0-9])/g, g => g[1].toUpperCase());
 };
@@ -214,10 +226,23 @@ export class ApiService {
         return this.keysToCamel(created);
     }
 
-    static async update<T>(tableName: string, id: string, data: Partial<T>): Promise<T> {
+    /**
+     * @param expectedUpdatedAt  Если передан — проверяет что запись не была изменена
+     *   другим пользователем. Получи значение из поля updatedAt при загрузке записи.
+     *   При несовпадении выбрасывает ConflictError.
+     */
+    static async update<T>(tableName: string, id: string, data: Partial<T>, expectedUpdatedAt?: string): Promise<T> {
         const snakeData = this.keysToSnake(data);
-        const { data: updated, error } = await supabase.from(tableName).update(snakeData).eq('id', id).select().single();
+        let query = supabase.from(tableName).update(snakeData).eq('id', id);
+        if (expectedUpdatedAt) {
+            query = query.eq('updated_at', expectedUpdatedAt);
+        }
+        const { data: updated, error } = await query.select().single();
         if (error) {
+            // PGRST116 = 0 rows matched → запись уже изменена другим пользователем
+            if (error.code === 'PGRST116' && expectedUpdatedAt) {
+                throw new ConflictError(tableName);
+            }
             console.error(`[API] Error updating ${tableName}:`, error.message);
             throw error;
         }
@@ -286,7 +311,7 @@ export class ApiService {
     async fetchAll<T>(t: string, o?: string | Record<string, any>): Promise<T[]> { return ApiService.fetchAll<T>(t, o); }
     async fetchOne<T>(t: string, id: string): Promise<T | null> { return ApiService.fetchOne<T>(t, id); }
     async create<T>(t: string, d: Partial<T>): Promise<T> { return ApiService.create<T>(t, d); }
-    async update<T>(t: string, id: string, d: Partial<T>): Promise<T> { return ApiService.update<T>(t, id, d); }
+    async update<T>(t: string, id: string, d: Partial<T>, expectedUpdatedAt?: string): Promise<T> { return ApiService.update<T>(t, id, d, expectedUpdatedAt); }
     async delete(t: string, id: string): Promise<void> { return ApiService.delete(t, id); }
     async createMany<T>(t: string, d: Partial<T>[]): Promise<T[]> { return ApiService.createMany<T>(t, d); }
     async upsert<T>(t: string, d: Partial<T>, c: string = 'id'): Promise<T> { return ApiService.upsert<T>(t, d, c); }
