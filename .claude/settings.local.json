@@ -4,7 +4,8 @@
       "Bash(claude mcp:*)",
       "mcp__supabase__execute_sql",
       "mcp__supabase__apply_migration",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(git -C \"c:/Users/Sergei Calidad/calidadERP/CalidadERP\" status --short)"
     ]
   }
 }

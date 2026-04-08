@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import { OptionVariant, Currency, ProductCategory, Product, Counterparty, Manufacturer } from '@/types';
-import { Plus, X, Layers, Upload, Image as ImageIcon, Loader2, Tag, AlertCircle } from 'lucide-react';
+import { Plus, X, Layers, Upload, Image as ImageIcon, Loader2, Tag, AlertCircle, Copy } from 'lucide-react';
 import { ApiService } from '@/services/api';
 import { storage as firebaseStorage } from '@/services/firebase';
 import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage';
@@ -14,6 +14,7 @@ interface VariantFormProps {
     selectedTypeId: string;
     /** null = новый вариант, объект = редактирование */
     initialVariant: Partial<OptionVariant> | null;
+    isCopy?: boolean;
     suppliers: Counterparty[];
     manufacturers: Manufacturer[];
     machineCategories: ProductCategory[];
@@ -29,6 +30,7 @@ export const VariantForm: React.FC<VariantFormProps> = memo(({
     categoryId,
     selectedTypeId,
     initialVariant,
+    isCopy,
     suppliers,
     manufacturers,
     machineCategories,
@@ -170,6 +172,11 @@ export const VariantForm: React.FC<VariantFormProps> = memo(({
 
     return (
         <div className="p-4 bg-indigo-50 border-b border-indigo-100 animate-in slide-in-from-top-2">
+            {isCopy && (
+                <div className="flex items-center gap-2 mb-4 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-[10px] font-black uppercase tracking-widest">
+                    <Copy size={14} className="shrink-0"/> Создание дубля — это новый вариант, оригинал не изменится
+                </div>
+            )}
             <input
                 type="file"
                 ref={variantImageInputRef}

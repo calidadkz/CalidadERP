@@ -60,6 +60,7 @@ export const NomenclaturePage: React.FC = () => {
         isModalOpen,
         modalMode,
         modalInitialData,
+        isCopy,
         setIsModalOpen,
         handleAdd,
         handleEdit,
@@ -231,11 +232,12 @@ export const NomenclaturePage: React.FC = () => {
                 </div>
             )}
 
-            <ProductModal 
-                isOpen={isModalOpen} 
-                onClose={() => setIsModalOpen(false)} 
-                onSave={onSave} 
-                modalMode={modalMode} 
+            <ProductModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSave={onSave}
+                modalMode={modalMode}
+                isCopy={isCopy}
                 initialData={modalInitialData} 
                 suppliers={suppliers} 
                 categories={state.categories || []} 

@@ -7,6 +7,12 @@ export enum CashFlowCategory {
     FINANCIAL = 'Financial',
 }
 
+export interface CashFlowTag {
+    id: string;
+    name: string;
+    color: string;          // hex-цвет, например '#6366f1'
+}
+
 export interface CounterpartyAccount {
     id: string;
     counterpartyId: string;
@@ -31,6 +37,12 @@ export interface CashFlowItem {
     name: string;
     type: 'Income' | 'Expense';
     category: CashFlowCategory;
+    // Группировка (уровень 2)
+    parentId?: string | null;   // null/undefined = корневая группа или статья верхнего уровня
+    isGroup: boolean;           // true = группа (контейнер), false = конкретная статья
+    sortOrder: number;
+    // Теги
+    tagIds: string[];           // массив id из CashFlowTag
 }
 
 export interface CurrencyLot {

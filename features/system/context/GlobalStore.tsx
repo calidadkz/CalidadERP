@@ -4,12 +4,12 @@ import { TableNames } from '../../../constants';
 import { ApiService } from '../../../services/api';
 import { useAuth } from './AuthContext';
 import { 
-    Product, Counterparty, CounterpartyAccount, Manufacturer, OurCompany, Employee, ProductCategory, OptionType, OptionVariant, 
-    Bundle, LogItem, TrashItem, Currency, PricingProfile, 
+    Product, Counterparty, CounterpartyAccount, Manufacturer, OurCompany, Employee, ProductCategory, OptionType, OptionVariant,
+    Bundle, LogItem, TrashItem, Currency, PricingProfile,
     SupplierOrder, SalesOrder, Reception, Shipment, PlannedPayment,
     ActualPayment, InternalTransaction, BankAccount, CurrencyLot, StockMovement, Discrepancy,
     OrderItem, SalesOrderItem, ReceptionItem, ReceptionExpense, ShipmentItem, PaymentAllocation,
-    CashFlowItem, HSCode, ActionType, ProductType
+    CashFlowItem, CashFlowTag, HSCode, ActionType, ProductType
 } from '../../../types';
 import { PreCalculationDocument, PreCalculationItem, PackingListItem, GeneralSettings } from '../../../types/pre-calculations';
 import { useReferenceState } from '../hooks/useReferenceState';
@@ -37,6 +37,7 @@ interface AppState {
     employees: Employee[];
     categories: ProductCategory[];
     cashFlowItems: CashFlowItem[];
+    cashFlowTags: CashFlowTag[];
     hscodes: HSCode[];
     optionTypes: OptionType[];
     optionVariants: OptionVariant[];
@@ -85,7 +86,11 @@ interface AppActions {
     addCategoriesBulk: (cats: ProductCategory[]) => Promise<ProductCategory[]>;
     deleteCategory: (id: string) => Promise<void>;
     addCashFlowItem: (c: CashFlowItem) => Promise<CashFlowItem>;
+    updateCashFlowItem: (id: string, data: Partial<CashFlowItem>) => Promise<CashFlowItem>;
     deleteCashFlowItem: (id: string) => Promise<void>;
+    addCashFlowTag: (tag: Omit<CashFlowTag, 'id'>) => Promise<CashFlowTag>;
+    updateCashFlowTag: (id: string, data: Partial<CashFlowTag>) => Promise<CashFlowTag>;
+    deleteCashFlowTag: (id: string) => Promise<void>;
     addHSCode: (h: HSCode) => Promise<HSCode>;
     updateHSCode: (h: HSCode) => Promise<HSCode>;
     deleteHSCode: (id: string) => Promise<void>;
@@ -189,7 +194,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Стабилизируем сеттеры, чтобы они не вызывали бесконечный цикл
     const { setProducts, setDiscrepancies } = inventory;
-    const { setCounterparties, setCounterpartyAccounts, setManufacturers, setOurCompanies, setEmployees, setCategories, setCashFlowItems, setHscodes, setOptionTypes, setOptionVariants, setBundles, setExchangeRates, setTrash } = references;
+    const { setCounterparties, setCounterpartyAccounts, setManufacturers, setOurCompanies, setEmployees, setCategories, setCashFlowItems, setCashFlowTags, setHscodes, setOptionTypes, setOptionVariants, setBundles, setExchangeRates, setTrash } = references;
     const { setPlannedPayments, setActualPayments, setInternalTransactions, setBankAccounts, setCurrencyStacks } = finance;
     const { setOrders, setSalesOrders, setReceptions, setShipments } = orders;
 
@@ -197,10 +202,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (!session) return;
         try {
             const [
-                products, counterparties, counterpartyAccounts, 
+                products, counterparties, counterpartyAccounts,
                 ourCompanies, employees, categories, optionTypes,
                 optionVariants, bundles, exchangeRatesResult, fetchedPricingProfiles,
-                pricingProfileCategories, hsCodes, cashFlowItems, trashItems
+                pricingProfileCategories, hsCodes, cashFlowItems, cashFlowTags, trashItems
             ] = await Promise.all([
                 ApiService.fetchAll<Product>(TableNames.PRODUCTS),
                 ApiService.fetchAll<Counterparty>(TableNames.COUNTERPARTIES),
@@ -216,6 +221,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 ApiService.fetchAll<any>('pricing_profile_categories', 'profile_id'),
                 ApiService.fetchAll<HSCode>(TableNames.HS_CODES),
                 ApiService.fetchAll<CashFlowItem>(TableNames.CASH_FLOW_ITEMS),
+                ApiService.fetchAll<CashFlowTag>(TableNames.CASH_FLOW_TAGS),
                 ApiService.fetchAll<TrashItem>(TableNames.TRASH),
             ]);
 
@@ -226,7 +232,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             setOurCompanies(unique(ourCompanies));
             setEmployees(unique(employees));
             setCategories(unique(categories));
-            setCashFlowItems(unique(cashFlowItems));
+            setCashFlowItems(unique(cashFlowItems.map(c => ({ isGroup: false, sortOrder: 0, tagIds: [], ...c }))));
+            setCashFlowTags(unique(cashFlowTags));
             setHscodes(unique(hsCodes));
             setOptionTypes(unique(optionTypes));
             setOptionVariants(unique(optionVariants));
@@ -265,7 +272,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } catch (e) {
             console.error("REFERENCE LOAD ERROR", e);
         }
-    }, [session, setProducts, setCounterparties, setCounterpartyAccounts, setManufacturers, setOurCompanies, setEmployees, setCategories, setCashFlowItems, setHscodes, setOptionTypes, setOptionVariants, setBundles, setExchangeRates, setTrash, loadInventorySummary]);
+    }, [session, setProducts, setCounterparties, setCounterpartyAccounts, setManufacturers, setOurCompanies, setEmployees, setCategories, setCashFlowItems, setCashFlowTags, setHscodes, setOptionTypes, setOptionVariants, setBundles, setExchangeRates, setTrash, loadInventorySummary]);
 
     const loadOperational = useCallback(async () => {
         if (!session) return;
@@ -349,6 +356,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         employees: references.employees,
         categories: references.categories,
         cashFlowItems: references.cashFlowItems,
+        cashFlowTags: references.cashFlowTags,
         hscodes: references.hscodes,
         optionTypes: references.optionTypes,
         optionVariants: references.optionVariants,
@@ -380,7 +388,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         inventory.products, inventory.stockMovements, inventory.discrepancies,
         references.counterparties, references.counterpartyAccounts, manufacturers,
         references.ourCompanies, references.employees, references.categories,
-        references.cashFlowItems, references.hscodes, references.optionTypes,
+        references.cashFlowItems, references.cashFlowTags, references.hscodes, references.optionTypes,
         references.optionVariants, references.bundles, references.logs, references.trash,
         references.exchangeRates, pricingProfiles, clients, suppliers,
         orders.orders, orders.salesOrders, orders.receptions, orders.shipments,
@@ -410,7 +418,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addCategoriesBulk: references.addCategoriesBulk,
         deleteCategory: references.deleteCategory,
         addCashFlowItem: references.addCashFlowItem,
+        updateCashFlowItem: references.updateCashFlowItem,
         deleteCashFlowItem: references.deleteCashFlowItem,
+        addCashFlowTag: references.addCashFlowTag,
+        updateCashFlowTag: references.updateCashFlowTag,
+        deleteCashFlowTag: references.deleteCashFlowTag,
         addHSCode: references.addHSCode,
         updateHSCode: references.updateHSCode,
         deleteHSCode: references.deleteHSCode,

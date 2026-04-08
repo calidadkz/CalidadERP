@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Counterparty, CounterpartyAccount, Manufacturer, OurCompany, Employee, LogEntry, ProductCategory, OptionType, OptionVariant, Bundle, TrashItem, ActionType, Currency, CashFlowItem, HSCode } from '@/types';
+import { Counterparty, CounterpartyAccount, Manufacturer, OurCompany, Employee, LogEntry, ProductCategory, OptionType, OptionVariant, Bundle, TrashItem, ActionType, Currency, CashFlowItem, CashFlowTag, HSCode } from '@/types';
 import { ApiService } from '@/services/api';
 import { TableNames, KZT_RATES } from '@/constants';
 
@@ -12,6 +12,7 @@ export const useReferenceState = () => {
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [categories, setCategories] = useState<ProductCategory[]>([]);
     const [cashFlowItems, setCashFlowItems] = useState<CashFlowItem[]>([]);
+    const [cashFlowTags, setCashFlowTags] = useState<CashFlowTag[]>([]);
     const [hscodes, setHscodes] = useState<HSCode[]>([]);
     const [optionTypes, setOptionTypes] = useState<OptionType[]>([]);
     const [optionVariants, setOptionVariants] = useState<OptionVariant[]>([]);
@@ -313,18 +314,62 @@ export const useReferenceState = () => {
         delete data.id;
         delete data.category; // no category column in DB
         const saved = await ApiService.create<CashFlowItem>(TableNames.CASH_FLOW_ITEMS, data);
-        setCashFlowItems(prev => [...prev, saved]);
+        setCashFlowItems(prev => [...prev, { ...saved, isGroup: saved.isGroup ?? false, sortOrder: saved.sortOrder ?? 0, tagIds: saved.tagIds ?? [] }]);
         addLog('Create', 'Статья ДДС', saved.id, `Создана статья: ${saved.name}`);
+        return saved;
+    };
+
+    const updateCashFlowItem = async (id: string, data: Partial<CashFlowItem>) => {
+        const payload = { ...data } as any;
+        delete payload.category;
+        const saved = await ApiService.update<CashFlowItem>(TableNames.CASH_FLOW_ITEMS, id, payload);
+        setCashFlowItems(prev => prev.map(x => x.id === id ? { ...x, ...saved, isGroup: saved.isGroup ?? x.isGroup, tagIds: saved.tagIds ?? x.tagIds } : x));
         return saved;
     };
 
     const deleteCashFlowItem = async (id: string) => {
         const item = cashFlowItems.find(x => x.id === id);
         if (item) {
+            // Переносим дочерние статьи в корень (снимаем parentId)
+            const children = cashFlowItems.filter(x => x.parentId === id);
+            await Promise.all(children.map(ch => ApiService.update(TableNames.CASH_FLOW_ITEMS, ch.id, { parentId: null })));
+            if (children.length > 0) {
+                setCashFlowItems(prev => prev.map(x => x.parentId === id ? { ...x, parentId: undefined } : x));
+            }
             await moveToTrash(id, 'CashFlowItem', item.name, item);
             await ApiService.delete(TableNames.CASH_FLOW_ITEMS, id);
             setCashFlowItems(prev => prev.filter(x => x.id !== id));
         }
+    };
+
+    // --- Теги ДДС ---
+    const addCashFlowTag = async (tag: Omit<CashFlowTag, 'id'>) => {
+        const saved = await ApiService.create<CashFlowTag>(TableNames.CASH_FLOW_TAGS, tag);
+        setCashFlowTags(prev => [...prev, saved]);
+        addLog('Create', 'Тег ДДС', saved.id, `Создан тег: ${saved.name}`);
+        return saved;
+    };
+
+    const updateCashFlowTag = async (id: string, data: Partial<CashFlowTag>) => {
+        const saved = await ApiService.update<CashFlowTag>(TableNames.CASH_FLOW_TAGS, id, data);
+        setCashFlowTags(prev => prev.map(x => x.id === id ? { ...x, ...saved } : x));
+        return saved;
+    };
+
+    const deleteCashFlowTag = async (id: string) => {
+        // Снимаем тег со всех статей
+        const affected = cashFlowItems.filter(x => x.tagIds?.includes(id));
+        await Promise.all(affected.map(item =>
+            ApiService.update(TableNames.CASH_FLOW_ITEMS, item.id, { tagIds: item.tagIds.filter(t => t !== id) })
+        ));
+        if (affected.length > 0) {
+            setCashFlowItems(prev => prev.map(x =>
+                x.tagIds?.includes(id) ? { ...x, tagIds: x.tagIds.filter(t => t !== id) } : x
+            ));
+        }
+        await ApiService.delete(TableNames.CASH_FLOW_TAGS, id);
+        setCashFlowTags(prev => prev.filter(x => x.id !== id));
+        addLog('Delete', 'Тег ДДС', id, 'Удалён тег');
     };
 
     const addOptionType = async (ot: OptionType) => {
@@ -433,7 +478,8 @@ export const useReferenceState = () => {
         manufacturers, setManufacturers,
         ourCompanies, setOurCompanies, employees, setEmployees,
         categories, setCategories,
-        cashFlowItems, setCashFlowItems, addCashFlowItem, deleteCashFlowItem,
+        cashFlowItems, setCashFlowItems, addCashFlowItem, updateCashFlowItem, deleteCashFlowItem,
+        cashFlowTags, setCashFlowTags, addCashFlowTag, updateCashFlowTag, deleteCashFlowTag,
         hscodes, setHscodes, addHSCode, updateHSCode, deleteHSCode,
         optionTypes, setOptionTypes, optionVariants, setOptionVariants,
         bundles, setBundles, logs, setLogs, trash, setTrash,

@@ -10,15 +10,18 @@ export const useNomenclatureCRUD = (selectedType: ProductType) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
     const [modalInitialData, setModalInitialData] = useState<Partial<Product>>({});
+    const [isCopy, setIsCopy] = useState(false);
 
     const handleAdd = () => {
         setModalMode('create');
+        setIsCopy(false);
         setModalInitialData({ type: selectedType, currency: Currency.CNY, markupPercentage: 80 });
         setIsModalOpen(true);
     };
 
     const handleEdit = (product: Product) => {
         setModalMode('edit');
+        setIsCopy(false);
         setModalInitialData(product);
         setIsModalOpen(true);
     };
@@ -26,11 +29,10 @@ export const useNomenclatureCRUD = (selectedType: ProductType) => {
     const handleCopy = (product: Product) => {
         const { id, ...rest } = product;
         setModalMode('create');
+        setIsCopy(true);
         setModalInitialData({
             ...rest,
             sku: `${rest.sku}_copy`,
-            name: `${rest.name} (копия)`,
-            supplierProductName: `${rest.supplierProductName} (копия)`
         });
         setIsModalOpen(true);
     };
@@ -57,6 +59,7 @@ export const useNomenclatureCRUD = (selectedType: ProductType) => {
             await actions.updateProduct(product);
         }
         setIsModalOpen(false);
+        setIsCopy(false);
     };
 
     return {
@@ -64,6 +67,7 @@ export const useNomenclatureCRUD = (selectedType: ProductType) => {
         isModalOpen,
         modalMode,
         modalInitialData,
+        isCopy,
         setIsModalOpen,
         handleAdd,
         handleEdit,

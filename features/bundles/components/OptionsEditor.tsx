@@ -47,6 +47,7 @@ export const OptionsEditor: React.FC = () => {
     // --- Variant form state (simplified — VariantForm owns the rest) ---
     const [variantFormCategoryId, setVariantFormCategoryId] = useState<string | null>(null);
     const [editingVariant, setEditingVariant] = useState<Partial<OptionVariant> | null>(null);
+    const [isCloning, setIsCloning] = useState(false);
 
     // --- Section state ---
     const [sectionFilters, setSectionFilters] = useState<Record<string, { supplierId: string; manufacturer: string }>>({});
@@ -201,11 +202,13 @@ export const OptionsEditor: React.FC = () => {
     const handleOpenVariantForm = (categoryId: string, variant?: OptionVariant) => {
         setVariantFormCategoryId(categoryId);
         setEditingVariant(variant ?? null);
+        setIsCloning(false);
     };
 
     const handleCloneVariant = (variant: OptionVariant) => {
         setVariantFormCategoryId(variant.categoryId || null);
-        setEditingVariant({ ...variant, id: undefined, name: `${variant.name} (копия)` });
+        setEditingVariant({ ...variant, id: undefined });
+        setIsCloning(true);
     };
 
     const handleSaveVariantData = async (variantData: OptionVariant) => {
@@ -213,6 +216,7 @@ export const OptionsEditor: React.FC = () => {
         else await actions.addOptionVariant(variantData);
         setVariantFormCategoryId(null);
         setEditingVariant(null);
+        setIsCloning(false);
     };
 
     const handleDeleteVariant = (id: string) => {
@@ -574,6 +578,7 @@ export const OptionsEditor: React.FC = () => {
                                                         categoryId={catId}
                                                         selectedTypeId={selectedTypeId}
                                                         initialVariant={editingVariant}
+                                                        isCopy={isCloning}
                                                         suppliers={suppliers}
                                                         manufacturers={manufacturers}
                                                         machineCategories={machineCategories}
@@ -582,7 +587,7 @@ export const OptionsEditor: React.FC = () => {
                                                         supplierMap={supplierMap}
                                                         canWriteVariants={canWriteVariants}
                                                         onSave={handleSaveVariantData}
-                                                        onCancel={() => { setVariantFormCategoryId(null); setEditingVariant(null); }}
+                                                        onCancel={() => { setVariantFormCategoryId(null); setEditingVariant(null); setIsCloning(false); }}
                                                     />
                                                 )}
 

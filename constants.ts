@@ -32,6 +32,7 @@ export enum TableNames {
     TRASH = 'trash',
     PRICING_PROFILES = 'pricing_profiles',
     CASH_FLOW_ITEMS = 'cash_flow_items',
+    CASH_FLOW_TAGS = 'cash_flow_tags',
     HS_CODES = 'hscodes',
     MANUFACTURERS = 'manufacturers',
     OUR_COMPANIES = 'our_companies',

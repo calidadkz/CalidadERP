@@ -5,7 +5,7 @@ import { ProductType, PricingMethod } from '@/types/enums';
 import { Currency } from '@/types/currency';
 import { Counterparty as Supplier, Manufacturer } from '@/types/counterparty';
 import { OptionType, OptionVariant } from '@/types/options';
-import { Cpu, Settings, X, LayoutGrid, Wrench, ArrowRight, ArrowLeft, Save, Calculator, ShieldCheck, AlertCircle, Eye, Loader2, PieChart } from 'lucide-react';
+import { Cpu, Settings, X, LayoutGrid, Wrench, ArrowRight, ArrowLeft, Save, Calculator, ShieldCheck, AlertCircle, Eye, Loader2, PieChart, Copy } from 'lucide-react';
 import { GeneralTab } from '../tabs/GeneralTab';
 import { OptionsTab } from '../tabs/OptionsTab';
 import { CompositionTab } from '../tabs/CompositionTab';
@@ -21,6 +21,7 @@ interface ProductModalProps {
     onClose: () => void;
     onSave: (p: Product) => Promise<void> | void;
     modalMode: 'create' | 'edit';
+    isCopy?: boolean;
     initialData: Partial<Product>;
     suppliers: Supplier[];
     categories: ProductCategory[];
@@ -38,8 +39,8 @@ export interface StorageImage {
     url: string;
 }
 
-export const ProductModal: React.FC<ProductModalProps> = ({ 
-    isOpen, onClose, onSave, modalMode, initialData, suppliers, categories, optionTypes, optionVariants, products, addOptionType, addOptionVariant, exchangeRates, manufacturers
+export const ProductModal: React.FC<ProductModalProps> = ({
+    isOpen, onClose, onSave, modalMode, isCopy, initialData, suppliers, categories, optionTypes, optionVariants, products, addOptionType, addOptionVariant, exchangeRates, manufacturers
 }) => {
     const { state } = useStore();
     const access = useAccess('nomenclature');
@@ -271,6 +272,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
+                        {isCopy && (
+                            <div className="bg-amber-500/20 px-3 py-1.5 rounded-xl border border-amber-400/40 text-amber-300 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                <Copy size={14}/> Создание дубля — это новая позиция
+                            </div>
+                        )}
                         {!canWrite && <div className="bg-blue-600/20 px-3 py-1.5 rounded-xl border border-blue-400/30 text-blue-300 text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><Eye size={14}/> Просмотр</div>}
                         <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-full"><X size={24}/></button>
                     </div>
