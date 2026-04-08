@@ -13,18 +13,20 @@ export const BatchDetailPage: React.FC = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<TabType>('ECONOMY');
 
-    const { 
-        batch, 
-        preCalculation, 
-        expenses, 
-        documents, 
-        itemActuals, 
-        isLoading, 
-        stats, 
-        addExpense, 
-        deleteExpense, 
-        uploadDocument, 
-        deleteDocument 
+    const {
+        batch,
+        preCalculation,
+        expenses,
+        documents,
+        itemActuals,
+        plannedPayments,
+        actualPayments,
+        isLoading,
+        stats,
+        addExpense,
+        deleteExpense,
+        uploadDocument,
+        deleteDocument
     } = useBatches(id);
 
     const formatCurrency = (val?: number) => 
@@ -56,7 +58,7 @@ export const BatchDetailPage: React.FC = () => {
             case 'ECONOMY':
                 return preCalculation ? <BatchEconomyTab preCalculation={preCalculation} itemActuals={itemActuals} /> : null;
             case 'EXPENSES':
-                return <BatchExpensesTab expenses={expenses} onAddExpense={addExpense} onDeleteExpense={deleteExpense} />;
+                return <BatchExpensesTab expenses={expenses} plannedPayments={plannedPayments} actualPayments={actualPayments} onAddExpense={addExpense} onDeleteExpense={deleteExpense} />;
             case 'DOCUMENTS':
                 return <BatchDocumentsTab documents={documents} onUpload={uploadDocument} onDelete={deleteDocument} />;
             default:
@@ -149,11 +151,15 @@ export const BatchDetailPage: React.FC = () => {
                          </div>
                          <div className="space-y-4 flex-1 overflow-auto custom-scrollbar pr-2">
                              {[
-                                { key: 'logistics_china', label: 'Логистика Китай' },
-                                { key: 'logistics_local', label: 'Логистика Локальная' },
+                                { key: 'logistics_urumqi_almaty', label: 'Урумчи–Алматы' },
+                                { key: 'logistics_almaty_karaganda', label: 'Алматы–Кар.' },
+                                { key: 'logistics_china_domestic', label: 'По Китаю' },
                                 { key: 'customs', label: 'Таможня' },
+                                { key: 'customs_vat', label: 'НДС Там.' },
                                 { key: 'broker', label: 'Брокер' },
-                                { key: 'svh', label: 'СВХ' }
+                                { key: 'svh', label: 'СВХ' },
+                                { key: 'pnr', label: 'ПНР' },
+                                { key: 'delivery_local', label: 'До клиента' }
                              ].map((item) => {
                                 const amount = stats?.expensesByCategory?.[item.key] || 0;
                                 const percentage = stats?.totalActualExpenses && stats.totalActualExpenses > 0 

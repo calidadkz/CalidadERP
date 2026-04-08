@@ -60,6 +60,7 @@ export const OptionsEditor: React.FC = () => {
 
     // --- Mass add state (modal owns search/selection/prices internally) ---
     const [isMassAddMode, setIsMassAddMode] = useState(false);
+    const [massAddCatId, setMassAddCatId] = useState<string | null>(null);
     const [selectedVariantsToApply, setSelectedVariantsToApply] = useState<string[]>([]);
     const [isMassAddModalOpen, setIsMassAddModalOpen] = useState(false);
 
@@ -218,8 +219,11 @@ export const OptionsEditor: React.FC = () => {
         if (confirm('Переместить вариант в корзину?')) actions.deleteOptionVariant(id);
     };
 
-    const toggleVariantSelection = (id: string) =>
+    const toggleVariantSelection = (id: string) => {
+        const variant = variantMap.get(id);
+        if (!variant || variant.categoryId !== massAddCatId) return;
         setSelectedVariantsToApply(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
+    };
 
     const startMassAdd = () => {
         if (selectedVariantsToApply.length === 0) return;
@@ -380,6 +384,7 @@ export const OptionsEditor: React.FC = () => {
                     selectedVariantsToApply={selectedVariantsToApply}
                     variantMap={variantMap}
                     machines={machineProducts}
+                    suppliers={suppliers}
                     onClose={() => setIsMassAddModalOpen(false)}
                     onConfirm={handleConfirmMassAdd}
                 />
@@ -530,8 +535,22 @@ export const OptionsEditor: React.FC = () => {
                                                         <button onClick={() => handleOpenVariantForm(catId)} className="ml-2 px-3 py-1 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-all font-black text-[9px] flex items-center gap-1 uppercase tracking-widest shadow-sm whitespace-nowrap">
                                                             <Plus size={12}/> Добавить
                                                         </button>
-                                                        <button onClick={() => { setIsMassAddMode(!isMassAddMode); setSelectedVariantsToApply([]); }} className={`px-3 py-1 rounded-md transition-all font-black text-[9px] flex items-center gap-1 uppercase tracking-widest shadow-sm whitespace-nowrap ${isMassAddMode ? 'bg-orange-500 text-white' : 'bg-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white'}`}>
-                                                            <MousePointer2 size={12}/> {isMassAddMode ? 'Отмена выбора' : 'Выбрать массово'}
+                                                        <button
+                                                            onClick={() => {
+                                                                const isThisCatActive = isMassAddMode && massAddCatId === catId;
+                                                                if (isThisCatActive) {
+                                                                    setIsMassAddMode(false);
+                                                                    setMassAddCatId(null);
+                                                                    setSelectedVariantsToApply([]);
+                                                                } else {
+                                                                    setIsMassAddMode(true);
+                                                                    setMassAddCatId(catId);
+                                                                    setSelectedVariantsToApply([]);
+                                                                }
+                                                            }}
+                                                            className={`px-3 py-1 rounded-md transition-all font-black text-[9px] flex items-center gap-1 uppercase tracking-widest shadow-sm whitespace-nowrap ${isMassAddMode && massAddCatId === catId ? 'bg-orange-500 text-white' : 'bg-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white'}`}
+                                                        >
+                                                            <MousePointer2 size={12}/> {isMassAddMode && massAddCatId === catId ? 'Отмена выбора' : 'Выбрать массово'}
                                                         </button>
                                                     </div>
                                                 )}
@@ -573,14 +592,17 @@ export const OptionsEditor: React.FC = () => {
                                                         const sup = supplierMap.get(v.supplierId || '');
                                                         const isSelectedForMassAdd = selectedVariantsToApply.includes(v.id);
                                                         const isDeleted = deletedVariantIds.has(v.id);
+                                                        const isThisCatMassAdd = isMassAddMode && massAddCatId === catId;
                                                         return (
                                                             <div
                                                                 key={v.id}
-                                                                onClick={() => isMassAddMode && !isDeleted && toggleVariantSelection(v.id)}
+                                                                onClick={() => isThisCatMassAdd && !isDeleted && toggleVariantSelection(v.id)}
                                                                 className={`p-2 rounded-lg border transition-all group bg-white flex flex-col gap-0.5 shadow-sm overflow-hidden relative ${
                                                                     isDeleted ? 'border-red-200 bg-red-50/30 grayscale-[0.5]'
-                                                                    : isMassAddMode
+                                                                    : isThisCatMassAdd
                                                                         ? (isSelectedForMassAdd ? 'border-emerald-500 ring-2 ring-emerald-100' : 'border-slate-200 hover:border-blue-400 cursor-pointer')
+                                                                    : isMassAddMode
+                                                                        ? 'border-slate-100 opacity-40 pointer-events-none'
                                                                         : 'border-slate-200 hover:border-blue-400 hover:shadow-md'
                                                                 }`}
                                                             >
@@ -590,7 +612,7 @@ export const OptionsEditor: React.FC = () => {
                                                                     </div>
                                                                 )}
                                                                 <div className="flex gap-2">
-                                                                    {isMassAddMode && !isDeleted ? (
+                                                                    {isThisCatMassAdd && !isDeleted ? (
                                                                         <div className={`w-5 h-5 rounded flex-none flex items-center justify-center border transition-all ${isSelectedForMassAdd ? 'bg-emerald-500 border-emerald-600 text-white' : 'border-slate-300 bg-slate-50'}`}>
                                                                             {isSelectedForMassAdd && <Check size={12}/>}
                                                                         </div>

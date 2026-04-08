@@ -73,6 +73,19 @@ export const NomenclaturePage: React.FC = () => {
     const [isSidebarVisible, setIsSidebarVisible] = useState(true);
     const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
 
+    const handleInlineUpdate = useCallback(async (product: Product) => {
+        try {
+            await actions.updateProduct(product);
+        } catch (e) {
+            console.error('Inline update failed', e);
+        }
+    }, [actions]);
+
+    const handleMassUpdate = useCallback(async (ids: string[], changes: Partial<Product>) => {
+        const targets = (state.products || []).filter(p => ids.includes(p.id));
+        await Promise.all(targets.map(p => actions.updateProduct({ ...p, ...changes })));
+    }, [state.products, actions]);
+
     const handleFilteredProductsChange = useCallback((newFilteredList: Product[]) => {
         setFilteredProducts(prev => {
             if (prev.length === newFilteredList.length && (prev.length === 0 || prev[0].id === newFilteredList[0].id)) {
@@ -177,14 +190,18 @@ export const NomenclaturePage: React.FC = () => {
                 </div>
 
                 <div className="flex-1 overflow-hidden">
-                    <NomenclatureTable 
-                        products={displayedProducts} 
-                        suppliers={suppliers} 
-                        categories={state.categories || []} 
-                        onEdit={handleEdit} 
+                    <NomenclatureTable
+                        products={displayedProducts}
+                        suppliers={suppliers}
+                        categories={state.categories || []}
+                        hscodes={state.hscodes || []}
+                        manufacturers={(state.manufacturers || []).map((m: any) => m.name || m)}
+                        onEdit={handleEdit}
                         onCopy={handleCopy}
-                        onDelete={handleDelete} 
-                        onFilteredDataChange={handleFilteredProductsChange} 
+                        onDelete={handleDelete}
+                        onFilteredDataChange={handleFilteredProductsChange}
+                        onInlineUpdate={handleInlineUpdate}
+                        onMassUpdate={handleMassUpdate}
                     />
                 </div>
             </div>

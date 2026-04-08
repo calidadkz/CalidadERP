@@ -1,10 +1,10 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useStore } from '@/features/system/context/GlobalStore';
 import { PricingProfile, ProductCategory } from '@/types/product';
 import { Currency } from '@/types/currency';
 import { ProductType } from '@/types/enums';
-import { Plus, Save, Trash2, Pencil, X, Calculator as CalcIcon, RefreshCw, Loader2, CheckCircle, Download, Upload, AlertCircle, Truck, Users, Percent, Target, Info, Landmark } from 'lucide-react';
+import { Plus, Save, Trash2, Pencil, X, Calculator as CalcIcon, RefreshCw, Loader2, CheckCircle, Download, Upload, AlertCircle, Truck, Users, Percent, Target, Info, Landmark, Factory, Search, ChevronDown } from 'lucide-react';
 import { PricingService } from '@/services/PricingService';
 import { ApiService } from '@/services/api';
 import { useAccess } from '@/features/auth/hooks/useAccess';
@@ -24,9 +24,11 @@ export const PricingManagerPage: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    
+
     const [importStatus, setImportStatus] = useState<{ added: number, updated: number, errors: number, total: number } | null>(null);
     const [isImporting, setIsImporting] = useState(false);
+    const [recalcingId, setRecalcingId] = useState<string | null>(null);
+    const [recalcResult, setRecalcResult] = useState<{ profileId: string; count: number } | null>(null);
 
     const handleAddNew = () => {
         setEditingId(null);
@@ -50,18 +52,27 @@ export const PricingManagerPage: React.FC = () => {
     };
     
     const handleRecalculateAll = async () => {
-        if (!window.confirm('Пересчитать цены для ВСЕХ товаров и комплектаций? Это может занять некоторое время и перезапишет текущие цены продажи.')) return;
-        
+        if (!window.confirm('Пересчитать цены для ВСЕХ товаров? Это перезапишет текущие цены продажи.')) return;
         try {
-            await PricingService.recalculateAndSaveAllPrices(
-                products,
-                pricingProfiles,
-                exchangeRates
-            );
-            alert('Цены успешно пересчитаны и сохранены!');
+            const count = await PricingService.recalculateAndSaveAllPrices(products, pricingProfiles, exchangeRates);
+            alert(`Цены пересчитаны: ${count} товаров обновлено.`);
         } catch (error) {
-            console.error("Ошибка при массовом пересчете цен:", error);
-            alert('Произошла ошибка при пересчете. Подробности в консоли.');
+            console.error('Ошибка при массовом пересчёте:', error);
+            alert('Произошла ошибка. Подробности в консоли.');
+        }
+    };
+
+    const handleRecalculateProfile = async (profile: PricingProfile) => {
+        setRecalcingId(profile.id);
+        setRecalcResult(null);
+        try {
+            const count = await PricingService.recalculateProfilePrices(profile, pricingProfiles, products, exchangeRates);
+            setRecalcResult({ profileId: profile.id, count });
+            setTimeout(() => setRecalcResult(null), 4000);
+        } catch (error) {
+            console.error('Ошибка при пересчёте профиля:', error);
+        } finally {
+            setRecalcingId(null);
         }
     };
     
@@ -229,6 +240,7 @@ export const PricingManagerPage: React.FC = () => {
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Название</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Тип</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Поставщик</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Производитель</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Категории</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Маржа</th>
                                 <th className="px-6 py-4"></th>
@@ -246,18 +258,38 @@ export const PricingManagerPage: React.FC = () => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-xs font-bold text-slate-500">
-                                        {p.supplierId ? (suppliers.find(s => s.id === p.supplierId)?.name || '-') : 'Все'}
+                                        {p.supplierId ? (suppliers.find(s => s.id === p.supplierId)?.name || '-') : <span className="text-slate-300 italic font-medium">Все</span>}
                                     </td>
                                     <td className="px-6 py-4 text-xs font-bold text-slate-500">
-                                       {p.applicableCategoryIds.length > 0 ? p.applicableCategoryIds.map(id => categories.find(c => c.id === id)?.name || 'id: ' + id).join(', ') : 'Все'}
+                                        {p.applicableManufacturer || <span className="text-slate-300 italic font-medium">Все</span>}
+                                    </td>
+                                    <td className="px-6 py-4 text-xs font-bold text-slate-500">
+                                        {p.applicableCategoryIds.length > 0 ? p.applicableCategoryIds.map(id => categories.find(c => c.id === id)?.name || id).join(', ') : <span className="text-slate-300 italic font-medium">Все</span>}
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <div className="font-black text-emerald-600 flex items-center gap-1 justify-end"> <Target size={12}/> {p.targetNetMarginPercent}%</div>
+                                        <div className="font-black text-emerald-600 flex items-center gap-1 justify-end"><Target size={12}/> {p.targetNetMarginPercent}%</div>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                                            { access.canWrite('actions', 'update') && <button onClick={() => handleEdit(p.id)} className="p-2 text-slate-400 hover:text-blue-600 transition-colors"><Pencil size={16} /></button> }
-                                            { access.canWrite('actions', 'delete') && <button onClick={() => handleDelete(p.id)} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={16} /></button> }
+                                        <div className="flex items-center justify-end gap-1">
+                                            {recalcResult?.profileId === p.id && (
+                                                <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
+                                                    ✓ {recalcResult.count} товаров
+                                                </span>
+                                            )}
+                                            {access.canWrite('actions', 'recalculate') && (
+                                                <button
+                                                    onClick={() => handleRecalculateProfile(p)}
+                                                    disabled={recalcingId === p.id}
+                                                    title="Пересчитать цены для этого профиля"
+                                                    className="p-2 text-slate-300 hover:text-amber-500 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                                                >
+                                                    {recalcingId === p.id ? <Loader2 size={15} className="animate-spin text-amber-500"/> : <RefreshCw size={15}/>}
+                                                </button>
+                                            )}
+                                            <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {access.canWrite('actions', 'update') && <button onClick={() => handleEdit(p.id)} className="p-2 text-slate-400 hover:text-blue-600 transition-colors"><Pencil size={16}/></button>}
+                                                {access.canWrite('actions', 'delete') && <button onClick={() => handleDelete(p.id)} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>}
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>
@@ -312,9 +344,49 @@ interface PricingProfileModalProps {
 
 const PricingProfileModal: React.FC<PricingProfileModalProps> = ({ profileId, onClose }) => {
     const { state, actions } = useStore();
-    const { pricingProfiles, suppliers, categories } = state;
+    const { pricingProfiles, suppliers, categories, products = [] } = state;
     const [profile, setProfile] = useState<Partial<PricingProfile> | null>(null);
     const [availableCategories, setAvailableCategories] = useState<ProductCategory[]>([]);
+
+    // Производитель — дропдаун с поиском
+    const [isManufOpen, setIsManufOpen] = useState(false);
+    const [manufSearch, setManufSearch] = useState('');
+    const manufRef = useRef<HTMLDivElement>(null);
+
+    // Поставщик — дропдаун с поиском
+    const [isSupplierOpen, setIsSupplierOpen] = useState(false);
+    const [supplierSearch, setSupplierSearch] = useState('');
+    const supplierRef = useRef<HTMLDivElement>(null);
+
+    const availableManufacturers = useMemo(() => {
+        return Array.from(new Set(
+            products.filter(p => p.manufacturer).map(p => p.manufacturer as string)
+        )).sort((a, b) => a.localeCompare(b, 'ru'));
+    }, [products]);
+
+    const filteredManufacturers = useMemo(() =>
+        availableManufacturers.filter(m => !manufSearch || m.toLowerCase().includes(manufSearch.toLowerCase())),
+        [availableManufacturers, manufSearch]
+    );
+
+    const filteredSuppliers = useMemo(() =>
+        suppliers.filter(s => !supplierSearch || s.name.toLowerCase().includes(supplierSearch.toLowerCase())),
+        [suppliers, supplierSearch]
+    );
+
+    const selectedSupplierName = useMemo(() =>
+        suppliers.find(s => s.id === profile?.supplierId)?.name || '',
+        [suppliers, profile?.supplierId]
+    );
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (manufRef.current && !manufRef.current.contains(e.target as Node)) setIsManufOpen(false);
+            if (supplierRef.current && !supplierRef.current.contains(e.target as Node)) setIsSupplierOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     useEffect(() => {
         if (profileId) {
@@ -384,8 +456,9 @@ const PricingProfileModal: React.FC<PricingProfileModalProps> = ({ profileId, on
             applicableCategoryIds: profile.applicableCategoryIds || []
         };
 
+        // type — UI-поле, не хранится в БД
         const { type, ...profileToSave } = profileWithDefaults;
-    
+
         if (profileId) {
             await actions.updatePricingProfile(profileToSave as PricingProfile);
         } else {
@@ -411,10 +484,86 @@ const PricingProfileModal: React.FC<PricingProfileModalProps> = ({ profileId, on
             <div className="flex-1 overflow-y-auto p-6 bg-slate-100">
                 <div className="w-full max-w-6xl mx-auto space-y-5">
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
-                        <div className="md:col-span-2"><StyledSelect label="Тип профиля" value={profile.type || ''} onChange={e => handleChange('type', e.target.value as ProductType)} options={Object.values(ProductType)} /></div>
-                        <div className="md:col-span-3"><StyledInput label="Название профиля" value={profile.name || ''} onChange={e => handleChange('name', e.target.value)} placeholder="Лазеры JK" /></div>
-                        <div className="md:col-span-2"><StyledSelect label="Поставщик" value={profile.supplierId || ''} onChange={e => handleChange('supplierId', e.target.value)} options={[{label: 'Все', value: ''}, ...suppliers.map(s => ({ label: s.name, value: s.id }))]} /></div>
-                        <div className="md:col-span-5">
+                        <div className="md:col-span-2">
+                            <StyledSelect label="Тип профиля" value={profile.type || ''} onChange={e => handleChange('type', e.target.value as ProductType)} options={Object.values(ProductType)} />
+                        </div>
+                        <div className="md:col-span-3">
+                            <StyledInput label="Название профиля" value={profile.name || ''} onChange={e => handleChange('name', e.target.value)} placeholder="Лазеры JK" />
+                        </div>
+
+                        {/* Поставщик — дропдаун с поиском */}
+                        <div className="md:col-span-2 relative" ref={supplierRef}>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider flex items-center gap-1"><Truck size={11}/> Поставщик</label>
+                            <div
+                                className={`w-full flex items-center justify-between border rounded-lg py-2 px-3 text-sm font-bold cursor-pointer transition-all bg-white shadow-sm ${isSupplierOpen ? 'border-blue-500 ring-4 ring-blue-500/10' : 'border-slate-300/70'}`}
+                                onClick={() => { setIsSupplierOpen(v => !v); setSupplierSearch(''); }}
+                            >
+                                <span className={selectedSupplierName ? 'text-slate-800' : 'text-slate-400 italic font-medium text-sm'}>
+                                    {selectedSupplierName || 'Все'}
+                                </span>
+                                <ChevronDown size={14} className={`text-slate-300 transition-transform flex-shrink-0 ${isSupplierOpen ? 'rotate-180' : ''}`}/>
+                            </div>
+                            {isSupplierOpen && (
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-[200] animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden">
+                                    <div className="p-2 border-b bg-slate-50">
+                                        <div className="relative">
+                                            <Search size={11} className="absolute left-2.5 top-2 text-slate-400"/>
+                                            <input autoFocus className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold outline-none focus:border-blue-400" placeholder="Начните ввод..." value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)}/>
+                                        </div>
+                                    </div>
+                                    <div className="max-h-52 overflow-y-auto p-1 custom-scrollbar">
+                                        <div onClick={() => { handleChange('supplierId', ''); setIsSupplierOpen(false); setSupplierSearch(''); }} className={`px-3 py-2 rounded-lg cursor-pointer text-[11px] flex items-center justify-between transition-all ${!profile.supplierId ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-400 italic'}`}>
+                                            <span className="font-bold">— Все поставщики —</span>
+                                            {!profile.supplierId && <CheckCircle size={12} className="text-blue-500"/>}
+                                        </div>
+                                        {filteredSuppliers.map(s => (
+                                            <div key={s.id} onClick={() => { handleChange('supplierId', s.id); setIsSupplierOpen(false); setSupplierSearch(''); }} className={`px-3 py-2 rounded-lg cursor-pointer text-[11px] flex items-center justify-between transition-all ${profile.supplierId === s.id ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-600'}`}>
+                                                <span className="font-bold">{s.name}</span>
+                                                {profile.supplierId === s.id && <CheckCircle size={12} className="text-blue-500"/>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Производитель — дропдаун с поиском */}
+                        <div className="md:col-span-2 relative" ref={manufRef}>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider flex items-center gap-1"><Factory size={11}/> Производитель</label>
+                            <div
+                                className={`w-full flex items-center justify-between border rounded-lg py-2 px-3 text-sm font-bold cursor-pointer transition-all bg-white shadow-sm ${isManufOpen ? 'border-blue-500 ring-4 ring-blue-500/10' : 'border-slate-300/70'}`}
+                                onClick={() => { setIsManufOpen(v => !v); setManufSearch(''); }}
+                            >
+                                <span className={profile.applicableManufacturer ? 'text-slate-800' : 'text-slate-400 italic font-medium text-sm'}>
+                                    {profile.applicableManufacturer || 'Все'}
+                                </span>
+                                <ChevronDown size={14} className={`text-slate-300 transition-transform flex-shrink-0 ${isManufOpen ? 'rotate-180' : ''}`}/>
+                            </div>
+                            {isManufOpen && (
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-[200] animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden">
+                                    <div className="p-2 border-b bg-slate-50">
+                                        <div className="relative">
+                                            <Search size={11} className="absolute left-2.5 top-2 text-slate-400"/>
+                                            <input autoFocus className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold outline-none focus:border-blue-400" placeholder="Начните ввод..." value={manufSearch} onChange={e => setManufSearch(e.target.value)}/>
+                                        </div>
+                                    </div>
+                                    <div className="max-h-52 overflow-y-auto p-1 custom-scrollbar">
+                                        <div onClick={() => { handleChange('applicableManufacturer', ''); setIsManufOpen(false); setManufSearch(''); }} className={`px-3 py-2 rounded-lg cursor-pointer text-[11px] flex items-center justify-between transition-all ${!profile.applicableManufacturer ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-400 italic'}`}>
+                                            <span className="font-bold">— Все производители —</span>
+                                            {!profile.applicableManufacturer && <CheckCircle size={12} className="text-blue-500"/>}
+                                        </div>
+                                        {filteredManufacturers.map(m => (
+                                            <div key={m} onClick={() => { handleChange('applicableManufacturer', m); setIsManufOpen(false); setManufSearch(''); }} className={`px-3 py-2 rounded-lg cursor-pointer text-[11px] flex items-center justify-between transition-all ${profile.applicableManufacturer === m ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-600'}`}>
+                                                <span className="font-bold">{m}</span>
+                                                {profile.applicableManufacturer === m && <CheckCircle size={12} className="text-blue-500"/>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="md:col-span-3">
                             <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Категории</label>
                             <div className="flex flex-wrap gap-2 p-2.5 bg-white rounded-lg border border-slate-300/70 min-h-[5.5rem] max-h-48 overflow-y-auto shadow-sm">
                                 {availableCategories.map(cat => (

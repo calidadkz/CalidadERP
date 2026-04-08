@@ -43,6 +43,14 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
     const [hsSearch, setHSSearch] = useState('');
     const hsRef = useRef<HTMLDivElement>(null);
 
+    const [isSupplierOpen, setIsSupplierOpen] = useState(false);
+    const [supplierSearch, setSupplierSearch] = useState('');
+    const supplierRef = useRef<HTMLDivElement>(null);
+
+    const [isManufOpen, setIsManufOpen] = useState(false);
+    const [manufSearch, setManufSearch] = useState('');
+    const manufRef = useRef<HTMLDivElement>(null);
+
     const [isMethodOpen, setIsMethodOpen] = useState(false);
     const methodRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +71,8 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             if (catRef.current && !catRef.current.contains(event.target as Node)) setIsCatOpen(false);
             if (hsRef.current && !hsRef.current.contains(event.target as Node)) setIsHSOpen(false);
             if (methodRef.current && !methodRef.current.contains(event.target as Node)) setIsMethodOpen(false);
+            if (supplierRef.current && !supplierRef.current.contains(event.target as Node)) setIsSupplierOpen(false);
+            if (manufRef.current && !manufRef.current.contains(event.target as Node)) setIsManufOpen(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -105,6 +115,22 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             .filter(c => !catSearch || c.name.toLowerCase().includes(catSearch.toLowerCase()))
             .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
     }, [categories, formData.type, catSearch]);
+
+    const filteredSuppliers = useMemo(() => {
+        return [...suppliers]
+            .filter(s => !supplierSearch || s.name.toLowerCase().includes(supplierSearch.toLowerCase()) || s.country.toLowerCase().includes(supplierSearch.toLowerCase()))
+            .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    }, [suppliers, supplierSearch]);
+
+    const currentSupplier = useMemo(() =>
+        suppliers.find(s => s.id === formData.supplierId),
+    [suppliers, formData.supplierId]);
+
+    const filteredManufacturers = useMemo(() => {
+        return [...manufacturers]
+            .filter(m => !manufSearch || m.name.toLowerCase().includes(manufSearch.toLowerCase()))
+            .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    }, [manufacturers, manufSearch]);
 
     const machineCategories = useMemo(() => {
         return categories
@@ -285,36 +311,118 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                             </div>
                         </div>
 
-                        <div className="col-span-1">
+                        <div className="col-span-1 relative" ref={supplierRef}>
                             <label className="block text-[8px] font-black text-slate-400 uppercase mb-1.5 ml-1">Поставщик</label>
-                            <select 
-                                className="w-full border border-slate-200 rounded-lg py-1.5 px-3 text-xs font-bold bg-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all disabled:opacity-70" 
-                                value={formData.supplierId || ''} 
-                                onChange={e => onChange('supplierId', e.target.value)}
-                                disabled={!canWriteField('supplierId')}
-                            >
-                                <option value="">-- Не указан --</option>
-                                {[...suppliers].sort((a,b) => a.name.localeCompare(b.name, 'ru')).map(s => (
-                                    <option key={s.id} value={s.id}>{s.name} ({s.country})</option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <div
+                                    className={`w-full flex items-center justify-between border rounded-lg py-1.5 px-3 text-xs font-bold transition-all cursor-pointer ${
+                                        isSupplierOpen ? 'border-blue-500 ring-4 ring-blue-500/10 bg-white' : 'border-slate-200 bg-white'
+                                    } ${!canWriteField('supplierId') ? 'opacity-70 pointer-events-none' : ''}`}
+                                    onClick={() => setIsSupplierOpen(!isSupplierOpen)}
+                                >
+                                    <span className={currentSupplier ? 'text-slate-800' : 'text-slate-400 italic'}>
+                                        {currentSupplier ? `${currentSupplier.name} (${currentSupplier.country})` : 'Не указан'}
+                                    </span>
+                                    <ChevronDown size={14} className={`text-slate-300 transition-transform ${isSupplierOpen ? 'rotate-180' : ''}`}/>
+                                </div>
+                                {isSupplierOpen && (
+                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-[100] animate-in fade-in slide-in-from-top-1 overflow-hidden">
+                                        <div className="p-2 border-b bg-slate-50">
+                                            <div className="relative">
+                                                <Search size={12} className="absolute left-2.5 top-2 text-slate-400" />
+                                                <input
+                                                    autoFocus
+                                                    className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold outline-none focus:border-blue-400"
+                                                    placeholder="Начните ввод..."
+                                                    value={supplierSearch}
+                                                    onChange={e => setSupplierSearch(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="max-h-56 overflow-y-auto p-1 custom-scrollbar">
+                                            <div
+                                                onClick={() => { onChange('supplierId', null); setIsSupplierOpen(false); setSupplierSearch(''); }}
+                                                className={`px-3 py-2 rounded-lg cursor-pointer text-[11px] flex items-center justify-between transition-all ${
+                                                    !formData.supplierId ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-400 italic'
+                                                }`}
+                                            >
+                                                <span className="font-bold">— Не указан —</span>
+                                                {!formData.supplierId && <CheckCircle size={12} className="text-blue-500"/>}
+                                            </div>
+                                            {filteredSuppliers.map(s => (
+                                                <div
+                                                    key={s.id}
+                                                    onClick={() => { onChange('supplierId', s.id); setIsSupplierOpen(false); setSupplierSearch(''); }}
+                                                    className={`px-3 py-2 rounded-lg cursor-pointer text-[11px] flex items-center justify-between transition-all ${
+                                                        formData.supplierId === s.id ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-600'
+                                                    }`}
+                                                >
+                                                    <span className="font-bold">{s.name} <span className="font-normal text-slate-400">({s.country})</span></span>
+                                                    {formData.supplierId === s.id && <CheckCircle size={12} className="text-blue-500"/>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
-                        <div className="col-span-1">
+                        <div className="col-span-1 relative" ref={manufRef}>
                             <label className="block text-[8px] font-black text-slate-400 uppercase mb-1.5 ml-1 flex items-center gap-1">
                                 <Factory size={10} className="text-blue-500"/> Производитель
                             </label>
-                            <select 
-                                className="w-full border border-slate-200 rounded-lg py-1.5 px-3 text-xs font-bold bg-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all disabled:opacity-70" 
-                                value={formData.manufacturer || ''} 
-                                onChange={e => onChange('manufacturer', e.target.value)}
-                                disabled={!canWriteField('name')}
-                            >
-                                <option value="">-- Не указан --</option>
-                                {[...manufacturers].sort((a,b) => a.name.localeCompare(b.name, 'ru')).map(m => (
-                                    <option key={m.id} value={m.name}>{m.name}</option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <div
+                                    className={`w-full flex items-center justify-between border rounded-lg py-1.5 px-3 text-xs font-bold transition-all cursor-pointer ${
+                                        isManufOpen ? 'border-blue-500 ring-4 ring-blue-500/10 bg-white' : 'border-slate-200 bg-white'
+                                    } ${!canWriteField('name') ? 'opacity-70 pointer-events-none' : ''}`}
+                                    onClick={() => setIsManufOpen(!isManufOpen)}
+                                >
+                                    <span className={formData.manufacturer ? 'text-slate-800' : 'text-slate-400 italic'}>
+                                        {formData.manufacturer || 'Не указан'}
+                                    </span>
+                                    <ChevronDown size={14} className={`text-slate-300 transition-transform ${isManufOpen ? 'rotate-180' : ''}`}/>
+                                </div>
+                                {isManufOpen && (
+                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-[100] animate-in fade-in slide-in-from-top-1 overflow-hidden">
+                                        <div className="p-2 border-b bg-slate-50">
+                                            <div className="relative">
+                                                <Search size={12} className="absolute left-2.5 top-2 text-slate-400" />
+                                                <input
+                                                    autoFocus
+                                                    className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold outline-none focus:border-blue-400"
+                                                    placeholder="Начните ввод..."
+                                                    value={manufSearch}
+                                                    onChange={e => setManufSearch(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="max-h-56 overflow-y-auto p-1 custom-scrollbar">
+                                            <div
+                                                onClick={() => { onChange('manufacturer', ''); setIsManufOpen(false); setManufSearch(''); }}
+                                                className={`px-3 py-2 rounded-lg cursor-pointer text-[11px] flex items-center justify-between transition-all ${
+                                                    !formData.manufacturer ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-400 italic'
+                                                }`}
+                                            >
+                                                <span className="font-bold">— Не указан —</span>
+                                                {!formData.manufacturer && <CheckCircle size={12} className="text-blue-500"/>}
+                                            </div>
+                                            {filteredManufacturers.map(m => (
+                                                <div
+                                                    key={m.id}
+                                                    onClick={() => { onChange('manufacturer', m.name); setIsManufOpen(false); setManufSearch(''); }}
+                                                    className={`px-3 py-2 rounded-lg cursor-pointer text-[11px] flex items-center justify-between transition-all ${
+                                                        formData.manufacturer === m.name ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-600'
+                                                    }`}
+                                                >
+                                                    <span className="font-bold">{m.name}</span>
+                                                    {formData.manufacturer === m.name && <CheckCircle size={12} className="text-blue-500"/>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 

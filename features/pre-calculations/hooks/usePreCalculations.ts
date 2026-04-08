@@ -84,9 +84,19 @@ export const usePreCalculations = (id?: string) => {
           manufacturer: item.manufacturer,
           purchasePriceKzt: Number(item.purchaseKzt) || 0,
           packages: item.packages || [],
-          options: item.options || [], 
-          deliveryChinaKzt: Number(item.deliveryChinaKzt) || 0,
-          deliveryAlmatyKaragandaPerItemKzt: Number(item.logisticsLocalKzt) || 0,
+          options: (() => {
+            const raw = item.options;
+            // Поддержка нового формата: { variants: [...], breakdown: {...} }
+            if (Array.isArray(raw)) return raw;
+            return (raw as any)?.variants || [];
+          })(),
+          purchasePriceBreakdown: (() => {
+            const raw = item.options;
+            if (Array.isArray(raw)) return undefined;
+            return (raw as any)?.breakdown || undefined;
+          })(),
+          deliveryUrumqiAlmatyKzt: Number(item.deliveryUrumqiAlmatyKzt) || 0,
+          deliveryAlmatyKaragandaPerItemKzt: Number(item.logisticsAlmatyKaragandaKzt) || 0,
           svhPerItemKzt: 0,
           brokerPerItemKzt: 0,
           customsFeesPerItemKzt: 0,
@@ -190,13 +200,25 @@ export const usePreCalculations = (id?: string) => {
       const newItem = { ...item };
       const qty = Number(newItem.quantity) || 0;
       
-      const purchaseRate = newItem.purchasePriceCurrency === 'CNY' ? Number(generalSettings.exchangeRateCny) || 63 : Number(generalSettings.exchangeRateUsd) || 450;
-      newItem.purchasePriceKzt = (Number(newItem.purchasePrice) || 0) * purchaseRate;
+      // Мультивалютный пересчёт: если есть разбивка по валютам — применяем курсы предрасчёта к каждой части.
+      // Это гарантирует, что CNY-опции пересчитываются по exchangeRateCny, а не "растворяются" в USD.
+      if (newItem.purchasePriceBreakdown && Object.keys(newItem.purchasePriceBreakdown).length > 0) {
+        const b = newItem.purchasePriceBreakdown;
+        const usdRate = Number(generalSettings.exchangeRateUsd) || 450;
+        const cnyRate = Number(generalSettings.exchangeRateCny) || 63;
+        newItem.purchasePriceKzt = Object.entries(b).reduce((sum, [cur, amt]) => {
+          const rate = cur === 'CNY' ? cnyRate : usdRate; // USD и прочие валюты → USD курс
+          return sum + (Number(amt) || 0) * rate;
+        }, 0);
+      } else {
+        const purchaseRate = newItem.purchasePriceCurrency === 'CNY' ? Number(generalSettings.exchangeRateCny) || 63 : Number(generalSettings.exchangeRateUsd) || 450;
+        newItem.purchasePriceKzt = (Number(newItem.purchasePrice) || 0) * purchaseRate;
+      }
 
       const effectiveVolumePerItem = newItem.useDimensions ? (Number(newItem.volumeM3) || 0) : 0;
 
-      // Расчет доставки из Китая за единицу товара
-      newItem.deliveryChinaKzt = effectiveVolumePerItem * (Number(generalSettings.shippingChinaUsdPerM3) || 0) * (Number(generalSettings.exchangeRateForShipping) || 0);
+      // Расчет доставки Урумчи–Алматы за единицу товара
+      newItem.deliveryUrumqiAlmatyKzt = effectiveVolumePerItem * (Number(generalSettings.shippingChinaUsdPerM3) || 0) * (Number(generalSettings.exchangeRateForShipping) || 0);
       
       // Расчет доставки Алматы-Караганда за единицу товара (цена за м3 * объем товара)
       newItem.deliveryAlmatyKaragandaPerItemKzt = (Number(generalSettings.deliveryAlmatyKaragandaKztPerM3) || 0) * effectiveVolumePerItem;
@@ -216,7 +238,7 @@ export const usePreCalculations = (id?: string) => {
       const ndsRate = Number(generalSettings.ndsRate) || 16;
       const revenue = Number(newItem.revenueKzt) || 0;
       
-      newItem.customsNdsKzt = (newItem.purchasePriceKzt + (newItem.deliveryChinaKzt * 0.6)) * (ndsRate / 100);
+      newItem.customsNdsKzt = (newItem.purchasePriceKzt + (newItem.deliveryUrumqiAlmatyKzt * 0.6)) * (ndsRate / 100);
 
       let totalNds = 0, kpn = 0;
       const inclusiveVatFactor = ndsRate / (100 + ndsRate);
@@ -228,7 +250,7 @@ export const usePreCalculations = (id?: string) => {
       } else {
         totalNds = revenue * inclusiveVatFactor;
         const salesBonus = revenue * (Number(generalSettings.salesBonusRate || 0) / 100);
-        const costsBeforeTax = newItem.purchasePriceKzt + newItem.deliveryChinaKzt + localLogisticsPerRowKzt + salesBonus;
+        const costsBeforeTax = newItem.purchasePriceKzt + newItem.deliveryUrumqiAlmatyKzt + localLogisticsPerRowKzt + salesBonus;
         const profitBeforeKPN = (revenue - totalNds) - costsBeforeTax;
         kpn = profitBeforeKPN > 0 ? profitBeforeKPN * (Number(generalSettings.kpn20Rate || 0) / 100) : 0;
       }
@@ -240,8 +262,8 @@ export const usePreCalculations = (id?: string) => {
 
       const otherCostsTotalKzt = (Number(newItem.pnrKzt) || 0) + (Number(newItem.deliveryLocalKzt) || 0);
 
-      newItem.fullCostKzt = newItem.purchasePriceKzt + newItem.totalNdsKzt + newItem.deliveryChinaKzt + localLogisticsPerRowKzt + newItem.salesBonusKzt + kpn + otherCostsTotalKzt;
-      newItem.preSaleCostKzt = newItem.purchasePriceKzt + (newItem.taxRegime === 'Упр.' ? newItem.totalNdsKzt : newItem.customsNdsKzt) + newItem.deliveryChinaKzt + localLogisticsPerRowKzt;
+      newItem.fullCostKzt = newItem.purchasePriceKzt + newItem.totalNdsKzt + newItem.deliveryUrumqiAlmatyKzt + localLogisticsPerRowKzt + newItem.salesBonusKzt + kpn + otherCostsTotalKzt;
+      newItem.preSaleCostKzt = newItem.purchasePriceKzt + (newItem.taxRegime === 'Упр.' ? newItem.totalNdsKzt : newItem.customsNdsKzt) + newItem.deliveryUrumqiAlmatyKzt + localLogisticsPerRowKzt;
       newItem.profitKzt = revenue - newItem.fullCostKzt;
       newItem.marginPercentage = revenue > 0 ? (newItem.profitKzt / revenue) * 100 : 0;
 
@@ -257,6 +279,10 @@ export const usePreCalculations = (id?: string) => {
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== itemId) return item;
+        // Ручное редактирование цены сбрасывает мультивалютную разбивку
+        if (key === 'purchasePrice') {
+          return { ...item, purchasePrice: value, purchasePriceBreakdown: undefined };
+        }
         return { ...item, [key]: value };
       })
     );
@@ -369,10 +395,13 @@ export const usePreCalculations = (id?: string) => {
             volumeM3: Number(item.volumeM3) || 0,
             weightKg: Number(item.weightKg) || 0,
             useDimensions: !!item.useDimensions,
-            options: item.options,
+            // Упаковываем breakdown в options JSON для обратной совместимости (без новых колонок в БД)
+            options: item.purchasePriceBreakdown
+              ? { variants: item.options || [], breakdown: item.purchasePriceBreakdown }
+              : (item.options || []),
             purchaseKzt: Number(item.purchasePriceKzt) || 0,
-            deliveryChinaKzt: Number(item.deliveryChinaKzt) || 0,
-            logisticsLocalKzt: Number(item.deliveryAlmatyKaragandaPerItemKzt) || 0,
+            deliveryUrumqiAlmatyKzt: Number(item.deliveryUrumqiAlmatyKzt) || 0,
+            logisticsAlmatyKaragandaKzt: Number(item.deliveryAlmatyKaragandaPerItemKzt) || 0,
             customsNdsKzt: Number(item.customsNdsKzt) || 0,
             totalNdsKzt: Number(item.totalNdsKzt) || 0,
             ndsDifferenceKzt: Number(item.ndsDifferenceKzt) || 0,

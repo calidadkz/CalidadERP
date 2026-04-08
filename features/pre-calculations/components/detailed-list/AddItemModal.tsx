@@ -226,6 +226,45 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, mode, onClos
       return PricingService.calculateSmartPrice(selectedProduct, profile, exchangeRates as any, bundleVolume, bundleTotal).finalPrice;
   }, [selectedProduct, bundleTotal, bundleVolume, pricingProfiles, exchangeRates]);
 
+  // Вычисляет разбивку закупочной цены по валютам для мультивалютных конфигураций станков.
+  // Возвращает { USD: X, CNY: Y, ... } — суммы в каждой валюте ДО конвертации в KZT.
+  const computePriceBreakdown = (product: Product, selectedVariantIds: string[]): Record<string, number> => {
+    const b: Record<string, number> = {};
+    const baseCurrency = product.currency || 'USD';
+    b[baseCurrency] = (b[baseCurrency] || 0) + (Number(product.basePrice) || 0);
+
+    if (!product.machineConfig) return b;
+
+    product.machineConfig.forEach(group => {
+      if (!group?.typeId) return;
+
+      const defaultIds = Array.from(new Set(
+        [group.defaultVariantId, ...(group.defaultVariantIds || [])].filter(Boolean) as string[]
+      ));
+
+      // Вычитаем стоимость дефолтных вариантов
+      defaultIds.forEach(defId => {
+        const v = optionVariants.find(av => av.id === defId);
+        if (!v) return;
+        const price = group.priceOverrides?.[defId] ?? v.price;
+        b[v.currency] = (b[v.currency] || 0) - (Number(price) || 0);
+      });
+
+      // Добавляем стоимость выбранных вариантов
+      const selectedInGroup = selectedVariantIds.filter(vid =>
+        optionVariants.find(av => av.id === vid)?.typeId === group.typeId
+      );
+      selectedInGroup.forEach(vid => {
+        const v = optionVariants.find(av => av.id === vid);
+        if (!v) return;
+        const price = group.priceOverrides?.[vid] ?? v.price;
+        b[v.currency] = (b[v.currency] || 0) + (Number(price) || 0);
+      });
+    });
+
+    return b;
+  };
+
   const handleAdd = () => {
     if (mode === 'ORDER') {
         Object.values(selectedOrderItems).forEach(({ order, item }) => {
@@ -234,16 +273,16 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, mode, onClos
 
             const isMachine = product.type === ProductType.MACHINE;
             const rawConfig = item.configuration || [];
-            
+
             // SMART RECOVERY of IDs
             const configOptionIds = isMachine ? recoverVariantIds(product, rawConfig) : [];
-            
+
             // Calculate purchase price and volume based on RECOVERED configuration
-            const purchasePrice = isMachine 
+            const purchasePrice = isMachine
                 ? PricingService.calculateBundlePurchasePrice(product, configOptionIds, optionVariants, exchangeRates as any)
                 : (product.basePrice || 0);
-            
-            const volume = isMachine 
+
+            const volume = isMachine
                 ? PricingService.calculateBundleVolume(product, configOptionIds, optionVariants)
                 : (product.workingVolumeM3 || (product.packages || []).reduce((acc, p) => acc + (p.volumeM3 || 0), 0));
 
@@ -253,6 +292,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, mode, onClos
                 return { typeId: type?.id || '', typeName: type?.name || '', variantId: variant?.id || '', variantName: variant?.name || '' };
             });
 
+            const breakdown = isMachine ? computePriceBreakdown(product, configOptionIds) : undefined;
             const actualOrderPaid = getOrderPaidAmount(order.id);
             const hsCodeObj = hscodes.find(h => h.id === product.hsCodeId);
 
@@ -267,6 +307,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, mode, onClos
                 quantity: item.quantity,
                 purchasePrice: purchasePrice,
                 purchasePriceCurrency: product.currency || 'USD',
+                purchasePriceBreakdown: breakdown,
                 revenueKzt: item.priceKzt,
                 isRevenueConfirmed: true,
                 prepaymentKzt: actualOrderPaid ? (actualOrderPaid * (item.totalKzt / order.totalAmount)) : 0,
@@ -278,7 +319,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, mode, onClos
                 ignoreDimensions: !isMachine,
                 manufacturer: product.manufacturer || '',
                 hsCode: hsCodeObj?.code || '',
-                deliveryChinaKzt: 0, deliveryAlmatyKaragandaPerItemKzt: 0, svhPerItemKzt: 0, brokerPerItemKzt: 0, 
+                deliveryUrumqiAlmatyKzt: 0, deliveryAlmatyKaragandaPerItemKzt: 0, svhPerItemKzt: 0, brokerPerItemKzt: 0,
                 customsFeesPerItemKzt: 0, customsNdsKzt: 0, totalNdsKzt: 0, ndsDifferenceKzt: 0, kpnKzt: 0,
                 salesBonusKzt: 0, preSaleCostKzt: 0, fullCostKzt: 0, profitKzt: 0
             });
@@ -298,6 +339,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, mode, onClos
         const volume = isMachine ? bundleVolume : (product.workingVolumeM3 || (product.packages || []).reduce((acc, p) => acc + (p.volumeM3 || 0), 0));
         const weight = (product.packages || []).reduce((acc: number, p: any) => acc + (p.weightKg || 0), 0);
         const hsCodeObj = hscodes.find(h => h.id === product.hsCodeId);
+        const breakdown = isMachine ? computePriceBreakdown(product, selectedVariantIds) : undefined;
 
         onAddItem({
             productId: product.id,
@@ -308,6 +350,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, mode, onClos
             quantity: 1,
             purchasePrice: isMachine ? bundleTotal : (product.basePrice || 0),
             purchasePriceCurrency: product.currency || 'USD',
+            purchasePriceBreakdown: breakdown,
             purchasePriceKzt: 0,
             revenueKzt: isMachine ? smartPrice : (product.salesPrice || 0),
             isRevenueConfirmed: false,
@@ -320,7 +363,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, mode, onClos
             manufacturer: product.manufacturer || '',
             hsCode: hsCodeObj?.code || '',
             options: configOptions,
-            deliveryChinaKzt: 0, deliveryAlmatyKaragandaPerItemKzt: 0, svhPerItemKzt: 0, brokerPerItemKzt: 0, 
+            deliveryUrumqiAlmatyKzt: 0, deliveryAlmatyKaragandaPerItemKzt: 0, svhPerItemKzt: 0, brokerPerItemKzt: 0,
             customsFeesPerItemKzt: 0, customsNdsKzt: 0, totalNdsKzt: 0, ndsDifferenceKzt: 0, kpnKzt: 0,
             salesBonusKzt: 0, preSaleCostKzt: 0, fullCostKzt: 0, profitKzt: 0
         });

@@ -1,6 +1,7 @@
 
 import { PricingProfile, Product, Currency, ProductType, OptionVariant } from '../types';
 import { ApiService } from './api';
+import { TableNames } from '../constants';
 
 export class PricingService {
     /**
@@ -18,7 +19,8 @@ export class PricingService {
             if (!p) return false;
             const matchSupplier = !p.supplierId || p.supplierId === product.supplierId;
             const matchCategory = !p.applicableCategoryIds?.length || p.applicableCategoryIds.includes(product.categoryId || '');
-            return matchSupplier && matchCategory;
+            const matchManufacturer = !p.applicableManufacturer || p.applicableManufacturer === product.manufacturer;
+            return matchSupplier && matchCategory && matchManufacturer;
         }) || null;
     }
 
@@ -242,14 +244,36 @@ export class PricingService {
             if (!p) return null;
             const profile = this.findProfile(p, profiles);
             const pricing = this.calculateSmartPrice(p, profile, rates);
-            return {
-                id: p.id,
-                salesPrice: pricing.finalPrice
-            };
-        }).filter((u): u is {id: string, salesPrice: number} => !!u);
+            return { id: p.id, salesPrice: pricing.finalPrice };
+        }).filter((u): u is { id: string; salesPrice: number } => !!u);
 
         for (const up of updates) {
-            await ApiService.update('products', up.id, { salesPrice: up.salesPrice });
+            await ApiService.update(TableNames.PRODUCTS, up.id, { salesPrice: up.salesPrice });
         }
+        return updates.length;
+    }
+
+    /**
+     * Пересчитывает цены только для товаров, привязанных к конкретному профилю.
+     * Привязка: явная (product.pricingProfileId === profile.id) или
+     * автоматическая (findProfile возвращает этот профиль первым среди всех).
+     */
+    static async recalculateProfilePrices(
+        profile: PricingProfile,
+        allProfiles: PricingProfile[],
+        products: Product[],
+        rates: Record<Currency, number>
+    ): Promise<number> {
+        const matching = products.filter(p => {
+            if (!p) return false;
+            const matched = this.findProfile(p, allProfiles);
+            return matched?.id === profile.id;
+        });
+
+        for (const p of matching) {
+            const pricing = this.calculateSmartPrice(p, profile, rates);
+            await ApiService.update(TableNames.PRODUCTS, p.id, { salesPrice: pricing.finalPrice });
+        }
+        return matching.length;
     }
 }

@@ -68,6 +68,7 @@ export interface PricingProfile {
     type: ProductType;
     supplierId: string;
     applicableCategoryIds: string[];
+    applicableManufacturer?: string;
     logisticsRateUsd: number;
     batchVolumeM3: number;
     batchShippingCostKzt: number;

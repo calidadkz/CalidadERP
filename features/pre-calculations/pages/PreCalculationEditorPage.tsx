@@ -58,10 +58,22 @@ export const PreCalculationEditorPage: React.FC = () => {
 
     const handleCreateBatch = async () => {
         if (!preCalculation || isNew) return;
-        
+
         try {
             await savePreCalculation();
-            
+
+            // Плановые показатели из позиций
+            const plannedRevenueKzt = items.reduce((s, i) => s + (i.revenueKzt || 0), 0);
+            const plannedPurchaseKzt = items.reduce((s, i) => s + (i.purchasePriceKzt || 0), 0);
+            const plannedProfit = items.reduce((s, i) => s + (i.profitKzt || 0), 0);
+
+            // Плановые расходы из generalSettings (суммируем по всем позициям)
+            const plannedLogisticsUrumqiAlmatyKzt = items.reduce((s, i) => s + (i.deliveryUrumqiAlmatyKzt || 0), 0);
+            const plannedLogisticsAlmatyKaragandaKzt = items.reduce((s, i) => s + (i.deliveryAlmatyKaragandaPerItemKzt || 0), 0);
+            const plannedSvhKzt = items.reduce((s, i) => s + (i.svhPerItemKzt || 0), 0);
+            const plannedBrokerKzt = items.reduce((s, i) => s + (i.brokerPerItemKzt || 0), 0);
+            const plannedCustomsKzt = items.reduce((s, i) => s + (i.customsFeesPerItemKzt || 0), 0);
+
             const batchId = api.generateId('B');
             const newBatch = {
                 id: batchId,
@@ -69,23 +81,33 @@ export const PreCalculationEditorPage: React.FC = () => {
                 name: `Партия: ${preCalculation.name}`,
                 status: 'active',
                 date: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date().toISOString(),
+                supplierOrderIds: [],
+                plannedRevenueKzt: plannedRevenueKzt,
+                plannedPurchaseKzt,
+                plannedLogisticsUrumqiAlmatyKzt,
+                plannedLogisticsAlmatyKaragandaKzt,
+                plannedLogisticsChinaDomesticKzt: 0,
+                plannedSvhKzt,
+                plannedBrokerKzt,
+                plannedCustomsKzt,
+                totalPlannedProfit: plannedProfit,
             };
-            
+
             await api.create(TableNames.BATCHES, newBatch);
-            
+
             const itemActuals = items.map(item => ({
                 id: api.generateId('BIA'),
                 batchId: batchId,
                 preCalculationItemId: item.id,
-                actualRevenueKzt: item.revenueKzt,
-                actualPurchaseKzt: item.purchasePriceKzt
+                actualRevenueKzt: 0,
+                actualPurchaseKzt: 0,
             }));
-            
+
             await api.createMany(TableNames.BATCH_ITEM_ACTUALS, itemActuals);
-            
+
             navigate(`/batches/${batchId}`);
-            
+
         } catch (error) {
             console.error("Failed to create batch:", error);
             alert("Ошибка при создании партии");

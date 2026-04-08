@@ -44,13 +44,14 @@ export interface PreCalculationItem {
   purchasePrice: number;
   purchasePriceCurrency: 'USD' | 'CNY';
   purchasePriceKzt: number;
+  purchasePriceBreakdown?: Record<string, number>; // { USD: 10000, CNY: 500 } — для мультивалютных конфигураций
 
   volumeM3: number;
   weightKg: number;
   packages: { lengthMm: number; widthMm: number; heightMm: number }[];
   useDimensions: boolean;
 
-  deliveryChinaKzt: number;
+  deliveryUrumqiAlmatyKzt: number;  // Доставка Урумчи–Алматы (за единицу)
   deliveryAlmatyKaragandaPerItemKzt: number;
   svhPerItemKzt: number;
   brokerPerItemKzt: number;

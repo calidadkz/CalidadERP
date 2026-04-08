@@ -70,7 +70,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, onSe
         {/* Logistics & Customs */}
         <SettingsCard title="Логистика" icon={Truck} colorClass="text-blue-500">
           <SettingRow 
-            label="Доставка из Китая" 
+            label="Доставка Урумчи–Алматы (за м³)"
             icon={Globe} 
             value={settings.shippingChinaUsdPerM3} 
             onChange={(v: number) => onSettingChange('shippingChinaUsdPerM3', v)}
@@ -84,7 +84,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, onSe
             unit="₸" 
           />
           <SettingRow 
-            label="Доставка Алматы-Караганда (за м³)" // Изменена метка
+            label="Доставка Алматы–Караганда (за м³)"
             icon={Truck} 
             value={settings.deliveryAlmatyKaragandaKztPerM3} // Изменено поле
             onChange={(v: number) => onSettingChange('deliveryAlmatyKaragandaKztPerM3', v)} // Изменен ключ

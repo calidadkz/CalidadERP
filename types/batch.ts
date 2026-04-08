@@ -1,7 +1,21 @@
-import { PreCalculationDocument } from "./pre-calculations";
-
 export type BatchStatus = 'active' | 'completed' | 'closed';
-export type ExpenseCategory = 'logistics_china' | 'logistics_local' | 'customs' | 'broker' | 'svh' | 'other' | 'revenue';
+
+export type ExpenseCategory =
+  | 'logistics_urumqi_almaty'      // Доставка Урумчи–Алматы
+  | 'logistics_almaty_karaganda'   // Доставка Алматы–Караганда
+  | 'logistics_china_domestic'     // Доставка по Китаю
+  | 'customs_vat'                  // НДС Таможенный
+  | 'sales_vat'                    // НДС итоговый при продаже
+  | 'resale_vat'                   // НДС от перепродажи (Упрощёнка)
+  | 'kpn_simplified'               // КПН (Упр.)
+  | 'kpn_standard'                 // КПН20
+  | 'svh'                          // СВХ
+  | 'broker'                       // Брокер
+  | 'customs'                      // Таможенные сборы
+  | 'pnr'                          // Пусконаладка
+  | 'delivery_local'               // Доставка до клиента
+  | 'other'                        // Прочее
+  | 'revenue';                     // Выручка
 
 export interface Batch {
   id: string;
@@ -10,6 +24,27 @@ export interface Batch {
   status: BatchStatus;
   date: string;
   updatedAt: string;
+  notes?: string;
+
+  // Связанные заказы поставщикам
+  supplierOrderIds: string[];
+
+  // Milestone-даты
+  expectedArrivalDate?: string;
+  customsDate?: string;
+  closedDate?: string;
+
+  // Плановые показатели (фиксируются при создании из предрасчёта)
+  plannedRevenueKzt: number;
+  plannedPurchaseKzt: number;
+  plannedLogisticsUrumqiAlmatyKzt: number;   // Доставка Урумчи–Алматы
+  plannedLogisticsAlmatyKaragandaKzt: number; // Доставка Алматы–Караганда
+  plannedLogisticsChinaDomesticKzt: number;   // Доставка по Китаю
+  plannedSvhKzt: number;
+  plannedBrokerKzt: number;
+  plannedCustomsKzt: number;
+
+  // Итоговые (пересчитываются)
   totalPlannedProfit?: number;
   totalActualProfit?: number;
 }
@@ -29,9 +64,9 @@ export interface BatchExpense {
   description: string;
   amountKzt: number;
   date: string;
-  paymentId?: string; // Связь с таблицей actual_payments (Выписка)
-  plannedPaymentId?: string; // Связь с таблицей planned_payments (Календарь)
-  documentIds?: string[]; // Список ID документов из batch_documents
+  paymentId?: string;        // Связь с actual_payments (Выписка) — подтверждает расход
+  plannedPaymentId?: string; // Связь с planned_payments (Календарь) — прогноз оплаты
+  documentIds?: string[];
 }
 
 export interface BatchDocument {

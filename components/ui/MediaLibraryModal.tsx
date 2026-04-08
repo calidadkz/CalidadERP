@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { X, Search, ChevronLeft, ChevronRight, Loader2, Image as ImageIcon, Trash2 } from 'lucide-react';
 
 interface StorageImage {
@@ -18,11 +18,25 @@ interface MediaLibraryModalProps {
 
 const ITEMS_PER_PAGE = 15;
 
-export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({ 
-    isOpen, onClose, images, isLoading, onSelect, currentUrl 
+export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
+    isOpen, onClose, images, isLoading, onSelect, currentUrl
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
+    const [hoveredImage, setHoveredImage] = useState<StorageImage | null>(null);
+    const [showAllNames, setShowAllNames] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Shift') setShowAllNames(true); };
+        const handleKeyUp   = (e: KeyboardEvent) => { if (e.key === 'Shift') setShowAllNames(false); };
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup',   handleKeyUp);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup',   handleKeyUp);
+        };
+    }, [isOpen]);
 
     const filteredImages = useMemo(() => {
         return images
@@ -54,7 +68,7 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
                 <div className="p-6 border-b bg-white flex gap-4 items-center">
                     <div className="relative flex-1">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
-                        <input 
+                        <input
                             type="text"
                             placeholder="Поиск по названию файла..."
                             className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/50 transition-all"
@@ -62,8 +76,18 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
                             onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                         />
                     </div>
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Всего: {filteredImages.length}
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                        {filteredImages.length} фото
+                    </div>
+                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-all duration-150 whitespace-nowrap ${
+                        showAllNames
+                            ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-200'
+                            : 'bg-amber-50 border-amber-300 text-amber-700'
+                    }`}>
+                        <kbd className={`text-[11px] font-black px-1.5 py-0.5 rounded ${showAllNames ? 'bg-white/20 text-white' : 'bg-amber-200 text-amber-800'}`}>Shift</kbd>
+                        <span className="text-[11px] font-black uppercase tracking-wide">
+                            {showAllNames ? 'Имена видны' : 'Показать имена'}
+                        </span>
                     </div>
                 </div>
 
@@ -81,16 +105,24 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
                     ) : (
                         <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
                             {paginatedImages.map(img => (
-                                <div 
+                                <div
                                     key={img.name}
                                     onClick={() => { onSelect(img.url); onClose(); }}
+                                    onMouseEnter={() => setHoveredImage(img)}
+                                    onMouseLeave={() => setHoveredImage(null)}
                                     className={`relative group aspect-square rounded-3xl overflow-hidden border-4 transition-all cursor-pointer hover:shadow-xl ${
                                         currentUrl === img.url ? 'border-blue-500 ring-4 ring-blue-100 scale-95' : 'border-slate-50 hover:border-blue-200'
                                     }`}
                                 >
-                                    <img src={img.url} alt={img.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
-                                        <p className="text-[9px] font-bold text-white truncate uppercase">{img.name}</p>
+                                    <img
+                                        src={img.url}
+                                        alt={img.name}
+                                        className={`w-full h-full object-cover transition-transform duration-500 ${showAllNames ? '' : 'group-hover:scale-110'}`}
+                                    />
+                                    <div className={`absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent transition-opacity duration-150 flex flex-col justify-end p-2 ${
+                                        showAllNames ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                                    }`}>
+                                        <p className="text-[10px] font-bold text-white leading-tight break-all line-clamp-2 select-none">{img.name}</p>
                                     </div>
                                     {currentUrl === img.url && (
                                         <div className="absolute top-2 right-2 bg-blue-500 text-white p-1.5 rounded-full shadow-lg">
@@ -101,6 +133,16 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
                             ))}
                         </div>
                     )}
+                </div>
+
+                <div className="px-8 py-2 border-t bg-white flex items-center gap-3 min-h-[38px] flex-none">
+                    <ImageIcon size={13} className="text-slate-300 flex-none" />
+                    <span className="text-xs font-bold text-slate-600 truncate">
+                        {hoveredImage
+                            ? hoveredImage.name
+                            : <span className="text-slate-300 font-normal">Наведите на фото для просмотра имени файла</span>
+                        }
+                    </span>
                 </div>
 
                 <div className="p-6 border-t bg-slate-50 flex justify-between items-center flex-none">
