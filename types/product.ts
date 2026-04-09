@@ -17,6 +17,7 @@ export interface MachineConfigEntry {
     priceOverrides: Record<string, number>;
     defaultVariantId?: string;
     defaultVariantIds?: string[];
+    baseVariantIds?: string[];   // варианты, включённые в базовую комплектацию станка
 }
 
 export interface Product {

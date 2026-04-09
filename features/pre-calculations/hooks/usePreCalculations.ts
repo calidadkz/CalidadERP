@@ -5,17 +5,21 @@ import { api } from '@/services';
 const DEFAULT_SETTINGS: GeneralSettings = {
     shippingChinaUsdPerM3: 150,
     exchangeRateForShipping: 500,
-    deliveryAlmatyKaragandaKztPerM3: 15000, 
+    deliveryAlmatyKaragandaKztPerM3: 15000,
     svhKzt: 100000,
     brokerKzt: 104000,
     customsFeesKzt: 52000,
     exchangeRateUsd: 500,
     exchangeRateCny: 75,
     ndsRate: 16,
-    kpn20Rate: 0, 
+    kpn20Rate: 0,
     kpn4Rate: 4,
     resaleMarkup: 25,
-    salesBonusRate: 3 
+    salesBonusRate: 3,
+    chinaDomesticRateMethod: 'volume',
+    chinaDomesticRatePerM3Usd: 0,
+    chinaDomesticRatePerTonUsd: 0,
+    chinaDomesticFixedKztPerUnit: 0,
 };
 
 export const usePreCalculations = (id?: string) => {
@@ -56,7 +60,11 @@ export const usePreCalculations = (id?: string) => {
           kpn20Rate: Number(docData.citRateStandard) || 0,
           kpn4Rate: Number(docData.citRateSimplified) || 4,
           resaleMarkup: Number(docData.intercompanyMarkupPercent) || 25,
-          salesBonusRate: Number(docData.salesBonusRate) || 3
+          salesBonusRate: Number(docData.salesBonusRate) || 3,
+          chinaDomesticRateMethod: (docData.chinaDomesticRateMethod as any) || 'volume',
+          chinaDomesticRatePerM3Usd: Number(docData.chinaDomesticRatePerM3Usd) || 0,
+          chinaDomesticRatePerTonUsd: Number(docData.chinaDomesticRatePerTonUsd) || 0,
+          chinaDomesticFixedKztPerUnit: Number(docData.chinaDomesticFixedKztPerUnit) || 0,
       };
 
       const mappedItems: PreCalculationItem[] = itemsData.map((item: any) => ({
@@ -96,6 +104,7 @@ export const usePreCalculations = (id?: string) => {
             return (raw as any)?.breakdown || undefined;
           })(),
           deliveryUrumqiAlmatyKzt: Number(item.deliveryUrumqiAlmatyKzt) || 0,
+          deliveryChinaDomesticKzt: Number(item.deliveryChinaDomesticKzt) || 0,
           deliveryAlmatyKaragandaPerItemKzt: Number(item.logisticsAlmatyKaragandaKzt) || 0,
           svhPerItemKzt: 0,
           brokerPerItemKzt: 0,
@@ -219,7 +228,22 @@ export const usePreCalculations = (id?: string) => {
 
       // Расчет доставки Урумчи–Алматы за единицу товара
       newItem.deliveryUrumqiAlmatyKzt = effectiveVolumePerItem * (Number(generalSettings.shippingChinaUsdPerM3) || 0) * (Number(generalSettings.exchangeRateForShipping) || 0);
-      
+
+      // Расчет доставки по Китаю за единицу товара (3 метода)
+      // Пропускаем если включён ручной ввод для этой позиции
+      if (!newItem.customChinaDomestic) {
+        const method = generalSettings.chinaDomesticRateMethod || 'volume';
+        const shippingRate = Number(generalSettings.exchangeRateForShipping) || 0;
+        if (method === 'volume') {
+          newItem.deliveryChinaDomesticKzt = effectiveVolumePerItem * (Number(generalSettings.chinaDomesticRatePerM3Usd) || 0) * shippingRate;
+        } else if (method === 'weight') {
+          const weightTons = (Number(newItem.weightKg) || 0) / 1000;
+          newItem.deliveryChinaDomesticKzt = weightTons * (Number(generalSettings.chinaDomesticRatePerTonUsd) || 0) * shippingRate;
+        } else {
+          newItem.deliveryChinaDomesticKzt = Number(generalSettings.chinaDomesticFixedKztPerUnit) || 0;
+        }
+      }
+
       // Расчет доставки Алматы-Караганда за единицу товара (цена за м3 * объем товара)
       newItem.deliveryAlmatyKaragandaPerItemKzt = (Number(generalSettings.deliveryAlmatyKaragandaKztPerM3) || 0) * effectiveVolumePerItem;
       
@@ -238,7 +262,7 @@ export const usePreCalculations = (id?: string) => {
       const ndsRate = Number(generalSettings.ndsRate) || 16;
       const revenue = Number(newItem.revenueKzt) || 0;
       
-      newItem.customsNdsKzt = (newItem.purchasePriceKzt + (newItem.deliveryUrumqiAlmatyKzt * 0.6)) * (ndsRate / 100);
+      newItem.customsNdsKzt = (newItem.purchasePriceKzt + ((newItem.deliveryUrumqiAlmatyKzt + newItem.deliveryChinaDomesticKzt) * 0.6)) * (ndsRate / 100);
 
       let totalNds = 0, kpn = 0;
       const inclusiveVatFactor = ndsRate / (100 + ndsRate);
@@ -250,7 +274,7 @@ export const usePreCalculations = (id?: string) => {
       } else {
         totalNds = revenue * inclusiveVatFactor;
         const salesBonus = revenue * (Number(generalSettings.salesBonusRate || 0) / 100);
-        const costsBeforeTax = newItem.purchasePriceKzt + newItem.deliveryUrumqiAlmatyKzt + localLogisticsPerRowKzt + salesBonus;
+        const costsBeforeTax = newItem.purchasePriceKzt + newItem.deliveryUrumqiAlmatyKzt + newItem.deliveryChinaDomesticKzt + localLogisticsPerRowKzt + salesBonus;
         const profitBeforeKPN = (revenue - totalNds) - costsBeforeTax;
         kpn = profitBeforeKPN > 0 ? profitBeforeKPN * (Number(generalSettings.kpn20Rate || 0) / 100) : 0;
       }
@@ -262,8 +286,8 @@ export const usePreCalculations = (id?: string) => {
 
       const otherCostsTotalKzt = (Number(newItem.pnrKzt) || 0) + (Number(newItem.deliveryLocalKzt) || 0);
 
-      newItem.fullCostKzt = newItem.purchasePriceKzt + newItem.totalNdsKzt + newItem.deliveryUrumqiAlmatyKzt + localLogisticsPerRowKzt + newItem.salesBonusKzt + kpn + otherCostsTotalKzt;
-      newItem.preSaleCostKzt = newItem.purchasePriceKzt + (newItem.taxRegime === 'Упр.' ? newItem.totalNdsKzt : newItem.customsNdsKzt) + newItem.deliveryUrumqiAlmatyKzt + localLogisticsPerRowKzt;
+      newItem.fullCostKzt = newItem.purchasePriceKzt + newItem.totalNdsKzt + newItem.deliveryUrumqiAlmatyKzt + newItem.deliveryChinaDomesticKzt + localLogisticsPerRowKzt + newItem.salesBonusKzt + kpn + otherCostsTotalKzt;
+      newItem.preSaleCostKzt = newItem.purchasePriceKzt + (newItem.taxRegime === 'Упр.' ? newItem.totalNdsKzt : newItem.customsNdsKzt) + newItem.deliveryUrumqiAlmatyKzt + newItem.deliveryChinaDomesticKzt + localLogisticsPerRowKzt;
       newItem.profitKzt = revenue - newItem.fullCostKzt;
       newItem.marginPercentage = revenue > 0 ? (newItem.profitKzt / revenue) * 100 : 0;
 
@@ -364,7 +388,11 @@ export const usePreCalculations = (id?: string) => {
           citRateStandard: Number(generalSettings.kpn20Rate) || 0,
           citRateSimplified: Number(generalSettings.kpn4Rate) || 0,
           intercompanyMarkupPercent: Number(generalSettings.resaleMarkup) || 0,
-          salesBonusRate: Number(generalSettings.salesBonusRate) || 0
+          salesBonusRate: Number(generalSettings.salesBonusRate) || 0,
+          chinaDomesticRateMethod: generalSettings.chinaDomesticRateMethod || 'volume',
+          chinaDomesticRatePerM3Usd: Number(generalSettings.chinaDomesticRatePerM3Usd) || 0,
+          chinaDomesticRatePerTonUsd: Number(generalSettings.chinaDomesticRatePerTonUsd) || 0,
+          chinaDomesticFixedKztPerUnit: Number(generalSettings.chinaDomesticFixedKztPerUnit) || 0,
       };
       await api.upsert('pre_calculations', dbDoc, 'id');
 
@@ -401,6 +429,7 @@ export const usePreCalculations = (id?: string) => {
               : (item.options || []),
             purchaseKzt: Number(item.purchasePriceKzt) || 0,
             deliveryUrumqiAlmatyKzt: Number(item.deliveryUrumqiAlmatyKzt) || 0,
+            deliveryChinaDomesticKzt: Number(item.deliveryChinaDomesticKzt) || 0,
             logisticsAlmatyKaragandaKzt: Number(item.deliveryAlmatyKaragandaPerItemKzt) || 0,
             customsNdsKzt: Number(item.customsNdsKzt) || 0,
             totalNdsKzt: Number(item.totalNdsKzt) || 0,

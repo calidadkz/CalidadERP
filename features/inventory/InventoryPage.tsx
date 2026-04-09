@@ -7,6 +7,7 @@ import { useAccess } from '../auth/hooks/useAccess';
 import { ApiService } from '@/services/api';
 import { supabase } from '@/services/supabaseClient';
 import { TableNames } from '@/constants';
+import { CalidadSelect, CalidadSelectOption } from '@/components/ui/CalidadSelect';
 
 import { useInventoryData } from './hooks/useInventoryData';
 import { useInventoryFilters } from './hooks/useInventoryFilters';
@@ -137,7 +138,24 @@ export const InventoryPage: React.FC = () => {
       });
 
       if (sortConfig) {
-          data.sort((a, b) => sortConfig.key === 'name' ? (sortConfig.direction === 'asc' ? (a.name || '').localeCompare(b.name || '') : (b.name || '').localeCompare(a.name || '')) : 0);
+          if (sortConfig.key === 'name') {
+              data.sort((a, b) => sortConfig.direction === 'asc'
+                  ? (a.name || '').localeCompare(b.name || '', 'ru')
+                  : (b.name || '').localeCompare(a.name || '', 'ru'));
+          } else {
+              const getNumericKey = (breakdown: any[]): Record<string, number> => {
+                  let s = 0, v = 0, sv = 0;
+                  for (const b of breakdown) { s += b.stock; v += b.totalValueKzt; sv += b.totalSalesValueKzt; }
+                  return { totalCost: v, unitCost: s > 0 ? v / s : 0, salesPrice: s > 0 ? sv / s : 0, revenue: sv };
+              };
+              data.sort((a, b) => {
+                  const aStats = getNumericKey(getDetailedBreakdown(a.id));
+                  const bStats = getNumericKey(getDetailedBreakdown(b.id));
+                  const aVal = aStats[sortConfig.key] ?? 0;
+                  const bVal = bStats[sortConfig.key] ?? 0;
+                  return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+              });
+          }
       }
       return data;
   }, [products, deferredSearchTerm, sortConfig, activeType, machineFilter, categoryFilter]);
@@ -309,19 +327,21 @@ export const InventoryPage: React.FC = () => {
                         <button onClick={() => { setActiveType(ProductType.PART); setMachineFilter('all'); setCategoryFilter('all'); }} className={`flex items-center gap-2 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${activeType === ProductType.PART ? 'bg-orange-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><Zap size={14}/> Запчасти</button>
                     </div>
                     {activeType === ProductType.PART && (
-                        <div className="w-56">
-                            <select className="w-full bg-white border border-slate-200 py-1.5 px-2.5 rounded-xl text-[11px] font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm" value={machineFilter} onChange={e => { setMachineFilter(e.target.value); setCategoryFilter('all'); }}>
-                                <option value="all">Все оборудование</option>
-                                {machineCategories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-                            </select>
-                        </div>
+                        <CalidadSelect
+                            options={machineCategories.map(c => ({ id: c.id, label: c.name }))}
+                            value={machineFilter === 'all' ? '' : machineFilter}
+                            onChange={v => { setMachineFilter(v || 'all'); setCategoryFilter('all'); }}
+                            nullLabel="Все оборудование"
+                            className="w-52"
+                        />
                     )}
-                    <div className="w-56">
-                        <select className="w-full bg-white border border-slate-200 py-1.5 px-2.5 rounded-xl text-[11px] font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
-                            <option value="all">Все категории</option>
-                            {displayedCategories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-                        </select>
-                    </div>
+                    <CalidadSelect
+                        options={displayedCategories.map(c => ({ id: c.id, label: c.name }))}
+                        value={categoryFilter === 'all' ? '' : categoryFilter}
+                        onChange={v => setCategoryFilter(v || 'all')}
+                        nullLabel="Все категории"
+                        className="w-52"
+                    />
                     <button onClick={() => actions.refreshInventorySummary()} className="p-2 text-slate-400 hover:text-blue-600"><RefreshCw size={16}/></button>
                 </div>
             </div>
@@ -340,11 +360,12 @@ export const InventoryPage: React.FC = () => {
                 />
             )}
 
-            <StockTable 
-                products={processedStockProducts} 
-                getDetailedBreakdown={getDetailedBreakdown} 
-                access={access} 
-                handleSort={handleSort} 
+            <StockTable
+                products={processedStockProducts}
+                getDetailedBreakdown={getDetailedBreakdown}
+                access={access}
+                handleSort={handleSort}
+                sortConfig={sortConfig}
             />
             
             {allFilteredProducts.length > displayLimit && (

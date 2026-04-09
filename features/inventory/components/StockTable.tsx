@@ -1,8 +1,9 @@
 
 import React, { useState, useMemo } from 'react';
 import { Product, ProductType } from '@/types';
-import { ChevronDown, ChevronRight, Cpu, Settings } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, Cpu, Settings } from 'lucide-react';
 import { ImageModal } from '@/components/ui/ImageModal';
+import { InventorySortKey } from '../hooks/useInventoryFilters';
 
 const PriceCell = React.memo(({ value, currency = "KZT", color = "text-slate-700", bg = "" }: { value: number, currency?: string, color?: string, bg?: string }) => {
   const f = (val: number) => Math.round(val).toLocaleString();
@@ -134,10 +135,34 @@ interface StockTableProps {
     products: Product[];
     getDetailedBreakdown: (productId: string) => any[];
     access: any;
-    handleSort: (key: 'name') => void;
+    handleSort: (key: InventorySortKey) => void;
+    sortConfig: { key: InventorySortKey; direction: 'asc' | 'desc' } | null;
 }
 
-export const StockTable: React.FC<StockTableProps> = ({ products, getDetailedBreakdown, access, handleSort }) => {
+const SortTh = ({ label, sortKey, sortConfig, onSort, className = '' }: {
+    label: string;
+    sortKey: InventorySortKey;
+    sortConfig: { key: InventorySortKey; direction: 'asc' | 'desc' } | null;
+    onSort: (key: InventorySortKey) => void;
+    className?: string;
+}) => {
+    const isActive = sortConfig?.key === sortKey;
+    return (
+        <th
+            className={`px-4 py-4 cursor-pointer select-none group transition-colors hover:bg-slate-100/60 ${className}`}
+            onClick={() => onSort(sortKey)}
+        >
+            <div className="flex items-center justify-end gap-1">
+                <span className={isActive ? 'text-blue-600' : ''}>{label}</span>
+                <span className={`transition-opacity ${isActive ? 'opacity-100 text-blue-500' : 'opacity-0 group-hover:opacity-40'}`}>
+                    {isActive && sortConfig?.direction === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                </span>
+            </div>
+        </th>
+    );
+};
+
+export const StockTable: React.FC<StockTableProps> = ({ products, getDetailedBreakdown, access, handleSort, sortConfig }) => {
     const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
     return (
@@ -146,15 +171,24 @@ export const StockTable: React.FC<StockTableProps> = ({ products, getDetailedBre
                 <thead className="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                     <tr>
                         <th className="w-10"></th>
-                        {access.canSee('fields', 'col_model') && <th className="px-6 py-4 text-left cursor-pointer" onClick={() => handleSort('name')}>Модель / Запчасть</th>}
+                        {access.canSee('fields', 'col_model') && (
+                            <th className="px-6 py-4 text-left cursor-pointer select-none group hover:bg-slate-100/60 transition-colors" onClick={() => handleSort('name')}>
+                                <div className="flex items-center gap-1">
+                                    <span className={sortConfig?.key === 'name' ? 'text-blue-600' : ''}>Модель / Запчасть</span>
+                                    <span className={`transition-opacity ${sortConfig?.key === 'name' ? 'opacity-100 text-blue-500' : 'opacity-0 group-hover:opacity-40'}`}>
+                                        {sortConfig?.key === 'name' && sortConfig.direction === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                                    </span>
+                                </div>
+                            </th>
+                        )}
                         {access.canSee('fields', 'col_stock') && <th className="px-4 py-4 text-right w-16">Склад</th>}
                         {access.canSee('fields', 'col_incoming') && <th className="px-4 py-4 text-right w-16 text-orange-600">Путь</th>}
                         {access.canSee('fields', 'col_reserved') && <th className="px-4 py-4 text-right w-16 text-red-500">Резерв</th>}
                         {access.canSee('fields', 'col_free') && <th className="px-4 py-4 text-right w-16 text-blue-700">Свободно</th>}
-                        {access.canSee('fields', 'col_cost') && <th className="px-4 py-4 text-right w-24 bg-blue-50/20">Себест. ед..</th>}
-                        {access.canSee('fields', 'col_total_cost') && <th className="px-4 py-4 text-right bg-blue-100/20">Общая себест.</th>}
-                        {access.canSee('fields', 'col_sales_price') && <th className="px-4 py-4 text-right w-24 bg-emerald-50/20 text-emerald-600">Цена Пр. ед.</th>}
-                        {access.canSee('fields', 'col_revenue') && <th className="px-4 py-4 text-right w-28 bg-emerald-100/20 font-black text-emerald-800">Выручка</th>}
+                        {access.canSee('fields', 'col_cost') && <SortTh label="Себест. ед." sortKey="unitCost" sortConfig={sortConfig} onSort={handleSort} className="text-right w-24 bg-blue-50/20" />}
+                        {access.canSee('fields', 'col_total_cost') && <SortTh label="Себест. общ." sortKey="totalCost" sortConfig={sortConfig} onSort={handleSort} className="text-right bg-blue-100/20" />}
+                        {access.canSee('fields', 'col_sales_price') && <SortTh label="Цена Пр. ед." sortKey="salesPrice" sortConfig={sortConfig} onSort={handleSort} className="text-right w-24 bg-emerald-50/20 text-emerald-600" />}
+                        {access.canSee('fields', 'col_revenue') && <SortTh label="Выручка" sortKey="revenue" sortConfig={sortConfig} onSort={handleSort} className="text-right w-28 bg-emerald-100/20 font-black text-emerald-800" />}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">

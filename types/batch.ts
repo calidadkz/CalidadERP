@@ -67,6 +67,7 @@ export interface BatchExpense {
   paymentId?: string;        // Связь с actual_payments (Выписка) — подтверждает расход
   plannedPaymentId?: string; // Связь с planned_payments (Календарь) — прогноз оплаты
   documentIds?: string[];
+  receptionId?: string;      // Авто-создан из приёмки (Receiving) — источник данных
 }
 
 export interface BatchDocument {

@@ -35,33 +35,34 @@ const Tooltip: React.FC<{ text: string; children: React.ReactNode }> = ({ text, 
     </div>
 );
 
-const COL_WIDTHS = { 
-  name: 400, 
-  manufacturer: 180, 
-  qty: 60, 
-  purchaseTotal: 120, 
-  order: 140, 
-  revenue: 120, 
-  paid: 100, 
-  profit: 100, 
-  margin: 70, 
-  volume: 80, 
-  china: 100, 
-  karaganda: 80, // Изменено с kg
-  svh: 80, 
-  broker: 80, 
-  fees: 80, 
-  regime: 120, 
-  vatTotal: 90, 
-  vatCustoms: 90, 
-  vatDiff: 90, 
-  cit: 90, 
+const COL_WIDTHS = {
+  name: 400,
+  manufacturer: 180,
+  qty: 60,
+  purchaseTotal: 120,
+  order: 140,
+  revenue: 120,
+  paid: 100,
+  profit: 100,
+  margin: 70,
+  volume: 80,
+  china: 100,
+  chinaDom: 120,
+  karaganda: 80,
+  svh: 80,
+  broker: 80,
+  fees: 80,
+  regime: 120,
+  vatTotal: 90,
+  vatCustoms: 90,
+  vatDiff: 90,
+  cit: 90,
   pnr: 110,
   deliveryLocal: 110,
   bonus: 90,
-  costFull: 90, 
-  costPreSale: 90, 
-  actions: 50 
+  costFull: 90,
+  costPreSale: 90,
+  actions: 50
 };
 const TOTAL_TABLE_WIDTH = Object.values(COL_WIDTHS).reduce((sum, w) => sum + w, 0);
 
@@ -137,7 +138,8 @@ export const DetailedList: React.FC<DetailedListProps> = ({ items, preCalculatio
     bonusKzt: syncedItems.reduce((sum, i) => sum + (i.salesBonusKzt || 0), 0),
     volume: syncedItems.reduce((sum, i) => sum + (i.useDimensions ? (i.volumeM3 || 0) * (i.quantity || 1) : 0), 0),
     chinaKzt: syncedItems.reduce((sum, i) => sum + (i.deliveryUrumqiAlmatyKzt || 0), 0),
-    karagandaKzt: syncedItems.reduce((sum, i) => sum + (i.deliveryAlmatyKaragandaPerItemKzt * i.quantity || 0), 0), // Изменено totals.localKzt на totals.karagandaKzt
+    chinaDomKzt: syncedItems.reduce((sum, i) => sum + ((i.deliveryChinaDomesticKzt || 0) * (i.quantity || 1)), 0),
+    karagandaKzt: syncedItems.reduce((sum, i) => sum + (i.deliveryAlmatyKaragandaPerItemKzt * i.quantity || 0), 0),
     svhKzt: syncedItems.reduce((sum, i) => sum + (i.svhPerItemKzt * i.quantity || 0), 0),
     brokerKzt: syncedItems.reduce((sum, i) => sum + (i.brokerPerItemKzt * i.quantity || 0), 0),
     feesKzt: syncedItems.reduce((sum, i) => sum + (i.customsFeesPerItemKzt * i.quantity || 0), 0),
@@ -346,10 +348,10 @@ export const DetailedList: React.FC<DetailedListProps> = ({ items, preCalculatio
           <table className="border-collapse text-left table-fixed w-max" style={{ minWidth: `${TOTAL_TABLE_WIDTH}px` }}>
             <colgroup>{Object.values(COL_WIDTHS).map((w, i) => (<col key={i} style={{width: `${w}px`}}/>))}</colgroup>
             <thead className="sticky top-0 z-40 shadow-sm whitespace-nowrap text-sans">
-              <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 text-[9px] font-bold uppercase tracking-[0.2em]"><th colSpan={4} className="px-4 py-2 border-r border-slate-800 text-center">ТОВАР И ЗАКУП</th><th colSpan={3} className="px-4 py-2 border-r border-slate-800 text-center bg-blue-950/40 text-blue-400/70">ПРОДАЖА</th><th colSpan={2} className="px-4 py-2 border-r border-slate-800 text-center bg-emerald-950/40 text-emerald-400/70">ИТОГИ</th><th colSpan={6} className="px-4 py-2 border-r border-slate-800 text-center bg-amber-950/40 text-amber-400/70">ЛОГИСТИКА</th><th colSpan={5} className="px-4 py-2 border-r border-slate-800 text-center bg-slate-900/60 text-slate-400/70">НАЛОГИ</th><th colSpan={3} className="px-4 py-2 border-r border-slate-800 text-center bg-rose-950/40 text-rose-400/70">ПРОЧИЕ РАСХОДЫ</th><th colSpan={2} className="px-4 py-2 text-center text-slate-400/70">СЕБЕСТОИМОСТЬ</th><th className="bg-slate-950"></th></tr>
-              <tr className="bg-slate-800 text-white/90 border-b border-slate-700 text-[9px] font-bold uppercase tracking-wider"><th className="px-4 py-3">Наименование</th><th className="px-3 py-3 text-center">Производитель</th><th className="px-3 py-3 text-center">Кол</th><th className="px-3 py-3 text-right border-r border-slate-700 bg-slate-700/30">Закуп Всего</th><th className="px-4 py-3">Заказ / Контрагент</th><th className="px-3 py-3 text-right text-blue-200">Выручка</th><th className="px-3 py-3 text-right border-r border-slate-700 bg-blue-800/20 text-blue-200">Оплачено</th><th className="px-3 py-3 text-right text-emerald-300 bg-emerald-800/20">Прибыль</th><th className="px-3 py-3 text-center text-emerald-300 border-r border-slate-700">Р%</th><th className="px-3 py-3 text-center text-amber-200">Объем</th><th className="px-3 py-3 text-right text-amber-200">Урумчи($)</th><th className="px-3 py-3 text-right text-amber-200">Алм.-Кар.</th>
-<th className="px-3 py-3 text-right text-amber-200">СВХ</th><th className="px-3 py-3 text-right text-amber-200">Брок</th><th className="px-3 py-2 text-right border-r border-slate-700 bg-amber-800/20 text-amber-200">Сбор</th><th className="px-3 py-3 text-center">Режим</th><th className="px-3 py-3 text-right">НДС.Ит</th><th className="px-3 py-3 text-right">НДС.Тм</th><th className="px-3 py-3 text-right">Разн</th><th className="px-3 py-3 text-right border-r border-slate-700 bg-slate-700/30">КПН</th><th className="px-3 py-3 text-right text-rose-200 bg-rose-800/20">ПНР</th><th className="px-3 py-3 text-right text-rose-200 bg-rose-800/20">Дост</th><th className="px-3 py-3 text-right border-r border-slate-700 bg-rose-800/20 text-rose-200">Бонус ОП</th><th className="px-3 py-3 text-right font-bold bg-slate-700/30">Полная</th><th className="px-3 py-3 text-right font-bold border-r border-slate-700">Допр</th><th></th></tr>
-              <tr className="bg-white text-slate-900 border-b-2 border-blue-500/50 text-[10px] font-bold font-mono shadow-[0_4px_10px_-4px_rgba(0,0,0,0.1)] sticky top-[72px] z-30"><td className="px-4 py-2.5 text-[8px] uppercase tracking-tighter text-blue-600 bg-blue-50/50">ИТОГО ПО СПИСКУ:</td><td className="px-3 py-2.5 bg-blue-50/50"></td><td className="px-3 py-2.5 text-center bg-blue-50/50 text-slate-700">{totals.qty}</td><td className="px-3 py-2.5 text-right border-r border-slate-200 bg-blue-50/50 text-blue-700">{formatCurrency(totals.purchaseKzt)} ₸</td><td className="px-3 py-2.5 bg-indigo-50/30"></td><td className="px-3 py-2.5 text-right text-blue-600 bg-indigo-50/30">{formatCurrency(totals.revenueKzt)} ₸</td><td className="px-3 py-2.5 text-right border-r border-slate-200 bg-indigo-50/30 text-indigo-500">{formatCurrency(totals.paidKzt)} ₸</td><td className="px-3 py-2.5 text-right text-emerald-600 bg-emerald-50/50">{formatCurrency(totals.profitKzt)} ₸</td><td className="px-3 py-2.5 text-center text-emerald-600 bg-emerald-50/50 border-r border-slate-200">{totals.revenueKzt > 0 ? ((totals.profitKzt / totals.revenueKzt) * 100).toFixed(1) : '0.0'}%</td><td className="px-3 py-2.5 text-right text-amber-600 bg-amber-50/50">{formatNumber(totals.volume, 3)} м³</td><td className="px-3 py-2.5 text-right text-amber-600 bg-amber-50/50">{formatCurrency(totals.chinaKzt)}</td><td className="px-3 py-2.5 text-right text-amber-600 bg-amber-50/50">{formatCurrency(totals.karagandaKzt)}</td><td className="px-3 py-2.5 text-right text-amber-600 bg-amber-50/50">{formatCurrency(totals.svhKzt)}</td><td className="px-3 py-2.5 text-right text-amber-600 bg-amber-50/50">{formatCurrency(totals.brokerKzt)}</td><td className="px-3 py-2.5 text-right border-r border-slate-200 bg-amber-50/50 text-amber-600">{formatCurrency(totals.feesKzt)}</td><td className="px-3 py-2.5"></td><td className="px-3 py-2.5 text-right text-slate-900">{formatCurrency(totals.vatTotalKzt)}</td><td className="px-3 py-2.5 text-right text-slate-400">{formatCurrency(totals.vatCustomsKzt)}</td><td className="px-3 py-2.5 text-right text-amber-700">{formatCurrency(totals.vatTotalKzt - totals.vatCustomsKzt)}</td><td className="px-3 py-2.5 text-right border-r border-slate-200">{formatCurrency(totals.kpnKzt)}</td><td className="px-3 py-2.5 text-right text-rose-700 bg-rose-50/50">{formatCurrency(totals.pnrKzt)}</td><td className="px-3 py-2.5 text-right text-rose-700 bg-rose-50/50">{formatCurrency(totals.deliveryLocalKzt)}</td><td className="px-3 py-2.5 text-right border-r border-slate-200 bg-rose-50/50 text-rose-700">{formatCurrency(totals.bonusKzt)}</td><td className="px-3 py-2.5 text-right font-black text-slate-900 bg-slate-50">{formatCurrency(totals.costFullKzt)}</td><td className="px-3 py-2.5 text-right text-slate-500 border-r border-slate-200 bg-slate-50">{formatCurrency(totals.costPreSaleKzt)}</td><td></td></tr>
+              <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 text-[9px] font-bold uppercase tracking-[0.2em]"><th colSpan={4} className="px-4 py-2 border-r border-slate-800 text-center">ТОВАР И ЗАКУП</th><th colSpan={3} className="px-4 py-2 border-r border-slate-800 text-center bg-blue-950/40 text-blue-400/70">ПРОДАЖА</th><th colSpan={2} className="px-4 py-2 border-r border-slate-800 text-center bg-emerald-950/40 text-emerald-400/70">ИТОГИ</th><th colSpan={7} className="px-4 py-2 border-r border-slate-800 text-center bg-amber-950/40 text-amber-400/70">ЛОГИСТИКА</th><th colSpan={5} className="px-4 py-2 border-r border-slate-800 text-center bg-slate-900/60 text-slate-400/70">НАЛОГИ</th><th colSpan={3} className="px-4 py-2 border-r border-slate-800 text-center bg-rose-950/40 text-rose-400/70">ПРОЧИЕ РАСХОДЫ</th><th colSpan={2} className="px-4 py-2 text-center text-slate-400/70">СЕБЕСТОИМОСТЬ</th><th className="bg-slate-950"></th></tr>
+              <tr className="bg-slate-800 text-white/90 border-b border-slate-700 text-[9px] font-bold uppercase tracking-wider"><th className="px-4 py-3">Наименование</th><th className="px-3 py-3 text-center">Производитель</th><th className="px-3 py-3 text-center">Кол</th><th className="px-3 py-3 text-right border-r border-slate-700 bg-slate-700/30">Закуп Всего</th><th className="px-4 py-3">Заказ / Контрагент</th><th className="px-3 py-3 text-right text-blue-200">Выручка</th><th className="px-3 py-3 text-right border-r border-slate-700 bg-blue-800/20 text-blue-200">Оплачено</th><th className="px-3 py-3 text-right text-emerald-300 bg-emerald-800/20">Прибыль</th><th className="px-3 py-3 text-center text-emerald-300 border-r border-slate-700">Рент%</th><th className="px-3 py-3 text-center text-amber-200">Объем</th><th className="px-3 py-3 text-right text-amber-200">Урум.-Алм.</th><th className="px-3 py-3 text-right text-sky-300">По Китаю</th><th className="px-3 py-3 text-right text-amber-200">Алм.-Кар.</th>
+<th className="px-3 py-3 text-right text-amber-200">СВХ</th><th className="px-3 py-3 text-right text-amber-200">Брок</th><th className="px-3 py-2 text-right border-r border-slate-700 bg-amber-800/20 text-amber-200">Сбор</th><th className="px-3 py-3 text-center">Режим</th><th className="px-3 py-3 text-right">НДС Итог</th><th className="px-3 py-3 text-right">НДС Тамож</th><th className="px-3 py-3 text-right">Разн</th><th className="px-3 py-3 text-right border-r border-slate-700 bg-slate-700/30">КПН</th><th className="px-3 py-3 text-right text-rose-200 bg-rose-800/20">ПНР</th><th className="px-3 py-3 text-right text-rose-200 bg-rose-800/20">Дост</th><th className="px-3 py-3 text-right border-r border-slate-700 bg-rose-800/20 text-rose-200">Бонус ОП</th><th className="px-3 py-3 text-right font-bold bg-slate-700/30">Полная</th><th className="px-3 py-3 text-right font-bold border-r border-slate-700">ДОПРОД</th><th></th></tr>
+              <tr className="bg-white text-slate-900 border-b-2 border-blue-500/50 text-[10px] font-bold font-mono shadow-[0_4px_10px_-4px_rgba(0,0,0,0.1)] sticky top-[72px] z-30"><td className="px-4 py-2.5 text-[8px] uppercase tracking-tighter text-blue-600 bg-blue-50/50">ИТОГО ПО СПИСКУ:</td><td className="px-3 py-2.5 bg-blue-50/50"></td><td className="px-3 py-2.5 text-center bg-blue-50/50 text-slate-700">{totals.qty}</td><td className="px-3 py-2.5 text-right border-r border-slate-200 bg-blue-50/50 text-blue-700">{formatCurrency(totals.purchaseKzt)} ₸</td><td className="px-3 py-2.5 bg-indigo-50/30"></td><td className="px-3 py-2.5 text-right text-blue-600 bg-indigo-50/30">{formatCurrency(totals.revenueKzt)} ₸</td><td className="px-3 py-2.5 text-right border-r border-slate-200 bg-indigo-50/30 text-indigo-500">{formatCurrency(totals.paidKzt)} ₸</td><td className="px-3 py-2.5 text-right text-emerald-600 bg-emerald-50/50">{formatCurrency(totals.profitKzt)} ₸</td><td className="px-3 py-2.5 text-center text-emerald-600 bg-emerald-50/50 border-r border-slate-200">{totals.revenueKzt > 0 ? ((totals.profitKzt / totals.revenueKzt) * 100).toFixed(1) : '0.0'}%</td><td className="px-3 py-2.5 text-right text-amber-600 bg-amber-50/50">{formatNumber(totals.volume, 3)} м³</td><td className="px-3 py-2.5 text-right text-amber-600 bg-amber-50/50">{formatCurrency(totals.chinaKzt)}</td><td className="px-3 py-2.5 text-right text-sky-600 bg-sky-50/50">{formatCurrency(totals.chinaDomKzt)}</td><td className="px-3 py-2.5 text-right text-amber-600 bg-amber-50/50">{formatCurrency(totals.karagandaKzt)}</td><td className="px-3 py-2.5 text-right text-amber-600 bg-amber-50/50">{formatCurrency(totals.svhKzt)}</td><td className="px-3 py-2.5 text-right text-amber-600 bg-amber-50/50">{formatCurrency(totals.brokerKzt)}</td><td className="px-3 py-2.5 text-right border-r border-slate-200 bg-amber-50/50 text-amber-600">{formatCurrency(totals.feesKzt)}</td><td className="px-3 py-2.5"></td><td className="px-3 py-2.5 text-right text-slate-900">{formatCurrency(totals.vatTotalKzt)}</td><td className="px-3 py-2.5 text-right text-slate-400">{formatCurrency(totals.vatCustomsKzt)}</td><td className="px-3 py-2.5 text-right text-amber-700">{formatCurrency(totals.vatTotalKzt - totals.vatCustomsKzt)}</td><td className="px-3 py-2.5 text-right border-r border-slate-200">{formatCurrency(totals.kpnKzt)}</td><td className="px-3 py-2.5 text-right text-rose-700 bg-rose-50/50">{formatCurrency(totals.pnrKzt)}</td><td className="px-3 py-2.5 text-right text-rose-700 bg-rose-50/50">{formatCurrency(totals.deliveryLocalKzt)}</td><td className="px-3 py-2.5 text-right border-r border-slate-200 bg-rose-50/50 text-rose-700">{formatCurrency(totals.bonusKzt)}</td><td className="px-3 py-2.5 text-right font-black text-slate-900 bg-slate-50">{formatCurrency(totals.costFullKzt)}</td><td className="px-3 py-2.5 text-right text-slate-500 border-r border-slate-200 bg-slate-50">{formatCurrency(totals.costPreSaleKzt)}</td><td></td></tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700 font-sans">
               {syncedItems.map((item) => {
@@ -449,6 +451,30 @@ export const DetailedList: React.FC<DetailedListProps> = ({ items, preCalculatio
                   <td className="px-3 py-2 align-middle text-center bg-emerald-50/10 font-mono border-r border-slate-200"><span className="text-[11px] font-bold text-emerald-700">{item.marginPercentage?.toFixed(1)}%</span></td>
                   <td className="px-3 py-2 align-middle text-right font-mono"><div className="flex items-center justify-end gap-1.5"><span className="text-slate-700 font-bold text-[11px]">{formatNumber(item.volumeM3 * item.quantity, 3)}</span><input type="checkbox" checked={item.useDimensions} onChange={(e) => onUpdateItem(item.id, 'useDimensions', e.target.checked)} className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 cursor-pointer focus:ring-0 shadow-sm transition-all"/></div></td>
                   <td className="px-3 py-2 align-middle text-right font-mono text-slate-700 font-bold">{formatCurrency(item.deliveryUrumqiAlmatyKzt * item.quantity)}</td>
+                  <td className="px-2 py-2 align-middle">
+                    <div className="flex flex-col gap-0.5">
+                      {item.customChinaDomestic ? (
+                        <input
+                          type="number"
+                          value={item.deliveryChinaDomesticKzt || 0}
+                          onChange={e => onUpdateItem(item.id, 'deliveryChinaDomesticKzt', parseFloat(e.target.value) || 0)}
+                          className="w-full bg-sky-50 border border-sky-300 rounded-lg px-2 py-1 text-[11px] font-bold text-sky-700 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/20 transition-all font-mono text-right"
+                          placeholder="0"
+                        />
+                      ) : (
+                        <span className="text-right font-mono text-sky-700 font-bold text-[11px] pr-1 block">{formatCurrency((item.deliveryChinaDomesticKzt || 0) * item.quantity)}</span>
+                      )}
+                      <label className="flex items-center gap-1 cursor-pointer self-end" title="Свой расчёт доставки по Китаю">
+                        <input
+                          type="checkbox"
+                          checked={!!item.customChinaDomestic}
+                          onChange={e => onUpdateItem(item.id, 'customChinaDomestic', e.target.checked)}
+                          className="w-3 h-3 rounded border-sky-300 text-sky-600 cursor-pointer focus:ring-0 accent-sky-600"
+                        />
+                        <span className="text-[8px] font-bold text-sky-400 uppercase tracking-wide">свой</span>
+                      </label>
+                    </div>
+                  </td>
                   <td className="px-3 py-2 align-middle text-right font-mono text-slate-700 font-bold">{formatCurrency(item.deliveryAlmatyKaragandaPerItemKzt * item.quantity)}</td>
                   <td className="px-3 py-2 align-middle text-right font-mono text-slate-700 font-bold">{formatCurrency(item.svhPerItemKzt * item.quantity)}</td>
                   <td className="px-3 py-2 align-middle text-right font-mono text-slate-700 font-bold">{formatCurrency(item.brokerPerItemKzt * item.quantity)}</td>

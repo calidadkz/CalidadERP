@@ -1,20 +1,21 @@
 
 import React from 'react';
-import { PlannedPayment, CashFlowItem, Counterparty } from '@/types';
+import { PlannedPayment, Counterparty } from '@/types';
 import { Trash2, ArrowRight } from 'lucide-react';
+import { CashFlowSelector } from '@/components/ui/CashFlowSelector';
 
 interface SalesPaymentsTabProps {
     unallocatedAmount: number;
     formPayments: Partial<PlannedPayment>[];
     setFormPayments: React.Dispatch<React.SetStateAction<Partial<PlannedPayment>[]>>;
     handleAddPaymentStep: () => void;
-    cashFlowItems: CashFlowItem[];
+    cashFlowItems?: any; // оставлен для совместимости, не используется
     isFormWriteable: boolean;
-    intermediaries?: Counterparty[]; // Посредники (Kaspi Bank и т.д.)
+    intermediaries?: Counterparty[];
 }
 
 export const SalesPaymentsTab: React.FC<SalesPaymentsTabProps> = ({
-    unallocatedAmount, formPayments, setFormPayments, handleAddPaymentStep, cashFlowItems, isFormWriteable, intermediaries = []
+    unallocatedAmount, formPayments, setFormPayments, handleAddPaymentStep, isFormWriteable, intermediaries = []
 }) => {
     const f = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
@@ -67,17 +68,13 @@ export const SalesPaymentsTab: React.FC<SalesPaymentsTabProps> = ({
                                     />
                                 </td>
                                 <td className="px-6 py-3">
-                                    <select
-                                        className="w-full border-none bg-slate-50 p-1.5 rounded-lg font-bold text-slate-700 outline-none text-xs disabled:opacity-70"
+                                    <CashFlowSelector
                                         value={p.cashFlowItemId || ''}
-                                        onChange={e => updatePayment(idx, 'cashFlowItemId', e.target.value)}
+                                        onChange={id => updatePayment(idx, 'cashFlowItemId', id)}
+                                        direction="Incoming"
                                         disabled={!isFormWriteable}
-                                    >
-                                        <option value="">-- Выбрать статью --</option>
-                                        {cashFlowItems.filter(i => i.type === 'Income').sort((a, b) => a.name.localeCompare(b.name)).map(item => (
-                                            <option key={item.id} value={item.id}>{item.name}</option>
-                                        ))}
-                                    </select>
+                                        dropdownMinWidth={240}
+                                    />
                                 </td>
                                 <td className="px-6 py-3">
                                     <input

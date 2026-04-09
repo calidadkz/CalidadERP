@@ -1,20 +1,21 @@
 import React from 'react';
-import { GeneralSettings as GeneralSettingsType } from '@/types/pre-calculations';
-import { 
-  Truck, 
-  Globe, 
-  Banknote, 
-  Percent, 
-  Zap, 
-  BarChart3, 
-  DollarSign, 
+import { GeneralSettings as GeneralSettingsType, ChinaDomesticRateMethod } from '@/types/pre-calculations';
+import {
+  Truck,
+  Globe,
+  Banknote,
+  Percent,
+  Zap,
+  BarChart3,
+  DollarSign,
   ShieldAlert,
   Target,
   GanttChartSquare,
   ArrowRightLeft,
   Briefcase,
   Coins,
-  Info
+  Info,
+  Package
 } from 'lucide-react';
 
 interface GeneralSettingsProps {
@@ -65,52 +66,111 @@ const SettingsCard = ({ title, icon: Icon, children, colorClass = "text-blue-500
 export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, onSettingChange }) => {
   return (
     <div className="max-w-full mx-auto px-4 py-2 animate-in fade-in duration-500 overflow-y-auto max-h-[calc(100vh-140px)] custom-scrollbar">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+
         {/* Logistics & Customs */}
         <SettingsCard title="Логистика" icon={Truck} colorClass="text-blue-500">
-          <SettingRow 
+          <SettingRow
             label="Доставка Урумчи–Алматы (за м³)"
-            icon={Globe} 
-            value={settings.shippingChinaUsdPerM3} 
+            icon={Globe}
+            value={settings.shippingChinaUsdPerM3}
             onChange={(v: number) => onSettingChange('shippingChinaUsdPerM3', v)}
-            unit="$" 
+            unit="$"
           />
-          <SettingRow 
-            label="Курс логистики" 
-            icon={ArrowRightLeft} 
-            value={settings.exchangeRateForShipping} 
+          <SettingRow
+            label="Курс логистики"
+            icon={ArrowRightLeft}
+            value={settings.exchangeRateForShipping}
             onChange={(v: number) => onSettingChange('exchangeRateForShipping', v)}
-            unit="₸" 
+            unit="₸"
           />
-          <SettingRow 
-            label="Доставка Алматы–Караганда (за м³)"
-            icon={Truck} 
-            value={settings.deliveryAlmatyKaragandaKztPerM3} // Изменено поле
-            onChange={(v: number) => onSettingChange('deliveryAlmatyKaragandaKztPerM3', v)} // Изменен ключ
-            unit="₸ / м³" // Изменены единицы измерения
+          <SettingRow
+            label="Доставка Алматы–Кар. (за м³)"
+            icon={Truck}
+            value={settings.deliveryAlmatyKaragandaKztPerM3}
+            onChange={(v: number) => onSettingChange('deliveryAlmatyKaragandaKztPerM3', v)}
+            unit="₸/м³"
           />
-          <SettingRow 
-            label="СВХ" 
-            icon={Briefcase} 
-            value={settings.svhKzt} 
+          <SettingRow
+            label="СВХ"
+            icon={Briefcase}
+            value={settings.svhKzt}
             onChange={(v: number) => onSettingChange('svhKzt', v)}
-            unit="₸" 
+            unit="₸"
           />
-          <SettingRow 
-            label="Брокер" 
-            icon={Briefcase} 
-            value={settings.brokerKzt} 
+          <SettingRow
+            label="Брокер"
+            icon={Briefcase}
+            value={settings.brokerKzt}
             onChange={(v: number) => onSettingChange('brokerKzt', v)}
-            unit="₸" 
+            unit="₸"
           />
-          <SettingRow 
-            label="Тамож. сборы" 
-            icon={ArrowRightLeft} 
-            value={settings.customsFeesKzt} 
+          <SettingRow
+            label="Тамож. сборы"
+            icon={ArrowRightLeft}
+            value={settings.customsFeesKzt}
             onChange={(v: number) => onSettingChange('customsFeesKzt', v)}
-            unit="₸" 
+            unit="₸"
           />
+        </SettingsCard>
+
+        {/* China domestic delivery */}
+        <SettingsCard title="Доставка по Китаю" icon={Package} colorClass="text-sky-500">
+          <div className="flex flex-col gap-1.5 py-2 border-b border-slate-50 px-2">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Метод расчёта</span>
+            <div className="flex gap-1.5">
+              {([
+                { value: 'volume', label: 'Объём' },
+                { value: 'weight', label: 'Вес' },
+                { value: 'fixed',  label: 'Фикс.' },
+              ] as { value: ChinaDomesticRateMethod; label: string }[]).map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => onSettingChange('chinaDomesticRateMethod', opt.value as any)}
+                  className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all border ${
+                    settings.chinaDomesticRateMethod === opt.value
+                      ? 'bg-sky-600 text-white border-sky-600 shadow-md'
+                      : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-sky-300 hover:text-sky-600'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {settings.chinaDomesticRateMethod === 'volume' && (
+            <SettingRow
+              label="Рейт за м³"
+              icon={Package}
+              value={settings.chinaDomesticRatePerM3Usd}
+              onChange={(v: number) => onSettingChange('chinaDomesticRatePerM3Usd', v)}
+              unit="$"
+            />
+          )}
+          {settings.chinaDomesticRateMethod === 'weight' && (
+            <SettingRow
+              label="Рейт за тонну"
+              icon={Package}
+              value={settings.chinaDomesticRatePerTonUsd}
+              onChange={(v: number) => onSettingChange('chinaDomesticRatePerTonUsd', v)}
+              unit="$"
+            />
+          )}
+          {settings.chinaDomesticRateMethod === 'fixed' && (
+            <SettingRow
+              label="Цена за ед."
+              icon={Package}
+              value={settings.chinaDomesticFixedKztPerUnit}
+              onChange={(v: number) => onSettingChange('chinaDomesticFixedKztPerUnit', v)}
+              unit="₸"
+            />
+          )}
+          <div className="px-2 pt-1 pb-1">
+            <p className="text-[9px] text-slate-400 leading-relaxed">
+              Курс пересчёта — тот же что у Урумчи–Алматы.<br/>
+              Включается в себестоимость и НДС (таможня).
+            </p>
+          </div>
         </SettingsCard>
 
         {/* Financial Rates */}

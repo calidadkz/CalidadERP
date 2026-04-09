@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { PlannedPayment, Currency, CashFlowCategory } from '@/types';
 import { Plus, X, AlertCircle } from 'lucide-react';
+import { CashFlowSelector } from '@/components/ui/CashFlowSelector';
 import { useStore } from '@/features/system/context/GlobalStore';
 import { ApiService } from '@/services/api';
 
@@ -19,6 +20,17 @@ export const ManualPlanModal: React.FC<ManualPlanModalProps> = ({ onClose, onSub
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [cfId, setCfId] = useState('');
     const [error, setError] = useState<string | null>(null);
+
+    // Приоритетные статьи выбранного контрагента
+    const selectedCp = useMemo(() => state.counterparties.find(x => x.id === cpId), [cpId, state.counterparties]);
+    const priorityItemIds = selectedCp?.cashFlowItemIds || [];
+
+    // Автовыбор первой приоритетной статьи при смене контрагента
+    useEffect(() => {
+        if (priorityItemIds.length > 0) {
+            setCfId(priorityItemIds[0]);
+        }
+    }, [cpId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleSubmit = () => {
         setError(null);
@@ -87,18 +99,20 @@ export const ManualPlanModal: React.FC<ManualPlanModalProps> = ({ onClose, onSub
                                 </select>
                             </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Дата платежа</label>
-                                <input type="date" className="w-full border border-slate-200 p-3 rounded-xl text-xs font-bold outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" value={date} onChange={e => setDate(e.target.value)}/>
-                            </div>
-                            <div>
-                                <label className="block text-[9px] font-black text-blue-500 uppercase mb-1.5 ml-1 tracking-widest flex items-center gap-1">Статья ДДС <span className="text-red-500">*</span></label>
-                                <select className="w-full border border-blue-100 p-3 rounded-xl text-[10px] font-black bg-blue-50/30 text-blue-700 outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" value={cfId} onChange={e => setCfId(e.target.value)}>
-                                    <option value="">-- ВЫБЕРИТЕ СТАТЬЮ --</option>
-                                    {state.cashFlowItems.filter(i => i.type === (direction === 'Outgoing' ? 'Expense' : 'Income')).map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-                                </select>
-                            </div>
+                        <div>
+                            <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Дата платежа</label>
+                            <input type="date" className="w-full border border-slate-200 p-3 rounded-xl text-xs font-bold outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" value={date} onChange={e => setDate(e.target.value)}/>
+                        </div>
+                        <div>
+                            <label className="block text-[9px] font-black text-blue-500 uppercase mb-1.5 ml-1 tracking-widest flex items-center gap-1">Статья ДДС <span className="text-red-500">*</span></label>
+                            <CashFlowSelector
+                                value={cfId}
+                                onChange={setCfId}
+                                direction={direction}
+                                placeholder="— Выберите статью —"
+                                dropdownMinWidth={320}
+                                priorityItemIds={priorityItemIds}
+                            />
                         </div>
                     </div>
                     <button onClick={handleSubmit} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all active:scale-95 mt-4">Добавить в календарь</button>

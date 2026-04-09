@@ -1,17 +1,31 @@
 import React, { useState } from 'react';
-import { Layers, ArrowLeft, TrendingUp, TrendingDown, DollarSign, Calendar, Tag, ChevronRight, FileText, PlusCircle, CheckCircle2, MoreVertical, Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import {
+    ArrowLeft, CheckCircle2, Loader2, AlertTriangle,
+    DollarSign, TrendingUp, TrendingDown, BarChart3, FileText, Layers
+} from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useBatches } from './hooks/useBatches';
-import { BatchEconomyTab } from './components/BatchEconomyTab';
+import { BatchMainListTab } from './components/BatchMainListTab';
 import { BatchExpensesTab } from './components/BatchExpensesTab';
+import { BatchComparisonTab } from './components/BatchComparisonTab';
 import { BatchDocumentsTab } from './components/BatchDocumentsTab';
+import { BatchSidebar, SidebarContext } from './components/BatchSidebar';
 
-type TabType = 'ECONOMY' | 'EXPENSES' | 'DOCUMENTS';
+type TabType = 'LIST' | 'EXPENSES' | 'COMPARISON' | 'DOCUMENTS';
+
+const fmtShort = (v?: number) => {
+    if (!v && v !== 0) return '—';
+    const abs = Math.abs(v);
+    if (abs >= 1_000_000) return (v / 1_000_000).toFixed(1) + ' млн ₸';
+    if (abs >= 1_000) return (v / 1_000).toFixed(0) + ' тыс ₸';
+    return v.toLocaleString('ru-RU', { maximumFractionDigits: 0 }) + ' ₸';
+};
 
 export const BatchDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<TabType>('ECONOMY');
+    const [activeTab, setActiveTab] = useState<TabType>('LIST');
+    const [sidebarCtx, setSidebarCtx] = useState<SidebarContext>({ type: 'summary' });
 
     const {
         batch,
@@ -19,6 +33,7 @@ export const BatchDetailPage: React.FC = () => {
         expenses,
         documents,
         itemActuals,
+        receptions,
         plannedPayments,
         actualPayments,
         isLoading,
@@ -26,11 +41,18 @@ export const BatchDetailPage: React.FC = () => {
         addExpense,
         deleteExpense,
         uploadDocument,
-        deleteDocument
+        deleteDocument,
     } = useBatches(id);
 
-    const formatCurrency = (val?: number) => 
-        (val || 0).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' ₸';
+    const handleColumnClick = (ctx: SidebarContext) => {
+        setSidebarCtx(ctx);
+    };
+
+    const closeSidebar = () => {
+        setSidebarCtx({ type: 'summary' });
+    };
+
+    // ── Loading / Error states ────────────────────────────────────────────────
 
     if (isLoading && !batch) {
         return (
@@ -48,143 +70,182 @@ export const BatchDetailPage: React.FC = () => {
                     <AlertTriangle size={40} />
                 </div>
                 <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-2">Партия не найдена</h2>
-                <button onClick={() => navigate('/batches')} className="text-indigo-600 font-black uppercase text-[10px] tracking-widest hover:underline">Вернуться к списку</button>
+                <button onClick={() => navigate('/batches')} className="text-indigo-600 font-black uppercase text-[10px] tracking-widest hover:underline">
+                    Вернуться к списку
+                </button>
             </div>
         );
     }
 
-    const renderTabContent = () => {
-        switch (activeTab) {
-            case 'ECONOMY':
-                return preCalculation ? <BatchEconomyTab preCalculation={preCalculation} itemActuals={itemActuals} /> : null;
-            case 'EXPENSES':
-                return <BatchExpensesTab expenses={expenses} plannedPayments={plannedPayments} actualPayments={actualPayments} onAddExpense={addExpense} onDeleteExpense={deleteExpense} />;
-            case 'DOCUMENTS':
-                return <BatchDocumentsTab documents={documents} onUpload={uploadDocument} onDelete={deleteDocument} />;
-            default:
-                return null;
-        }
-    };
+    const profitPositive = (stats?.actualProfit ?? 0) >= 0;
+    const profitDiffPositive = (stats?.profitDiffPercent ?? 0) >= 0;
 
     return (
-        <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500">
-            {/* Action Bar */}
-            <div className="flex justify-between items-center bg-white px-8 py-5 rounded-[2.5rem] border border-slate-200 shadow-sm flex-none">
+        <div className="h-full flex flex-col gap-4 animate-in fade-in duration-300">
+
+            {/* ── Action Bar ───────────────────────────────────────────── */}
+            <div className="flex justify-between items-center bg-white px-6 py-4 rounded-[2rem] border border-slate-200 shadow-sm flex-none">
                 <div className="flex items-center gap-4">
-                    <button 
+                    <button
                         onClick={() => navigate('/batches')}
-                        className="p-3 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-all active:scale-95"
+                        className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all active:scale-95"
                     >
-                        <ArrowLeft size={20} />
+                        <ArrowLeft size={18} />
                     </button>
                     <div>
-                        <div className="flex items-center gap-2 group">
-                            <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight">{batch?.name}</h1>
-                            {batch?.status === 'completed' && <CheckCircle2 size={16} className="text-emerald-500" />}
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-lg font-black text-slate-900 uppercase tracking-tight">{batch?.name}</h1>
+                            {batch?.status === 'completed' && <CheckCircle2 size={14} className="text-emerald-500" />}
                         </div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                            Основание: Предрасчет от {batch?.date ? new Date(batch.date).toLocaleDateString() : '—'}
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                            Основание: предрасчёт от {batch?.date ? new Date(batch.date).toLocaleDateString('ru-RU') : '—'}
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <nav className="flex gap-1 bg-slate-100 p-1.5 rounded-2xl mr-4" aria-label="Tabs">
-                        <button 
-                            onClick={() => setActiveTab('ECONOMY')}
-                            className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'ECONOMY' ? 'bg-white shadow text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                            Экономика
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('EXPENSES')}
-                            className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'EXPENSES' ? 'bg-white shadow text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                            Расходы
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('DOCUMENTS')}
-                            className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'DOCUMENTS' ? 'bg-white shadow text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                            Документы
-                        </button>
+                <div className="flex items-center gap-3">
+                    {/* Навигация по вкладкам */}
+                    <nav className="flex gap-1 bg-slate-100 p-1 rounded-xl" aria-label="Tabs">
+                        {([
+                            { id: 'LIST', label: 'Позиции', icon: Layers },
+                            { id: 'EXPENSES', label: 'Расходы', icon: DollarSign },
+                            { id: 'COMPARISON', label: 'Сравнение', icon: BarChart3 },
+                            { id: 'DOCUMENTS', label: 'Документы', icon: FileText },
+                        ] as const).map(tab => {
+                            const Icon = tab.icon;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`flex items-center gap-1.5 px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                                        activeTab === tab.id
+                                            ? 'bg-white shadow text-blue-600'
+                                            : 'text-slate-400 hover:text-slate-600'
+                                    }`}
+                                >
+                                    <Icon size={12} />
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
                     </nav>
-                    <button className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-900/20">
-                        Завершить партию
+
+                    <button className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-black uppercase text-[9px] tracking-widest hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-900/20">
+                        <CheckCircle2 size={14}/> Завершить партию
                     </button>
                 </div>
             </div>
 
-            {/* Content Area */}
-            <div className="flex-1 overflow-hidden flex gap-6">
-                {/* Main Tab View */}
-                <div className="flex-[3] bg-white rounded-[3rem] border border-slate-200 shadow-xl overflow-hidden flex flex-col p-8">
-                    {renderTabContent()}
-                </div>
+            {/* ── KPI Bar ──────────────────────────────────────────────── */}
+            <div className="grid grid-cols-4 gap-3 flex-none">
+                <KpiCard
+                    label="Выручка (факт)"
+                    value={fmtShort(stats?.actualRevenue)}
+                    sub={`план: ${fmtShort(stats?.plannedRevenue)}`}
+                    progress={stats?.revenueProgress}
+                    color="text-emerald-600"
+                />
+                <KpiCard
+                    label="Расходы (факт)"
+                    value={fmtShort(stats?.totalActualExpenses)}
+                    sub={`план: ${fmtShort(stats?.plannedExpenses)}`}
+                    color="text-amber-600"
+                />
+                <KpiCard
+                    label="Прибыль (факт)"
+                    value={fmtShort(stats?.actualProfit)}
+                    sub={stats?.profitDiffPercent != null
+                        ? `${profitDiffPositive ? '+' : ''}${stats.profitDiffPercent.toFixed(1)}% от прогноза`
+                        : `план: ${fmtShort(stats?.plannedProfit)}`}
+                    color={profitPositive ? 'text-blue-600' : 'text-red-500'}
+                />
+                <KpiCard
+                    label="Позиций"
+                    value={`${preCalculation?.items.length ?? 0} шт.`}
+                    sub={`${receptions.length} приёмок · ${expenses.length} расходов`}
+                    color="text-slate-700"
+                />
+            </div>
 
-                {/* Right Side: Dashboard Stats */}
-                <div className="flex-1 flex flex-col gap-6">
-                    {/* Actual Profit Card */}
-                    <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-slate-900/40 border border-slate-800 relative overflow-hidden group">
-                        <div className="absolute -right-6 -top-6 w-32 h-32 bg-blue-600/10 rounded-full blur-3xl group-hover:bg-blue-600/20 transition-all" />
-                        <div className="relative z-10">
-                            <div className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
-                                <DollarSign size={12} className="text-blue-500" /> Итоговая прибыль (Фактич.)
-                            </div>
-                            <div className="text-4xl font-black tabular-nums tracking-tighter mb-2 text-blue-400">
-                                {formatCurrency(stats?.actualProfit).replace(' ₸', '')} <span className="text-lg opacity-40">₸</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
-                                <span className={`flex items-center gap-1 ${stats?.profitDiffPercent && stats.profitDiffPercent >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                                    {stats?.profitDiffPercent && stats.profitDiffPercent >= 0 ? <TrendingUp size={12}/> : <TrendingDown size={12}/>}
-                                    {stats?.profitDiffPercent?.toFixed(1)}%
-                                </span>
-                                <span className="text-slate-600">от прогноза</span>
+            {/* ── Основная область: контент + сайдбар ─────────────────── */}
+            <div className="flex-1 min-h-0 flex gap-4">
+                {/* Контент вкладки */}
+                <div className="flex-1 min-w-0 bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden flex flex-col p-6">
+                    {activeTab === 'LIST' && preCalculation && (
+                        <BatchMainListTab
+                            preCalculation={preCalculation}
+                            itemActuals={itemActuals}
+                            expenses={expenses}
+                            onColumnHeaderClick={handleColumnClick}
+                        />
+                    )}
+                    {activeTab === 'EXPENSES' && (
+                        <BatchExpensesTab
+                            expenses={expenses}
+                            onDeleteExpense={deleteExpense}
+                            onOpenSidebar={handleColumnClick}
+                        />
+                    )}
+                    {activeTab === 'COMPARISON' && preCalculation && (
+                        <BatchComparisonTab
+                            preCalculation={preCalculation}
+                            itemActuals={itemActuals}
+                            expenses={expenses}
+                        />
+                    )}
+                    {activeTab === 'DOCUMENTS' && (
+                        <BatchDocumentsTab
+                            documents={documents}
+                            onUpload={uploadDocument}
+                            onDelete={deleteDocument}
+                        />
+                    )}
+                    {!preCalculation && (activeTab === 'LIST' || activeTab === 'COMPARISON') && (
+                        <div className="flex-1 flex items-center justify-center text-slate-300">
+                            <div className="text-center">
+                                <Layers size={48} className="mx-auto mb-3 opacity-30" />
+                                <p className="text-[10px] font-black uppercase tracking-widest">Предрасчёт не найден</p>
                             </div>
                         </div>
-                    </div>
-
-                    {/* Expenses breakdown */}
-                    <div className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-xl flex-1 flex flex-col">
-                         <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
-                            <Tag size={12} className="text-amber-500" /> Расходы по статьям
-                         </div>
-                         <div className="space-y-4 flex-1 overflow-auto custom-scrollbar pr-2">
-                             {[
-                                { key: 'logistics_urumqi_almaty', label: 'Урумчи–Алматы' },
-                                { key: 'logistics_almaty_karaganda', label: 'Алматы–Кар.' },
-                                { key: 'logistics_china_domestic', label: 'По Китаю' },
-                                { key: 'customs', label: 'Таможня' },
-                                { key: 'customs_vat', label: 'НДС Там.' },
-                                { key: 'broker', label: 'Брокер' },
-                                { key: 'svh', label: 'СВХ' },
-                                { key: 'pnr', label: 'ПНР' },
-                                { key: 'delivery_local', label: 'До клиента' }
-                             ].map((item) => {
-                                const amount = stats?.expensesByCategory?.[item.key] || 0;
-                                const percentage = stats?.totalActualExpenses && stats.totalActualExpenses > 0 
-                                    ? (amount / stats.totalActualExpenses) * 100 
-                                    : 0;
-
-                                return (
-                                    <div key={item.key} className="flex flex-col gap-1.5 p-1">
-                                        <div className="flex justify-between items-end">
-                                            <span className="text-[10px] font-black uppercase text-slate-700 tracking-tighter">{item.label}</span>
-                                            <span className="text-[10px] font-bold text-slate-500 tabular-nums">{formatCurrency(amount)}</span>
-                                        </div>
-                                        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                            <div 
-                                                className="h-full bg-amber-400 rounded-full transition-all duration-1000" 
-                                                style={{ width: `${percentage}%` }} 
-                                            />
-                                        </div>
-                                    </div>
-                                );
-                             })}
-                         </div>
-                    </div>
+                    )}
                 </div>
+
+                {/* Сайдбар — всегда видим */}
+                <BatchSidebar
+                    context={sidebarCtx}
+                    onClose={closeSidebar}
+                    stats={stats}
+                    expenses={expenses}
+                    receptions={receptions}
+                    plannedPayments={plannedPayments}
+                    actualPayments={actualPayments}
+                    onAddExpense={addExpense}
+                />
             </div>
         </div>
     );
 };
+
+// ── KPI карточка ─────────────────────────────────────────────────────────────
+
+const KpiCard: React.FC<{
+    label: string;
+    value: string;
+    sub: string;
+    color: string;
+    progress?: number;
+}> = ({ label, value, sub, color, progress }) => (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4">
+        <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">{label}</div>
+        <div className={`text-xl font-black tabular-nums tracking-tighter ${color}`}>{value}</div>
+        <div className="text-[9px] font-bold text-slate-400 mt-1">{sub}</div>
+        {progress != null && (
+            <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                    className="h-full bg-emerald-400 rounded-full transition-all duration-700"
+                    style={{ width: `${Math.min(100, progress)}%` }}
+                />
+            </div>
+        )}
+    </div>
+);

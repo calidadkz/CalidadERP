@@ -13,10 +13,39 @@ export interface StockMovement {
     salesPriceKzt?: number;
     totalSalesPriceKzt?: number;
     statusType: MovementStatus;
-    documentType: 'Order' | 'SalesOrder' | 'Reception' | 'Shipment' | 'Adjustment';
+    documentType: 'Order' | 'SalesOrder' | 'Reception' | 'Shipment' | 'Adjustment' | 'WriteOff';
     documentId: string;
     description?: string;
     configuration?: string[];
+}
+
+export interface WriteOffReasonType {
+    id: string;
+    name: string;
+    color: string;
+    sortOrder: number;
+    createdAt?: string;
+}
+
+export interface WriteOffDocument {
+    name: string;
+    url: string;
+    uploadedAt: string;
+}
+
+export interface WriteOff {
+    id: string;
+    date: string;
+    productId: string;
+    productName: string;
+    sku: string;
+    quantity: number;
+    unitCostKzt: number;
+    reasonNote?: string;
+    reasonTypeId?: string;
+    documents: WriteOffDocument[];
+    movementId?: string;
+    createdAt?: string;
 }
 
 export interface Reception {
@@ -29,6 +58,7 @@ export interface Reception {
     expenses: ReceptionExpense[];
     status: 'Draft' | 'Posted';
     closeOrder?: boolean;
+    batchId?: string; // связь с партией — расходы приёмки автоматически синхронизируются в BatchExpense
 }
 
 export interface ReceptionItem {

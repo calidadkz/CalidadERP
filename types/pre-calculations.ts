@@ -1,18 +1,26 @@
 
+export type ChinaDomesticRateMethod = 'volume' | 'weight' | 'fixed';
+
 export interface GeneralSettings {
   shippingChinaUsdPerM3: number;
   exchangeRateForShipping: number;
-  deliveryAlmatyKaragandaKztPerM3: number; // Изменено с deliveryAlmatyKaragandaKzt
+  deliveryAlmatyKaragandaKztPerM3: number;
   svhKzt: number;
   brokerKzt: number;
   customsFeesKzt: number;
-  exchangeRateUsd: number; 
+  exchangeRateUsd: number;
   exchangeRateCny: number;
   ndsRate: number;
   kpn20Rate: number;
   kpn4Rate: number;
   resaleMarkup: number;
   salesBonusRate: number;
+
+  // Доставка по Китаю (внутренняя логистика)
+  chinaDomesticRateMethod: ChinaDomesticRateMethod; // 'volume' | 'weight' | 'fixed'
+  chinaDomesticRatePerM3Usd: number;   // рейт за м³ (метод volume)
+  chinaDomesticRatePerTonUsd: number;  // рейт за тонну (метод weight)
+  chinaDomesticFixedKztPerUnit: number; // фиксированная цена за ед. (метод fixed)
 }
 
 export interface PreCalculationItem {
@@ -51,7 +59,9 @@ export interface PreCalculationItem {
   packages: { lengthMm: number; widthMm: number; heightMm: number }[];
   useDimensions: boolean;
 
-  deliveryUrumqiAlmatyKzt: number;  // Доставка Урумчи–Алматы (за единицу)
+  deliveryUrumqiAlmatyKzt: number;      // Доставка Урумчи–Алматы (за единицу)
+  deliveryChinaDomesticKzt: number;     // Доставка по Китаю (за единицу)
+  customChinaDomestic?: boolean;        // true = ручной ввод, не пересчитывать из настроек
   deliveryAlmatyKaragandaPerItemKzt: number;
   svhPerItemKzt: number;
   brokerPerItemKzt: number;

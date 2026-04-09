@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Batch, BatchExpense, BatchDocument, BatchItemActuals, PreCalculationDocument, PreCalculationItem, PlannedPayment, ActualPayment } from '@/types';
+import { Batch, BatchExpense, BatchDocument, BatchItemActuals, PreCalculationDocument, PlannedPayment, ActualPayment, Reception } from '@/types';
 import { api } from '@/services';
 import { TableNames } from '@/constants';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
@@ -11,11 +11,12 @@ export const useBatches = (id?: string) => {
     const [expenses, setExpenses] = useState<BatchExpense[]>([]);
     const [documents, setDocuments] = useState<BatchDocument[]>([]);
     const [itemActuals, setItemActuals] = useState<BatchItemActuals[]>([]);
-    
+    const [receptions, setReceptions] = useState<Reception[]>([]);
+
     // Справочники для привязки
     const [plannedPayments, setPlannedPayments] = useState<PlannedPayment[]>([]);
     const [actualPayments, setActualPayments] = useState<ActualPayment[]>([]);
-    
+
     const [isLoading, setIsLoading] = useState(false);
 
     const loadBatchData = useCallback(async (batchId: string) => {
@@ -26,7 +27,7 @@ export const useBatches = (id?: string) => {
             if (!batchData) return;
             setBatch(batchData);
 
-            // 2. Предрасчет
+            // 2. Предрасчёт — полный маппинг всех полей
             const preCalcData = await api.fetchOne<any>(TableNames.PRE_CALCULATIONS, batchData.preCalculationId);
             if (preCalcData) {
                 const items = await api.fetchAll<any>(TableNames.PRE_CALCULATION_ITEMS, { pre_calculation_id: preCalcData.id });
@@ -37,17 +38,45 @@ export const useBatches = (id?: string) => {
                         name: item.productName,
                         sku: item.sku,
                         quantity: item.quantity,
-                        revenueKzt: item.sellingPriceKzt,
+                        type: item.type || 'MACHINE',
+                        supplierName: item.supplierName || '',
+                        // Выручка
+                        revenueKzt: item.sellingPriceKzt || 0,
+                        isRevenueConfirmed: item.isRevenueConfirmed || false,
+                        // Закупочная цена
+                        purchasePrice: item.purchasePrice || 0,
+                        purchasePriceCurrency: item.purchasePriceCurrency || 'USD',
                         purchasePriceKzt: item.purchaseKzt || 0,
+                        // Логистика
                         deliveryUrumqiAlmatyKzt: item.deliveryUrumqiAlmatyKzt || 0,
-                        localLogisticsKzt: item.logisticsAlmatyKaragandaKzt || 0,
+                        deliveryChinaDomesticKzt: item.deliveryChinaDomesticKzt || 0,
+                        deliveryAlmatyKaragandaPerItemKzt: item.deliveryAlmatyKaragandaPerItemKzt || item.logisticsAlmatyKaragandaKzt || 0,
+                        // Таможня
+                        svhPerItemKzt: item.svhPerItemKzt || 0,
+                        brokerPerItemKzt: item.brokerPerItemKzt || 0,
+                        customsFeesPerItemKzt: item.customsFeesPerItemKzt || 0,
+                        // Налоги
                         customsNdsKzt: item.customsNdsKzt || 0,
                         totalNdsKzt: item.totalNdsKzt || 0,
+                        ndsDifferenceKzt: item.ndsDifferenceKzt || 0,
                         kpnKzt: item.kpnKzt || 0,
+                        // Прочие расходы
+                        pnrKzt: item.pnrKzt || 0,
+                        deliveryLocalKzt: item.deliveryLocalKzt || 0,
+                        salesBonusKzt: item.salesBonusKzt || 0,
+                        // Итог
+                        preSaleCostKzt: item.preSaleCostKzt || 0,
                         fullCostKzt: item.fullCostKzt || 0,
-                        profitKzt: item.profitKzt || 0
+                        profitKzt: item.profitKzt || 0,
+                        marginPercentage: item.marginPercentage || 0,
+                        taxRegime: item.taxRegime || 'Общ.',
+                        // Габариты
+                        volumeM3: item.volumeM3 || 0,
+                        weightKg: item.weightKg || 0,
+                        packages: item.packages || [],
+                        useDimensions: item.useDimensions || false,
                     }))
-                } as any);
+                } as PreCalculationDocument);
             }
 
             // 3. Факты по позициям
@@ -62,7 +91,11 @@ export const useBatches = (id?: string) => {
             const batchDocs = await api.fetchAll<BatchDocument>(TableNames.BATCH_DOCUMENTS, { batch_id: batchId });
             setDocuments(batchDocs);
 
-            // 6. Платежи для выбора (фильтруем по типу Outgoing для расходов)
+            // 6. Приёмки, связанные с этой партией
+            const linkedReceptions = await api.fetchAll<Reception>(TableNames.RECEPTIONS, { batch_id: batchId });
+            setReceptions(linkedReceptions);
+
+            // 7. Платежи для выбора при ручном добавлении расходов
             const [planned, actual] = await Promise.all([
                 api.fetchAll<PlannedPayment>(TableNames.PLANNED_PAYMENTS, { direction: 'Outgoing' }),
                 api.fetchAll<ActualPayment>(TableNames.ACTUAL_PAYMENTS, { direction: 'Outgoing' })
@@ -97,6 +130,27 @@ export const useBatches = (id?: string) => {
     const deleteExpense = async (expenseId: string) => {
         await api.delete(TableNames.BATCH_EXPENSES, expenseId);
         setExpenses(prev => prev.filter(e => e.id !== expenseId));
+    };
+
+    // Обновить/создать факт по позиции предрасчёта
+    const updateItemActuals = async (preCalcItemId: string, data: { actualRevenueKzt?: number; actualPurchaseKzt?: number }) => {
+        if (!id) return;
+        const existing = itemActuals.find(a => a.preCalculationItemId === preCalcItemId);
+        if (existing) {
+            const updated = await api.update<BatchItemActuals>(TableNames.BATCH_ITEM_ACTUALS, existing.id, data);
+            setItemActuals(prev => prev.map(a => a.id === existing.id ? { ...a, ...data } : a));
+            return updated;
+        } else {
+            const created = await api.create<BatchItemActuals>(TableNames.BATCH_ITEM_ACTUALS, {
+                id: api.generateId('BIA'),
+                batchId: id,
+                preCalculationItemId: preCalcItemId,
+                actualRevenueKzt: data.actualRevenueKzt ?? 0,
+                actualPurchaseKzt: data.actualPurchaseKzt ?? 0,
+            });
+            setItemActuals(prev => [...prev, created]);
+            return created;
+        }
     };
 
     const uploadDocument = async (file: File) => {
@@ -137,6 +191,20 @@ export const useBatches = (id?: string) => {
     const stats = useMemo(() => {
         if (!preCalculation) return null;
         const plannedProfit = preCalculation.items.reduce((sum, item) => sum + (item.profitKzt || 0), 0);
+        const plannedRevenue = preCalculation.items.reduce((sum, item) => sum + ((item.revenueKzt || 0) * (item.quantity || 1)), 0);
+        const plannedExpenses = preCalculation.items.reduce((sum, item) => sum + (
+            ((item.purchasePriceKzt || 0) +
+             (item.deliveryUrumqiAlmatyKzt || 0) +
+             (item.deliveryChinaDomesticKzt || 0) +
+             (item.deliveryAlmatyKaragandaPerItemKzt || 0) +
+             (item.svhPerItemKzt || 0) +
+             (item.brokerPerItemKzt || 0) +
+             (item.customsFeesPerItemKzt || 0) +
+             (item.customsNdsKzt || 0) +
+             (item.kpnKzt || 0) +
+             (item.pnrKzt || 0) +
+             (item.deliveryLocalKzt || 0)) * (item.quantity || 1)
+        ), 0);
         const actualRevenue = itemActuals.reduce((sum, act) => sum + (act.actualRevenueKzt || 0), 0);
         const actualExpensesByCategory = expenses.reduce((acc, exp) => {
             acc[exp.category] = (acc[exp.category] || 0) + exp.amountKzt;
@@ -146,11 +214,14 @@ export const useBatches = (id?: string) => {
         const actualProfit = actualRevenue - totalActualExpenses;
         return {
             plannedProfit,
+            plannedRevenue,
+            plannedExpenses,
             actualProfit,
             actualRevenue,
             totalActualExpenses,
             expensesByCategory: actualExpensesByCategory,
-            profitDiffPercent: plannedProfit > 0 ? ((actualProfit - plannedProfit) / Math.abs(plannedProfit)) * 100 : 0
+            profitDiffPercent: plannedProfit !== 0 ? ((actualProfit - plannedProfit) / Math.abs(plannedProfit)) * 100 : 0,
+            revenueProgress: plannedRevenue > 0 ? (actualRevenue / plannedRevenue) * 100 : 0,
         };
     }, [preCalculation, itemActuals, expenses]);
 
@@ -160,12 +231,14 @@ export const useBatches = (id?: string) => {
         expenses,
         documents,
         itemActuals,
+        receptions,
         plannedPayments,
         actualPayments,
         isLoading,
         stats,
         addExpense,
         deleteExpense,
+        updateItemActuals,
         uploadDocument,
         deleteDocument,
         refresh: () => id && loadBatchData(id)

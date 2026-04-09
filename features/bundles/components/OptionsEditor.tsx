@@ -5,7 +5,7 @@ import { ProductType, OptionType, OptionVariant, Currency, Product, MachineConfi
 import { Plus, Trash2, Pencil, X, Settings, Download, Upload, AlertCircle, Loader2, CheckCircle, Factory, Box, LayoutList, User, Search, List, Copy, Filter, ChevronDown, ChevronRight, MousePointer2, Check, ArrowRight, AlertTriangle, Layers } from 'lucide-react';
 import { ApiService } from '@/services/api';
 import { useAccess } from '@/features/auth/hooks/useAccess';
-import { MassAddModal } from './MassAddModal';
+import { MassAddModal, ExistingMachineUpdate } from './MassAddModal';
 import { VariantForm } from './VariantForm';
 
 export const OptionsEditor: React.FC = () => {
@@ -234,21 +234,31 @@ export const OptionsEditor: React.FC = () => {
         setIsMassAddModalOpen(true);
     };
 
-    const handleConfirmMassAdd = async (selectedMachineIds: string[], priceOverrides: Record<string, Record<string, number | ''>>) => {
-        const updates = selectedMachineIds.map(mId => {
+    const handleConfirmMassAdd = async (
+        selectedMachineIds: string[],
+        priceOverrides: Record<string, Record<string, number | ''>>,
+        isBaseMap: Record<string, boolean>,
+        existingUpdates: ExistingMachineUpdate[]
+    ) => {
+        // Обновления для новых станков
+        const newUpdates = selectedMachineIds.map(mId => {
             const product = productMap.get(mId);
             if (!product) return null;
             const currentConfigs = [...(product.machineConfig || [])];
+            const isBase = !!isBaseMap[mId];
             selectedVariantsToApply.forEach(vId => {
                 const variant = variantMap.get(vId);
                 if (!variant) return;
                 let configGroup = currentConfigs.find(c => c.typeId === variant.typeId);
                 if (!configGroup) {
-                    configGroup = { typeId: variant.typeId, allowedVariantIds: [], priceOverrides: {} } as MachineConfigEntry;
+                    configGroup = { typeId: variant.typeId, allowedVariantIds: [], priceOverrides: {}, baseVariantIds: [] } as MachineConfigEntry;
                     currentConfigs.push(configGroup);
                 }
                 if (!configGroup.allowedVariantIds.includes(vId)) {
                     configGroup.allowedVariantIds = [...configGroup.allowedVariantIds, vId];
+                }
+                if (isBase && !(configGroup.baseVariantIds || []).includes(vId)) {
+                    configGroup.baseVariantIds = [...(configGroup.baseVariantIds || []), vId];
                 }
                 const override = priceOverrides[mId]?.[vId];
                 if (override !== '' && override !== undefined) {
@@ -258,11 +268,54 @@ export const OptionsEditor: React.FC = () => {
             return { ...product, machineConfig: currentConfigs };
         }).filter(Boolean) as Product[];
 
-        await actions.updateProductsBulk(updates);
+        // Обновления для уже добавленных станков (уже отфильтрованы в MassAddModal)
+        const existingMachineUpdates = existingUpdates
+            .map(u => {
+                const product = productMap.get(u.machineId);
+                if (!product) return null;
+                const currentConfigs = product.machineConfig ? product.machineConfig.map(c => ({ ...c })) : [];
+                selectedVariantsToApply.forEach(vId => {
+                    const variant = variantMap.get(vId);
+                    if (!variant) return;
+                    const configGroupIdx = currentConfigs.findIndex(c => c.typeId === variant.typeId);
+                    if (configGroupIdx === -1) return;
+                    const configGroup = { ...currentConfigs[configGroupIdx] };
+                    if (u.remove) {
+                        configGroup.allowedVariantIds = configGroup.allowedVariantIds.filter(id => !selectedVariantsToApply.includes(id));
+                        configGroup.baseVariantIds = (configGroup.baseVariantIds || []).filter(id => !selectedVariantsToApply.includes(id));
+                    } else {
+                        const override = u.priceOverrides[vId];
+                        if (override !== '' && override !== undefined) {
+                            configGroup.priceOverrides = { ...configGroup.priceOverrides, [vId]: Number(override) };
+                        }
+                        const bvIds = configGroup.baseVariantIds || [];
+                        if (u.isBase && !bvIds.includes(vId)) {
+                            configGroup.baseVariantIds = [...bvIds, vId];
+                        } else if (!u.isBase) {
+                            configGroup.baseVariantIds = bvIds.filter(id => id !== vId);
+                        }
+                    }
+                    currentConfigs[configGroupIdx] = configGroup;
+                });
+                return { ...product, machineConfig: currentConfigs };
+            }).filter(Boolean) as Product[];
+
+        const allUpdates = [...newUpdates, ...existingMachineUpdates];
+        if (allUpdates.length === 0) {
+            setIsMassAddModalOpen(false);
+            return;
+        }
+        await actions.updateProductsBulk(allUpdates);
         setIsMassAddModalOpen(false);
         setIsMassAddMode(false);
         setSelectedVariantsToApply([]);
-        alert(`Опции успешно добавлены к ${updates.length} станкам`);
+        const removedCount = existingUpdates.filter(u => u.remove).length;
+        const addedCount = newUpdates.length;
+        alert([
+            addedCount > 0 && `Добавлено к ${addedCount} станкам`,
+            removedCount > 0 && `Отключено у ${removedCount} станков`,
+            (existingMachineUpdates.length - removedCount) > 0 && `Обновлено ${existingMachineUpdates.length - removedCount} станков`,
+        ].filter(Boolean).join(' · '));
     };
 
     // ─── CSV Import/Export ────────────────────────────────────────────────────

@@ -1,8 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Counterparty, CounterpartyAccount, Currency, CounterpartyType } from '@/types';
-import { X, Save, Trash2, PlusCircle, CheckCircle2 } from 'lucide-react';
+import { X, Save, Trash2, PlusCircle, CheckCircle2, Star } from 'lucide-react';
 import { ApiService } from '@/services/api';
+import { useStore } from '@/features/system/context/GlobalStore';
+import { CashFlowSelector } from '@/components/ui/CashFlowSelector';
 
 interface CounterpartyCreateModalProps {
     onClose: () => void;
@@ -28,8 +30,11 @@ export const CounterpartyCreateModal: React.FC<CounterpartyCreateModalProps> = (
     autoFillData
 }) => {
     const api = new ApiService();
+    const { state } = useStore();
     const [name, setName] = useState('');
     const [roles, setRoles] = useState<CounterpartyType[]>([initialType]);
+    const [cashFlowItemIds, setCashFlowItemIds] = useState<string[]>([]);
+    const [addingCashFlowItem, setAddingCashFlowItem] = useState(false);
     const [legalAddress, setLegalAddress] = useState('');
     const [binIin, setBinIin] = useState('');
     const [director, setDirector] = useState('');
@@ -54,6 +59,7 @@ export const CounterpartyCreateModal: React.FC<CounterpartyCreateModalProps> = (
             setContactPerson(editingCounterparty.contactPerson || '');
             setPhone(editingCounterparty.phone || '');
             setAccounts(initialAccounts.length > 0 ? initialAccounts.map(a => ({...a})) : []);
+            setCashFlowItemIds(editingCounterparty.cashFlowItemIds || []);
         } else if (autoFillData) {
             // Создание нового с автозаполнением
             setName(autoFillData.name || '');
@@ -117,7 +123,8 @@ export const CounterpartyCreateModal: React.FC<CounterpartyCreateModalProps> = (
                 director: director.trim() || undefined,
                 legalEmail: legalEmail.trim() || undefined,
                 contactPerson: contactPerson.trim() || undefined,
-                phone: phone.trim() || undefined
+                phone: phone.trim() || undefined,
+                cashFlowItemIds: cashFlowItemIds.length > 0 ? cashFlowItemIds : undefined,
             };
 
             const validAccounts = (accounts as CounterpartyAccount[]).filter(a => a.iik);
@@ -240,6 +247,71 @@ export const CounterpartyCreateModal: React.FC<CounterpartyCreateModalProps> = (
                                 </div>
                             </div>
                         ))}
+                    </div>
+
+                    {/* Приоритетные статьи ДДС */}
+                    <div className="space-y-3 p-6 bg-amber-50/40 rounded-[2rem] border border-amber-100/70">
+                        <div className="flex justify-between items-center">
+                            <h4 className="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-2">
+                                <Star size={12} fill="currentColor" /> Приоритетные статьи ДДС
+                            </h4>
+                            <span className="text-[9px] text-slate-400 font-bold">Первая — автовыбор при импорте выписок</span>
+                        </div>
+
+                        {cashFlowItemIds.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                                {cashFlowItemIds.map((id, idx) => {
+                                    const item = state.cashFlowItems.find(x => x.id === id);
+                                    if (!item) return null;
+                                    return (
+                                        <div key={id} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-amber-200 rounded-xl text-[11px] font-bold text-slate-700 shadow-sm">
+                                            {idx === 0 && <Star size={9} fill="#f59e0b" className="text-amber-400 shrink-0" />}
+                                            <span className="truncate max-w-[200px]">{item.name}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCashFlowItemIds(prev => prev.filter(x => x !== id))}
+                                                className="ml-1 text-slate-300 hover:text-red-500 transition-colors shrink-0"
+                                            >
+                                                <X size={11} />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {addingCashFlowItem ? (
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1">
+                                    <CashFlowSelector
+                                        value=""
+                                        onChange={id => {
+                                            if (id && !cashFlowItemIds.includes(id)) {
+                                                setCashFlowItemIds(prev => [...prev, id]);
+                                            }
+                                            setAddingCashFlowItem(false);
+                                        }}
+                                        placeholder="— Выберите статью ДДС —"
+                                        dropdownMinWidth={320}
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setAddingCashFlowItem(false)}
+                                    className="p-2 text-slate-300 hover:text-slate-500 transition-colors"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => setAddingCashFlowItem(true)}
+                                className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-amber-700 bg-white px-4 py-2 rounded-lg border border-amber-200 hover:bg-amber-600 hover:text-white hover:border-amber-600 transition-all"
+                            >
+                                <PlusCircle size={13} /> Добавить статью
+                            </button>
+                        )}
                     </div>
 
                     {errorMsg && <p className="text-red-500 text-[10px] font-black uppercase text-center bg-red-50 p-4 rounded-xl border border-red-100">{errorMsg}</p>}

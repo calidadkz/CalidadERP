@@ -42,7 +42,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                 { id: 'receiving', label: 'Приемка на склад', icon: <Box size={18} /> },
                 { id: 'sales', label: 'Продажи (ЗК)', icon: <ShoppingCart size={18} /> },
                 { id: 'shipment', label: 'Отгрузка', icon: <FileText size={18} /> },
-                { id: 'discrepancy', label: 'Брак и потери', icon: <History size={18} /> },
+                { id: 'discrepancy', label: 'Списание и брак', icon: <History size={18} /> },
             ]
         },
         {

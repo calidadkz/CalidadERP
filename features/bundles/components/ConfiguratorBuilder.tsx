@@ -9,6 +9,7 @@ import { BundleCalculator } from '@/services/BundleCalculator';
 import { BundleExporter } from '@/services/BundleExporter';
 import { ApiService } from '@/services/api';
 import { useAccess } from '@/features/auth/hooks/useAccess';
+import { CalidadSelect } from '@/components/ui/CalidadSelect';
 
 interface ConfiguratorBuilderProps {
   onSaved: () => void;
@@ -231,17 +232,15 @@ export const ConfiguratorBuilder: React.FC<ConfiguratorBuilderProps> = ({ onSave
               <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest flex items-center gap-1.5">
                 <ListFilter size={10}/> КАТЕГОРИЯ
               </label>
-              <select
-                className="w-full border border-slate-200 py-1.5 px-2.5 rounded-lg text-xs font-bold text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all"
+              <CalidadSelect
+                options={categories.filter(c => c.type === ProductType.MACHINE).map(c => ({ id: c.id, label: c.name }))}
                 value={config.categoryId}
-                onChange={e => { config.setCategoryId(e.target.value); config.setBaseMachineId(''); setModelSearch(''); }}
+                onChange={id => { config.setCategoryId(id); config.setBaseMachineId(''); setModelSearch(''); }}
+                nullLabel="Все категории"
+                placeholder="Все категории"
                 disabled={!!editingBundle}
-              >
-                <option value="">Все категории</option>
-                {categories.filter(c => c.type === ProductType.MACHINE).map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+                zIndex="z-[110]"
+              />
             </div>
 
             {/* Поставщик */}

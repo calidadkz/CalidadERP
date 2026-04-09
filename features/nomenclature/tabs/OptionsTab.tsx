@@ -6,6 +6,7 @@ import { Settings, ChevronRight, CheckSquare, Square, X, Plus, AlertCircle, Chec
 import { api } from '@/services/api';
 import { useAccess } from '@/features/auth/hooks/useAccess';
 import { useStore } from '@/features/system/context/GlobalStore';
+import { CalidadSelect, CalidadSelectOption } from '@/components/ui/CalidadSelect';
 
 interface OptionsTabProps {
     formData: Partial<Product>;
@@ -23,9 +24,13 @@ export const OptionsTab: React.FC<OptionsTabProps> = ({ formData, optionTypes = 
     const canWrite = access.canWrite('actions', 'edit');
     const { state, actions } = useStore();
     
-    const suppliers = useMemo(() => 
+    const suppliers = useMemo(() =>
         ((state?.counterparties || []) as Counterparty[]).filter(c => c.type === 'Supplier'),
     [state?.counterparties]);
+
+    const manufacturerOptions = useMemo<CalidadSelectOption[]>(() =>
+        manufacturers.map(m => ({ id: m.name, label: m.name })).sort((a, b) => a.label.localeCompare(b.label, 'ru')),
+    [manufacturers]);
 
     const [selectedOptionTypeId, setSelectedOptionTypeId] = useState<string | null>(null);
     const [isAddingType, setIsAddingType] = useState(false);
@@ -251,36 +256,40 @@ export const OptionsTab: React.FC<OptionsTabProps> = ({ formData, optionTypes = 
                             )}
                         </div>
 
+                        {/* Скроллируемая область: форма + список вариантов */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+
                         {/* Форма добавления / редактирования варианта */}
                         {isAddingVariant && (
-                            <div className="mx-6 mt-4 mb-2 bg-indigo-50/50 border border-indigo-100 rounded-2xl p-5 space-y-4 animate-in slide-in-from-top-2 duration-200 shrink-0">
-                                <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">
+                            <div className="mx-4 mt-3 mb-1 bg-indigo-50/50 border border-indigo-100 rounded-2xl p-3 animate-in slide-in-from-top-2 duration-200">
+                                <div className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-2">
                                     {editingVariantId ? 'Редактировать вариант' : 'Новый вариант'}
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="col-span-2">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Название *</label>
+                                {/* Строка 1: Название | Наим. поставщика | Поставщик | Производитель */}
+                                <div className="grid grid-cols-4 gap-2 mb-2">
+                                    <div>
+                                        <label className="text-[8px] font-black text-slate-400 uppercase mb-0.5 block">Название *</label>
                                         <input
-                                            className="w-full p-2.5 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white focus:ring-4 focus:ring-indigo-500/10"
-                                            placeholder="Название варианта..."
+                                            className="w-full p-2 rounded-lg border border-indigo-200 text-xs font-bold outline-none bg-white focus:ring-2 focus:ring-indigo-500/10"
+                                            placeholder="Название..."
                                             value={variantFormData.name || ''}
                                             onChange={e => setVariantFormData({ ...variantFormData, name: e.target.value })}
                                             autoFocus
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Наим. у поставщика</label>
+                                        <label className="text-[8px] font-black text-slate-400 uppercase mb-0.5 block">Наим. у поставщика</label>
                                         <input
-                                            className="w-full p-2.5 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white focus:ring-4 focus:ring-indigo-500/10"
+                                            className="w-full p-2 rounded-lg border border-indigo-200 text-xs font-bold outline-none bg-white focus:ring-2 focus:ring-indigo-500/10"
                                             placeholder="Артикул / наименование"
                                             value={variantFormData.supplierProductName || ''}
                                             onChange={e => setVariantFormData({ ...variantFormData, supplierProductName: e.target.value })}
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Поставщик</label>
+                                        <label className="text-[8px] font-black text-slate-400 uppercase mb-0.5 block">Поставщик</label>
                                         <select
-                                            className="w-full p-2.5 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white"
+                                            className="w-full p-2 rounded-lg border border-indigo-200 text-xs font-bold outline-none bg-white"
                                             value={variantFormData.supplierId || ''}
                                             onChange={e => setVariantFormData({ ...variantFormData, supplierId: e.target.value })}
                                         >
@@ -289,25 +298,30 @@ export const OptionsTab: React.FC<OptionsTabProps> = ({ formData, optionTypes = 
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Производитель</label>
-                                        <input
-                                            className="w-full p-2.5 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white focus:ring-4 focus:ring-indigo-500/10"
-                                            placeholder="Производитель"
+                                        <label className="text-[8px] font-black text-slate-400 uppercase mb-0.5 block">Производитель</label>
+                                        <CalidadSelect
+                                            options={manufacturerOptions}
                                             value={variantFormData.manufacturer || ''}
-                                            onChange={e => setVariantFormData({ ...variantFormData, manufacturer: e.target.value })}
+                                            onChange={v => setVariantFormData({ ...variantFormData, manufacturer: v || '' })}
+                                            placeholder="Производитель"
+                                            nullLabel="— Не выбран —"
+                                            zIndex="z-[200]"
                                         />
                                     </div>
-                                    <div>
-                                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Цена закупки</label>
-                                        <div className="flex h-[38px]">
+                                </div>
+                                {/* Строка 2: Цена | Габариты | Описание */}
+                                <div className="grid grid-cols-12 gap-2 mb-2">
+                                    <div className="col-span-3">
+                                        <label className="text-[8px] font-black text-slate-400 uppercase mb-0.5 block">Цена закупки</label>
+                                        <div className="flex h-[34px]">
                                             <input
                                                 type="number"
-                                                className="w-full p-2.5 rounded-l-xl border border-indigo-200 text-xs font-black outline-none bg-white focus:ring-4 focus:ring-indigo-500/10"
+                                                className="w-full p-2 rounded-l-lg border border-indigo-200 text-xs font-black outline-none bg-white focus:ring-2 focus:ring-indigo-500/10"
                                                 value={variantFormData.price || 0}
                                                 onChange={e => setVariantFormData({ ...variantFormData, price: parseFloat(e.target.value) || 0 })}
                                             />
                                             <select
-                                                className="w-20 p-2 rounded-r-xl border-y border-r border-indigo-200 text-[10px] font-black bg-slate-50 outline-none"
+                                                className="w-16 px-1 rounded-r-lg border-y border-r border-indigo-200 text-[10px] font-black bg-slate-50 outline-none"
                                                 value={variantFormData.currency || Currency.Cny}
                                                 onChange={e => setVariantFormData({ ...variantFormData, currency: e.target.value as Currency })}
                                             >
@@ -315,45 +329,45 @@ export const OptionsTab: React.FC<OptionsTabProps> = ({ formData, optionTypes = 
                                             </select>
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Габариты мм (Д × Ш × В)</label>
-                                        <div className="flex gap-1">
-                                            <input type="number" className="flex-1 p-2 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white text-center" placeholder="Д" value={variantFormData.lengthMm || ''} onChange={e => setVariantFormData({ ...variantFormData, lengthMm: parseFloat(e.target.value) || 0 })}/>
-                                            <input type="number" className="flex-1 p-2 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white text-center" placeholder="Ш" value={variantFormData.widthMm || ''} onChange={e => setVariantFormData({ ...variantFormData, widthMm: parseFloat(e.target.value) || 0 })}/>
-                                            <input type="number" className="flex-1 p-2 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white text-center" placeholder="В" value={variantFormData.heightMm || ''} onChange={e => setVariantFormData({ ...variantFormData, heightMm: parseFloat(e.target.value) || 0 })}/>
+                                    <div className="col-span-4">
+                                        <label className="text-[8px] font-black text-slate-400 uppercase mb-0.5 block">Габариты мм (Д × Ш × В)</label>
+                                        <div className="flex gap-1 h-[34px]">
+                                            <input type="number" className="flex-1 p-1.5 rounded-lg border border-indigo-200 text-xs font-bold outline-none bg-white text-center" placeholder="Д" value={variantFormData.lengthMm || ''} onChange={e => setVariantFormData({ ...variantFormData, lengthMm: parseFloat(e.target.value) || 0 })}/>
+                                            <input type="number" className="flex-1 p-1.5 rounded-lg border border-indigo-200 text-xs font-bold outline-none bg-white text-center" placeholder="Ш" value={variantFormData.widthMm || ''} onChange={e => setVariantFormData({ ...variantFormData, widthMm: parseFloat(e.target.value) || 0 })}/>
+                                            <input type="number" className="flex-1 p-1.5 rounded-lg border border-indigo-200 text-xs font-bold outline-none bg-white text-center" placeholder="В" value={variantFormData.heightMm || ''} onChange={e => setVariantFormData({ ...variantFormData, heightMm: parseFloat(e.target.value) || 0 })}/>
                                         </div>
                                     </div>
-                                    <div className="col-span-2">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Описание</label>
+                                    <div className="col-span-5">
+                                        <label className="text-[8px] font-black text-slate-400 uppercase mb-0.5 block">Описание</label>
                                         <textarea
-                                            className="w-full p-2.5 rounded-xl border border-indigo-200 text-xs font-bold outline-none bg-white focus:ring-4 focus:ring-indigo-500/10 resize-none"
-                                            rows={2}
+                                            className="w-full p-2 rounded-lg border border-indigo-200 text-xs font-bold outline-none bg-white focus:ring-2 focus:ring-indigo-500/10 resize-none"
+                                            rows={1}
                                             placeholder="Описание варианта..."
                                             value={variantFormData.description || ''}
                                             onChange={e => setVariantFormData({ ...variantFormData, description: e.target.value })}
                                         />
                                     </div>
                                 </div>
-                                <div className="flex justify-end gap-2 pt-1">
+                                <div className="flex justify-end gap-2">
                                     <button
                                         onClick={() => { setIsAddingVariant(false); setEditingVariantId(null); setVariantFormData({ name: '', supplierProductName: '', description: '', price: 0, currency: Currency.Cny, composition: [], supplierId: '', manufacturer: '', lengthMm: 0, widthMm: 0, heightMm: 0 }); }}
-                                        className="px-4 py-2 text-slate-400 hover:text-slate-600 font-black text-xs uppercase tracking-widest transition-colors"
+                                        className="px-4 py-1.5 text-slate-400 hover:text-slate-600 font-black text-xs uppercase tracking-widest transition-colors"
                                     >
                                         Отмена
                                     </button>
                                     <button
                                         onClick={handleSaveVariant}
                                         disabled={!variantFormData.name?.trim()}
-                                        className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 disabled:opacity-30 shadow-lg shadow-indigo-100 transition-all active:scale-95"
+                                        className="flex items-center gap-2 px-5 py-1.5 bg-indigo-600 text-white rounded-lg font-black text-xs uppercase tracking-widest hover:bg-indigo-700 disabled:opacity-30 shadow-md shadow-indigo-100 transition-all active:scale-95"
                                     >
-                                        <Save size={14}/> {editingVariantId ? 'Сохранить' : 'Добавить'}
+                                        <Save size={13}/> {editingVariantId ? 'Сохранить' : 'Добавить'}
                                     </button>
                                 </div>
                             </div>
                         )}
 
                         {/* Список вариантов */}
-                        <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+                        <div className="p-6">
                             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                                 <table className="w-full border-collapse">
                                     <thead className="bg-slate-50 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-widest">
@@ -438,6 +452,7 @@ export const OptionsTab: React.FC<OptionsTabProps> = ({ formData, optionTypes = 
                                 )}
                             </div>
                         </div>
+                        </div>{/* end scrollable wrapper */}
                     </div>
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-slate-300 opacity-40">

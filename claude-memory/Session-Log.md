@@ -1,5 +1,295 @@
 # Session Log
 
+## 2026-04-09 — Незавершённые задачи: приоритеты ДДС в карточке, чистка BatchEconomyTab, баг unitCostKzt
+
+**Что сделано:**
+- **CounterpartyCreateModal**: добавлена секция «Приоритетные статьи ДДС» — просмотр, добавление (через CashFlowSelector), удаление чипов; первая статья помечена звёздочкой; `cashFlowItemIds` передаётся в `counterpartyData` при сохранении
+- **BatchEconomyTab**: удалён устаревший файл (заменён BatchComparisonTab + BatchMainListTab)
+- **Баг unitCostKzt = 0 в списаниях**: `createWriteOff` теперь берёт `unitCostKzt` из движения, которое создаёт `InventoryMediator` (FIFO), а не из хардкода модала
+
+**Файлы изменены:**
+- `features/counterparties/components/CounterpartyCreateModal.tsx`
+- `features/inventory/hooks/useInventoryState.ts`
+
+**Удалены:**
+- `features/batches/components/BatchEconomyTab.tsx`
+
+**Открытые задачи / следующий шаг:**
+- BatchMainListTab: добавить связь с заказами (выручка по позиции)
+- Форма внесения фактической выручки по позиции партии
+
+**Ссылки:** [[Modules/Batches-PreCalc]] | [[Architecture]]
+
+---
+
+## 2026-04-09 — Рефакторинг FinanceCategoriesPage + локальные правки модулей
+
+**Что сделано:**
+- Рефакторинг `FinanceCategoriesPage.tsx` (~900 строк) → 5 компонентов в `features/finance/components/`: `CashFlowBadges.tsx`, `DictManagerModal.tsx`, `CreateItemModal.tsx`, `ItemRow.tsx`, `GroupRow.tsx`; страница-оркестратор ~160 строк
+- Зафиксирован стандарт разбивки feature-страниц [[Decisions/005-feature-page-component-split]]
+- **OptionsTab**: фикс прокрутки (форма + список в одном overflow контейнере), компактная форма (grid-cols-4), CalidadSelect для Производителя
+- **NomenclatureTable**: поле Вес (кг) в быстром редактировании рядом с Габаритами
+- **MassAddModal**: секция уже добавленных станков (зелёный фон), кнопка отключения, чекбокс «В базе» (★), индикатор «новый тип»; новая сигнатура `onConfirm` с `isBaseMap` и `existingUpdates`
+- **OptionsEditor**: `handleConfirmMassAdd` переписан под новую сигнатуру; обработка remove/isBase/priceOverrides для существующих станков
+- **MachineConfigEntry**: новое поле `baseVariantIds?: string[]`
+- **FinanceCategoriesPage** (до рефакторинга): кнопка «+ Статья» в строке группы (с предзаполненным parentId), кнопка «# Тег» для тегов группы с наследованием в дочерних статьях (визуальное, пунктирная рамка)
+
+**Файлы изменены:**
+- `types/product.ts`
+- `features/nomenclature/tabs/OptionsTab.tsx`
+- `features/nomenclature/components/NomenclatureTable.tsx`
+- `features/bundles/components/MassAddModal.tsx`
+- `features/bundles/components/OptionsEditor.tsx`
+- `features/finance/FinanceCategoriesPage.tsx`
+
+**Созданы:**
+- `features/finance/components/CashFlowBadges.tsx`
+- `features/finance/components/DictManagerModal.tsx`
+- `features/finance/components/CreateItemModal.tsx`
+- `features/finance/components/ItemRow.tsx`
+- `features/finance/components/GroupRow.tsx`
+- `claude-memory/Decisions/005-feature-page-component-split.md`
+
+**Открытые задачи / следующий шаг:**
+- Управление приоритетными статьями ДДС в карточке контрагента (CounterpartyManagerPage)
+- `BatchEconomyTab` — поля `deliveryUrumqiAlmatyKzt` / `logisticsAlmatyKaragandaKzt` (переносится 9-ю сессию!)
+- `unitCostKzt` в списании = 0
+
+**Ссылки:** [[Decisions/005-feature-page-component-split]] | [[Modules/Finance]] | [[Architecture]]
+
+---
+
+## 2026-04-09 — Рефакторинг модуля Партий + интеграция с Приёмкой и Снабжением
+
+**Что сделано:**
+- **BatchDetailPage**: полностью переписан — KPI-бар (4 карточки), 4 вкладки (Позиции / Расходы / Сравнение / Документы), постоянный сайдбар справа
+- **BatchMainListTab** (новый): горизонтальная таблица план/факт по всем статьям расходов. Заголовки колонок кликабельны — открывают форму внесения факта в сайдбаре. Невнесённые данные показывают плановые значения (не 0)
+- **BatchSidebar** (новый): постоянная правая панель — базово сводка по партии, при клике на заголовок колонки меняется на форму внесения расхода (с выбором источника: вручную / календарь / выписки). Показывает историю по статье
+- **BatchComparisonTab** (новый): базовое сравнение прогноз/факт с DiffBadge и KPI-карточками
+- **BatchExpensesTab**: рефакторинг — убрана инлайн-форма, добавлены кнопки открытия сайдбара, бейдж «Приёмка» на расходах из приёмки
+- **useBatches**: полный маппинг всех полей предрасчёта, `updateItemActuals`, загрузка `receptions` по `batchId`
+- **DB**: `ALTER TABLE receptions ADD COLUMN batch_id`, `ALTER TABLE batch_expenses ADD COLUMN reception_id` + индексы
+- **Типы**: `Reception.batchId?`, `BatchExpense.receptionId?`
+- **useOrderState.saveReception**: при `r.batchId` автоматически создаёт `BatchExpense` записи из расходов приёмки (маппинг типа → категории партии)
+- **ReceivingPage**: при выборе заказа ищет связанную партию через `supplierOrderIds`, передаёт `batchId` в форму
+- **ReceivingForm**: баннер «Приёмка привязана к партии: X» при наличии batchId
+- **OrdersList + ProcurementPage**: загрузка всех партий, бейдж партии под названием заказа
+
+**Файлы изменены:**
+- `features/batches/BatchDetailPage.tsx`
+- `features/batches/hooks/useBatches.ts`
+- `features/batches/components/BatchExpensesTab.tsx`
+- `features/procurement/hooks/useOrderState.ts`
+- `features/procurement/ProcurementPage.tsx`
+- `features/procurement/components/OrdersList.tsx`
+- `features/receiving/ReceivingPage.tsx`
+- `features/receiving/components/ReceivingForm.tsx`
+- `types/inventory.ts` (Reception.batchId)
+- `types/batch.ts` (BatchExpense.receptionId)
+
+**Созданы:**
+- `features/batches/components/BatchSidebar.tsx`
+- `features/batches/components/BatchMainListTab.tsx`
+- `features/batches/components/BatchComparisonTab.tsx`
+
+**Открытые задачи / следующий шаг:**
+- Вкладка «Позиции» (BatchMainListTab): добавить связь с заказами (выручка по заказу как в DetailedList)
+- Форма внесения фактической выручки по позиции — пока только расходы
+- Управление приоритетами в карточке контрагента (CounterpartyManagerPage) — 9-я сессия
+- `BatchEconomyTab` старый можно удалить (заменён BatchComparisonTab + BatchMainListTab)
+- `unitCostKzt` в списании = 0
+
+**Ссылки:** [[Modules/Batches-PreCalc]] | [[Architecture]]
+
+---
+
+## 2026-04-09 — Приоритетные статьи ДДС для контрагентов
+
+**Что сделано:**
+- **DB**: `ALTER TABLE counterparties ADD COLUMN cash_flow_item_ids jsonb DEFAULT '[]'`
+- **Тип**: `cashFlowItemIds?: string[]` добавлен в `Counterparty`
+- **useReferenceState**: `patchCounterpartyCashFlowItems(id, ids)` — патч только поля cashFlowItemIds без перезаписи счетов
+- **GlobalStore**: action `patchCounterpartyCashFlowItems` пробросен через интерфейс
+- **CashFlowSelector**: новый prop `priorityItemIds` — показывает секцию «Приоритет» (янтарный цвет, звёздочка у первого) сверху над основным списком; секция скрывается при поиске/фильтре по тегу
+- **StatementImportModal**: при разборе выписки первая приоритетная статья контрагента автоматически подставляется (важнее suggestCashFlowItem); в ячейке «Статья ДДС» добавлена кнопка «★ Запомнить» — добавляет текущую статью в приоритеты контрагента прямо из окна импорта
+- **ManualPlanModal**: при выборе контрагента автоматически выбирается первая приоритетная статья; priorityItemIds передаётся в CashFlowSelector
+- **PaymentModal**: priorityItemIds из контрагента передаётся в CashFlowSelector каждой строки распределения
+
+**Файлы изменены:**
+- `types/counterparty.ts`
+- `features/system/hooks/useReferenceState.ts`
+- `features/system/context/GlobalStore.tsx`
+- `components/ui/CashFlowSelector.tsx`
+- `components/ui/StatementImportModal.tsx`
+- `features/finance/components/ManualPlanModal.tsx`
+- `features/finance/components/PaymentModal.tsx`
+
+**Открытые задачи / следующий шаг:**
+- Управление приоритетами в карточке контрагента (CounterpartyManagerPage) — просмотр и удаление статей из списка приоритетов
+- Проверить `BatchEconomyTab` — поля `deliveryUrumqiAlmatyKzt` / `logisticsAlmatyKaragandaKzt` (переносится 8-ю сессию!)
+
+**Ссылки:** [[Modules/Finance]] | [[Architecture]]
+
+---
+
+## 2026-04-09 — Багфиксы: MovementStatus + дропдаун WriteOffModal
+
+**Что сделано:**
+- **MovementStatus import error**: убран импорт `MovementStatus` из `enums.ts` — это `type`, а не `enum`, поэтому нельзя использовать как значение. Заменено на строковый литерал `'Physical' as const`
+- **WriteOffModal дропдаун**: убран `overflow-hidden` с внешнего контейнера модала и `overflow-y-auto flex-1` с тела — оба обрезали абсолютно позиционированный CalidadSelect. Модал расширен `max-w-lg` → `max-w-2xl`. Убран `dropdownMinWidth` — дропдаун теперь совпадает с шириной триггера через `right-0`
+
+**Файлы изменены:**
+- `features/inventory/hooks/useInventoryState.ts` — удалён импорт MovementStatus, `'Physical' as const`
+- `features/warehouse/components/WriteOffModal.tsx` — убраны overflow-клиппинги, расширен модал
+
+**Открытые задачи / следующий шаг:**
+- Проверить `BatchEconomyTab` — поля `deliveryUrumqiAlmatyKzt` / `logisticsAlmatyKaragandaKzt` (переносится 7-ю сессию!)
+- `unitCostKzt` в списании = 0. При необходимости подтягивать из `inventorySummary` при выборе товара
+
+**Ссылки:** [[Modules/UI-CalidadSelect]]
+
+---
+
+## 2026-04-09 — Модуль «Списание и брак» (WriteOff)
+
+**Что сделано:**
+- **DB**: 2 новые таблицы: `stock_writeoffs` (записи списаний) и `writeoff_reason_types` (справочник типов, 4 дефолтных типа)
+- **Меню**: «Брак и потери» → «Списание и брак»
+- **Типы**: `WriteOff`, `WriteOffReasonType`, `WriteOffDocument` в `types/inventory.ts`; `StockMovement.documentType` расширен значением `'WriteOff'`
+- **constants.ts**: `STOCK_WRITEOFFS`, `WRITEOFF_REASON_TYPES`
+- **useInventoryState**: `writeoffs` state, `createWriteOff` (создаёт движение Out + запись БД), `deleteWriteOff` (сторно движение + удаление записи)
+- **useReferenceState**: `writeoffReasonTypes` state + `addWriteoffReasonType`, `updateWriteoffReasonType`, `deleteWriteoffReasonType`
+- **GlobalStore**: загрузка writeoffs в `loadOperational`, загрузка writeoffReasonTypes в `loadReferences`, новые actions
+- **WriteOffModal**: форма создания — выбор товара (CalidadSelect), кол-во, тип-кнопки, textarea причины, FileUpload для документов; временный ID для папки Firebase с момента открытия
+- **ReasonTypesModal**: CRUD справочника типов с цветными бейджами, inline-редактирование, выбор цвета
+- **WriteOffPage**: таблица списаний с KPI (кол-во, qty, сумма), поиском, сортировкой по дате, раскрываемой строкой с причиной и ссылками на файлы
+
+**Файлы изменены:**
+- `types/inventory.ts`, `constants.ts`, `components/system/Layout.tsx`
+- `features/inventory/hooks/useInventoryState.ts`
+- `features/system/hooks/useReferenceState.ts`
+- `features/system/context/GlobalStore.tsx`
+- `App.tsx`
+
+**Созданы:**
+- `features/warehouse/components/WriteOffModal.tsx`
+- `features/warehouse/components/ReasonTypesModal.tsx`
+- `features/warehouse/pages/WriteOffPage.tsx`
+
+**Открытые задачи / следующий шаг:**
+- Проверить `BatchEconomyTab` — поля `deliveryUrumqiAlmatyKzt` / `logisticsAlmatyKaragandaKzt` (переносится!)
+- unitCostKzt в списании сейчас = 0 (нет доступа к средней себестоимости в момент создания). При необходимости — подтягивать из `inventorySummary`
+
+**Ссылки:** [[Modules/Inventory]] | [[Architecture]]
+
+---
+
+## 2026-04-08 — CalidadSelect + многоколоночная сортировка в Остатках
+
+**Что сделано:**
+- Заменены нативные `<select>` (Оборудование, Категории) на `CalidadSelect` в `InventoryPage`
+- Добавлена сортировка по числовым столбцам: Себест. ед. (`unitCost`), Себест. общ. (`totalCost`), Цена Пр. ед. (`salesPrice`), Выручка (`revenue`)
+- Экспортирован тип `InventorySortKey` из `useInventoryFilters`
+- `StockTable` получил `sortConfig` prop и компонент `SortTh` — активный столбец подсвечен синим + стрелка ChevronUp/Down
+
+**Файлы изменены:**
+- `features/inventory/hooks/useInventoryFilters.ts` — экспорт `InventorySortKey`, расширен тип
+- `features/inventory/InventoryPage.tsx` — CalidadSelect импорт, числовая сортировка в useMemo, передача sortConfig в StockTable
+- `features/inventory/components/StockTable.tsx` — SortTh компонент, обновлены props
+
+**Открытые задачи / следующий шаг:**
+- Проверить `BatchEconomyTab` — поля `deliveryUrumqiAlmatyKzt` / `logisticsAlmatyKaragandaKzt` (переносится 6-ю сессию!)
+
+**Ссылки:** [[Modules/Inventory]] | [[Modules/UI-CalidadSelect]]
+
+---
+
+## 2026-04-08 — Сортировка в MassAddModal (Опции)
+
+**Что сделано:**
+- Добавлена кликабельная сортировка по трём полям: **Станок** (название), **Закуп** (basePrice), **Продажа** (salesPrice)
+- Повторный клик по активному заголовку — переключает направление asc/desc; клик по другому — меняет поле и сбрасывает на asc
+- Компонент `SortTh` — заголовок-кнопка: активный подсвечен синим + стрелка ChevronUp/Down; неактивные — призрачная стрелка при наведении
+- Дефолт: сортировка по названию по возрастанию (сохранено поведение как было)
+
+**Файлы изменены:**
+- `features/bundles/components/MassAddModal.tsx` — типы `SortField`/`SortDir`, состояние `sortField`/`sortDir`, хендлер `handleSort`, компонент `SortTh`, обновлён `filteredMachines` useMemo
+
+**Открытые задачи / следующий шаг:**
+- Проверить `BatchEconomyTab` — поля `deliveryUrumqiAlmatyKzt` / `logisticsAlmatyKaragandaKzt` (переносится 5-ю сессию!)
+
+**Ссылки:** [[Modules/Bundles-Options]]
+
+---
+
+## 2026-04-08 — Дубль без «(копия)» + Доставка по Китаю в предрасчётах
+
+**Что сделано:**
+- **Дублирование Номенклатуры** — убрано слово «(копия)» из name/supplierProductName; добавлен `isCopy` флаг, при дублировании в шапке ProductModal появляется янтарный бейдж «Создание дубля — это новая позиция»
+- **Дублирование Вариантов опций** — убрано «(копия)» из name; в VariantForm при клонировании показывается янтарная полоса «Создание дубля — это новый вариант»
+- **Доставка по Китаю** в модуле Предрасчёты:
+  - Новые поля `ChinaDomesticRateMethod` + 4 поля в `GeneralSettings` + `deliveryChinaDomesticKzt` в `PreCalculationItem`
+  - Миграция БД: `pre_calculations` — 4 новых колонки; `pre_calculation_items` — `delivery_china_domestic_kzt`
+  - 3 метода расчёта: от объёма ($/м³), от веса ($/тонна), фикс. цена (₸/ед); курс — тот же что у Урумчи
+  - Включена в `fullCostKzt`, `preSaleCostKzt`, `customsNdsKzt` (×0.6)
+  - UI в GeneralSettings: карточка «Доставка по Китаю» с 3 кнопками-переключателями и полем ставки
+  - Колонка «Кит.Дом» в DetailedList (голубой цвет, между Урумчи и Алм.-Кар.)
+  - `plannedLogisticsChinaDomesticKzt` в создаваемой партии теперь реальный, а не 0
+
+**Файлы изменены:**
+- `types/pre-calculations.ts` — `ChinaDomesticRateMethod`, новые поля
+- `features/pre-calculations/hooks/usePreCalculations.ts` — дефолты, загрузка, расчёт, сохранение
+- `features/pre-calculations/components/general-settings/GeneralSettings.tsx` — карточка «Доставка по Китаю»
+- `features/pre-calculations/components/detailed-list/DetailedList.tsx` — колонка Кит.Дом
+- `features/pre-calculations/components/detailed-list/AddItemModal.tsx` — инициализация поля
+- `features/pre-calculations/pages/PreCalculationEditorPage.tsx` — реальный planned в партию
+- `features/nomenclature/hooks/useNomenclatureCRUD.ts` — isCopy, убрано «(копия)»
+- `features/nomenclature/NomenclaturePage.tsx` — передача isCopy
+- `features/nomenclature/components/ProductModal.tsx` — янтарный бейдж
+- `features/bundles/components/OptionsEditor.tsx` — isCloning, убрано «(копия)»
+- `features/bundles/components/VariantForm.tsx` — isCopy пропс + янтарная полоса
+
+**Открытые задачи / следующий шаг:**
+- Проверить `BatchEconomyTab` — поля `deliveryUrumqiAlmatyKzt` / `logisticsAlmatyKaragandaKzt` (переносится 5-ю сессию!)
+- По теме Доставки по Китаю: в Партиях расход `logistics_china_domestic` уже существует как категория. Логика запоздалого отражения (оплата попадает в следующую партию) — это организационный процесс, не требует доп. кода сейчас.
+
+**Ссылки:** [[Modules/Batches-PreCalc]] | [[Decisions/001-rename-expense-categories-and-delivery]] | [[Decisions/004-china-domestic-delivery-rate-methods]] | [[Architecture]]
+
+---
+
+## 2026-04-07 — Инфраструктура статей ДДС: группы, теги, CashFlowSelector
+
+**Что сделано:**
+- **DB миграция**: новая таблица `cash_flow_tags`, добавлены колонки `parent_id`, `is_group`, `sort_order`, `tag_ids` в `cash_flow_items`
+- **TypeScript**: добавлен интерфейс `CashFlowTag`, расширен `CashFlowItem` (isGroup, parentId, sortOrder, tagIds)
+- **`constants.ts`**: добавлен `CASH_FLOW_TAGS`
+- **`useReferenceState`**: загрузка тегов, `updateCashFlowItem`, CRUD для тегов (add/update/delete)
+- **`GlobalStore`**: `cashFlowTags` в стейте, actions, загрузке
+- **`FinanceCategoriesPage`**: полностью переписана — группы с вложенностью, управление тегами, фильтр по тегу, inline-переименование
+- **`CashFlowSelector`** (`components/ui/CashFlowSelector.tsx`): новый компонент — сгруппированный дропдаун с поиском и фильтром по тегам
+- Заменены нативные `<select>` → `CashFlowSelector` в: `PaymentModal`, `ManualPlanModal`, `StatementImportModal`, `OrderPaymentsTab`, `SalesPaymentsTab`
+
+**Файлы изменены:**
+- `types/finance.ts` — CashFlowTag, расширен CashFlowItem
+- `constants.ts` — CASH_FLOW_TAGS
+- `features/system/hooks/useReferenceState.ts` — теги, updateCashFlowItem
+- `features/system/context/GlobalStore.tsx` — cashFlowTags
+- `features/finance/FinanceCategoriesPage.tsx` — полная переработка
+- `components/ui/CashFlowSelector.tsx` — создан
+- `features/finance/components/PaymentModal.tsx` — CashFlowSelector
+- `features/finance/components/ManualPlanModal.tsx` — CashFlowSelector
+- `components/ui/StatementImportModal.tsx` — CashFlowSelector
+- `features/procurement/components/OrderPaymentsTab.tsx` — CashFlowSelector
+- `features/sales/components/SalesPaymentsTab.tsx` — CashFlowSelector
+
+**Открытые задачи / следующий шаг:**
+- Проверить `BatchEconomyTab` — поля `deliveryUrumqiAlmatyKzt` / `logisticsAlmatyKaragandaKzt` (**5-я сессия подряд!**)
+- Применить `CalidadSelect` в других местах по мере работы
+
+**Ссылки:** [[Modules/Finance]] | [[Architecture]]
+
+---
+
 ## 2026-04-08 — [ИТОГ СЕССИИ] Quick/Mass Edit в номенклатуре + CalidadSelect стандарт
 
 **Что сделано:**

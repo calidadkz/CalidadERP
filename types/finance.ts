@@ -13,6 +13,12 @@ export interface CashFlowTag {
     color: string;          // hex-цвет, например '#6366f1'
 }
 
+export interface CashFlowItemType {
+    id: string;
+    name: string;
+    color: string;          // hex-цвет для бейджа
+}
+
 export interface CounterpartyAccount {
     id: string;
     counterpartyId: string;
@@ -43,6 +49,8 @@ export interface CashFlowItem {
     sortOrder: number;
     // Теги
     tagIds: string[];           // массив id из CashFlowTag
+    // Тип статьи (одиночное значение)
+    itemTypeId?: string | null; // id из CashFlowItemType
 }
 
 export interface CurrencyLot {

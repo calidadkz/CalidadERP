@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { X, Upload, CheckCircle2, UserPlus, ArrowRight, Loader2, Info, AlertCircle, Save, PlusCircle, Trash2, Link, Tag, Search } from 'lucide-react';
+import { X, Upload, CheckCircle2, UserPlus, ArrowRight, Loader2, Info, AlertCircle, Save, PlusCircle, Trash2, Link, Tag, Search, Star } from 'lucide-react';
 import { useStore } from '@/features/system/context/GlobalStore';
 import { StatementParser, ParsedStatementRow, ParseResult } from '@/services/StatementParser';
-import { Currency, ActualPayment, Counterparty, CounterpartyAccount, CounterpartyType, CashFlowItem, PlannedPayment, PaymentAllocation } from '@/types'; 
+import { Currency, ActualPayment, Counterparty, CounterpartyAccount, CounterpartyType, CashFlowItem, PlannedPayment, PaymentAllocation } from '@/types';
 import { ApiService } from '@/services/api';
 import { CounterpartyCreateModal } from '@/features/counterparties/components/CounterpartyCreateModal';
+import { CashFlowSelector } from '@/components/ui/CashFlowSelector';
 
 interface StatementImportModalProps {
     onClose: () => void;
@@ -23,7 +24,8 @@ interface MatchResult {
 
 export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onClose }) => {
     const { state, actions } = useStore();
-    const { counterparties, bankAccounts, cashFlowItems, plannedPayments } = state; 
+    const { counterparties, bankAccounts, cashFlowItems, plannedPayments } = state;
+    const [savingPriorityFor, setSavingPriorityFor] = useState<number | null>(null);
 
     const [parsedData, setParsedData] = useState<{ rows: ParsedStatementRow[] } | null>(null);
     const [parsedDataMeta, setParsedDataMeta] = useState<{ accountNumber?: string, currency?: string } | null>(null);
@@ -128,11 +130,15 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
                 Math.abs(p.amountDue - p.amountPaid - amount) < 0.01
             ) : null;
 
+            // Приоритетная статья контрагента — важнее suggestCashFlowItem
+            const priorityIds = matchedCp?.cashFlowItemIds?.filter(Boolean) || [];
+            const prioritySuggestion = priorityIds.length > 0 ? priorityIds[0] : null;
+
             return {
                 row: { ...row },
                 matchedId: matchedCp?.id || null,
                 matchedType: matchedCp?.type || null,
-                cashFlowItemId: matchedPp?.cashFlowItemId || suggestCashFlowItem(row.purpose, direction),
+                cashFlowItemId: matchedPp?.cashFlowItemId || prioritySuggestion || suggestCashFlowItem(row.purpose, direction),
                 plannedPaymentId: matchedPp?.id || null,
                 isNew: false,
                 status: matchedCp ? 'matched' : 'unmatched' as any
@@ -206,6 +212,24 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
             setError("Ошибка при создании контрагента: " + (e as Error).message);
         } finally {
             setIsProcessing(false);
+        }
+    };
+
+    const handleSavePriority = async (idx: number) => {
+        const match = matches[idx];
+        if (!match.matchedId || !match.cashFlowItemId) return;
+        const cp = counterparties.find(c => c.id === match.matchedId);
+        if (!cp) return;
+
+        const existing = cp.cashFlowItemIds || [];
+        if (existing.includes(match.cashFlowItemId)) return; // уже есть
+
+        const updated = [match.cashFlowItemId, ...existing];
+        setSavingPriorityFor(idx);
+        try {
+            await actions.patchCounterpartyCashFlowItems(match.matchedId, updated);
+        } finally {
+            setSavingPriorityFor(null);
         }
     };
 
@@ -439,17 +463,43 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
                                                     </td>
 
                                                     <td className="px-4 py-4 border-y border-slate-100">
-                                                        <div className="flex flex-col gap-1">
-                                                            <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Статья ДДС</label>
-                                                            <select 
-                                                                className={`w-full text-[10px] font-bold rounded-xl p-2 border outline-none transition-all ${match.cashFlowItemId ? 'bg-indigo-50 border-indigo-100 text-indigo-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}
-                                                                value={match.cashFlowItemId || ''}
-                                                                onChange={e => updateMatch(idx, 'cashFlowItemId', e.target.value)}
-                                                            >
-                                                                <option value="">-- Выберите статью --</option>
-                                                                {cashFlowItems.filter(i => i.type === direction).map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-                                                            </select>
-                                                        </div>
+                                                        {(() => {
+                                                            const cp = match.matchedId ? counterparties.find(c => c.id === match.matchedId) : null;
+                                                            const cpPriorityIds = cp?.cashFlowItemIds || [];
+                                                            const isAlreadyPriority = !!match.cashFlowItemId && cpPriorityIds.includes(match.cashFlowItemId);
+                                                            const canSavePriority = !!match.matchedId && !!match.cashFlowItemId && !isAlreadyPriority;
+                                                            const isSaving = savingPriorityFor === idx;
+                                                            return (
+                                                                <div className="flex flex-col gap-1">
+                                                                    <div className="flex items-center justify-between ml-1">
+                                                                        <label className="text-[8px] font-black text-slate-400 uppercase">Статья ДДС</label>
+                                                                        {match.matchedId && match.cashFlowItemId && (
+                                                                            <button
+                                                                                onClick={() => handleSavePriority(idx)}
+                                                                                disabled={isAlreadyPriority || isSaving}
+                                                                                title={isAlreadyPriority ? 'Уже в приоритетах' : 'Запомнить как приоритетную для контрагента'}
+                                                                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase transition-all ${
+                                                                                    isAlreadyPriority
+                                                                                        ? 'text-amber-500 bg-amber-50 cursor-default'
+                                                                                        : 'text-slate-400 hover:text-amber-500 hover:bg-amber-50'
+                                                                                }`}
+                                                                            >
+                                                                                {isSaving ? <Loader2 size={10} className="animate-spin"/> : <Star size={10} fill={isAlreadyPriority ? 'currentColor' : 'none'}/>}
+                                                                                {isAlreadyPriority ? 'Приоритет' : 'Запомнить'}
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                    <CashFlowSelector
+                                                                        value={match.cashFlowItemId || ''}
+                                                                        onChange={id => updateMatch(idx, 'cashFlowItemId', id)}
+                                                                        direction={direction === 'Income' ? 'Incoming' : 'Outgoing'}
+                                                                        dropdownMinWidth={220}
+                                                                        placeholder="— Статья ДДС —"
+                                                                        priorityItemIds={cpPriorityIds}
+                                                                    />
+                                                                </div>
+                                                            );
+                                                        })()}
                                                     </td>
 
                                                     <td className="px-4 py-4 border-y border-slate-100">

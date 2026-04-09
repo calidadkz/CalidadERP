@@ -33,6 +33,7 @@ export enum TableNames {
     PRICING_PROFILES = 'pricing_profiles',
     CASH_FLOW_ITEMS = 'cash_flow_items',
     CASH_FLOW_TAGS = 'cash_flow_tags',
+    CASH_FLOW_ITEM_TYPES = 'cash_flow_item_types',
     HS_CODES = 'hscodes',
     MANUFACTURERS = 'manufacturers',
     OUR_COMPANIES = 'our_companies',
@@ -44,7 +45,9 @@ export enum TableNames {
     BATCH_EXPENSES = 'batch_expenses',
     BATCH_DOCUMENTS = 'batch_documents',
     BATCH_ITEM_ACTUALS = 'batch_item_actuals',
-    INVENTORY_SUMMARY = 'v_inventory_summary'
+    INVENTORY_SUMMARY = 'v_inventory_summary',
+    STOCK_WRITEOFFS = 'stock_writeoffs',
+    WRITEOFF_REASON_TYPES = 'writeoff_reason_types'
 }
 
 export const KZT_RATES: Record<Currency, number> = {

@@ -1,14 +1,21 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '@/features/system/context/GlobalStore';
-import { SupplierOrder, PlannedPayment, ProductType } from '@/types';
+import { SupplierOrder, PlannedPayment, ProductType, Batch } from '@/types';
 import { ShoppingCart, Plus, AlertCircle } from 'lucide-react';
 import { OrdersList } from './components/OrdersList';
 import { OrderForm } from './components/OrderForm';
+import { api } from '@/services';
+import { TableNames } from '@/constants';
 
 export const ProcurementPage: React.FC = () => {
     const { state, actions } = useStore();
     const [view, setView] = useState<'list' | 'form'>('list');
+    const [batches, setBatches] = useState<Batch[]>([]);
+
+    useEffect(() => {
+        api.fetchAll<Batch>(TableNames.BATCHES).then(setBatches).catch(() => {});
+    }, []);
     const [editingOrder, setEditingOrder] = useState<SupplierOrder | null>(null);
     const [supplierFilter, setSupplierFilter] = useState('');
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -67,14 +74,15 @@ export const ProcurementPage: React.FC = () => {
             </div>
 
             {view === 'list' ? (
-                <OrdersList 
-                    orders={state.orders} 
-                    suppliers={state.suppliers} 
-                    supplierFilter={supplierFilter} 
-                    setSupplierFilter={setSupplierFilter} 
-                    plannedPayments={state.plannedPayments} 
+                <OrdersList
+                    orders={state.orders}
+                    suppliers={state.suppliers}
+                    supplierFilter={supplierFilter}
+                    setSupplierFilter={setSupplierFilter}
+                    plannedPayments={state.plannedPayments}
                     onEdit={handleEditOrder}
                     onDelete={handleDeleteOrder}
+                    batches={batches}
                 />
             ) : (
                 <OrderForm 

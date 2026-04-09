@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { ReceptionItem, ReceptionExpense, SupplierOrder } from '@/types';
-import { Package, Save } from 'lucide-react';
+import { Package, Save, Layers } from 'lucide-react';
 import { ExpenseForm } from './ExpenseForm';
 import { EconomySummary } from './EconomySummary';
 import { useReceivingLogic } from '../hooks/useReceivingLogic';
@@ -12,10 +12,12 @@ interface ReceivingFormProps {
     actions: any;
     onCancel: () => void;
     onSave: (reception: any) => void;
+    batchId?: string;       // если заказ привязан к партии
+    batchName?: string;     // название партии для отображения
 }
 
 export const ReceivingForm: React.FC<ReceivingFormProps> = ({
-    order, state, actions, onCancel, onSave
+    order, state, actions, onCancel, onSave, batchId, batchName
 }) => {
     const [items, setItems] = useState<ReceptionItem[]>(order.items.map(i => {
         const product = state.products.find((p: any) => p.id === i.productId);
@@ -51,6 +53,23 @@ export const ReceivingForm: React.FC<ReceivingFormProps> = ({
 
     return (
         <div className="space-y-6">
+            {/* Баннер привязки к партии */}
+            {batchId && (
+                <div className="flex items-center gap-3 px-5 py-3 bg-indigo-50 border border-indigo-200 rounded-2xl">
+                    <div className="p-2 bg-indigo-100 rounded-xl text-indigo-600 flex-none">
+                        <Layers size={16}/>
+                    </div>
+                    <div>
+                        <div className="text-[11px] font-black text-indigo-800 uppercase tracking-widest">
+                            Приёмка привязана к партии: {batchName || batchId}
+                        </div>
+                        <div className="text-[10px] font-bold text-indigo-500 mt-0.5">
+                            Расходы этой приёмки автоматически попадут в партию как фактические затраты
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-12 gap-6">
                 <div className="col-span-12 lg:col-span-8 space-y-6">
                     <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">

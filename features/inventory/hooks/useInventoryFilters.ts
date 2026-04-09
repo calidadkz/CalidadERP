@@ -2,9 +2,11 @@
 import { useState, useMemo} from 'react';
 import { Product, ProductType, ProductCategory } from '@/types';
 
+export type InventorySortKey = 'name' | 'totalCost' | 'unitCost' | 'salesPrice' | 'revenue';
+
 export const useInventoryFilters = (products: Product[], categories: ProductCategory[]) => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [sortConfig, setSortConfig] = useState<{ key: 'name'; direction: 'asc' | 'desc' } | null>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: InventorySortKey; direction: 'asc' | 'desc' } | null>(null);
     const [activeType, setActiveType] = useState<ProductType>(ProductType.PART);
     const [machineFilter, setMachineFilter] = useState<string | 'all'>('all');
     const [categoryFilter, setCategoryFilter] = useState<string | 'all'>('all');
@@ -18,7 +20,7 @@ export const useInventoryFilters = (products: Product[], categories: ProductCate
         return base.filter(cat => products.some(p => p.type === activeType && p.categoryId === cat.id && (p.compatibleMachineCategoryIds || []).includes(machineFilter)));
     }, [categories, activeType, machineFilter, products]);
 
-    const handleSort = (key: 'name') => {
+    const handleSort = (key: InventorySortKey) => {
         let direction: 'asc' | 'desc' = 'asc';
         if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
             direction = 'desc';

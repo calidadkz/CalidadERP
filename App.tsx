@@ -26,6 +26,7 @@ const CurrencyRatesPage = lazy(() => import('./features/finance/pages/CurrencyRa
 const CounterpartyManagerPage = lazy(() => import('./features/counterparties/pages/CounterpartyManagerPage').then(module => ({ default: module.CounterpartyManagerPage })));
 const CategoriesPage = lazy(() => import('./features/products/pages/CategoriesPage').then(module => ({ default: module.CategoriesPage })));
 const DiscrepancyPage = lazy(() => import('./features/warehouse/pages/DiscrepancyPage').then(module => ({ default: module.DiscrepancyPage })));
+const WriteOffPage = lazy(() => import('./features/warehouse/pages/WriteOffPage').then(module => ({ default: module.WriteOffPage })));
 const HistoryPage = lazy(() => import('./features/history/pages/HistoryPage').then(module => ({ default: module.HistoryPage })));
 const RecycleBinPage = lazy(() => import('./features/system/pages/RecycleBinPage').then(module => ({ default: module.RecycleBinPage })));
 const PricingManagerPage = lazy(() => import('./features/products/pages/PricingManagerPage').then(module => ({ default: module.PricingManagerPage })));
@@ -136,7 +137,7 @@ const AppContent = () => {
                         <Route path="/receiving" element={<ReceivingPage />} />
                         <Route path="/sales" element={<SalesPage />} />
                         <Route path="/shipment" element={<ShipmentPage />} />
-                        <Route path="/discrepancy" element={<DiscrepancyPage />} />
+                        <Route path="/discrepancy" element={<WriteOffPage />} />
                         <Route path="/finance_calendar" element={<FinancePage view="plan" />} />
                         <Route path="/finance_statements" element={<FinancePage view="fact" />} />
                         <Route path="/finance_accounts" element={<FinancePage view="treasury" />} />

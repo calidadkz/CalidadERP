@@ -565,6 +565,30 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
                                                         )}
                                                     </div>
 
+                                                    {/* Вес */}
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Вес (кг)</span>
+                                                        {(!product.packages || product.packages.length === 0) ? (
+                                                            <span className="h-[30px] flex items-center text-[10px] text-slate-400 italic">—</span>
+                                                        ) : product.packages.length === 1 ? (
+                                                            <input
+                                                                type="number"
+                                                                defaultValue={product.packages[0].weightKg || 0}
+                                                                onBlur={e => {
+                                                                    const pkg = { ...product.packages![0], weightKg: parseFloat(e.target.value) || 0 };
+                                                                    const updated: Product = { ...product, ...(inlineEdits[product.id] || {}), packages: [pkg] };
+                                                                    onInlineUpdate?.(updated);
+                                                                    setInlineEdits(prev => { const n = { ...prev }; delete n[product.id]; return n; });
+                                                                }}
+                                                                className="w-20 bg-white border border-amber-200 rounded-lg px-2 py-1 text-[10px] font-mono text-slate-700 focus:outline-none focus:border-amber-400 text-center"
+                                                            />
+                                                        ) : (
+                                                            <div className="h-[30px] flex items-center">
+                                                                <span className="text-[10px] text-slate-400 italic">откройте карточку</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
                                                     {/* Кнопка сохранить если есть изменения */}
                                                     {dirty && (
                                                         <button

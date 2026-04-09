@@ -1,6 +1,7 @@
 
 import { useState } from 'react';
 import { Product, StockMovement, Discrepancy, TrashItem, Currency, OptionVariant, PricingProfile } from '@/types';
+import { WriteOff } from '@/types/inventory';
 import { ApiService } from '@/services/api';
 import { TableNames } from '@/constants';
 import { InventoryMediator } from '@/services/InventoryMediator';
@@ -12,6 +13,7 @@ export const useInventoryState = (
     const [products, setProducts] = useState<Product[]>([]);
     const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
     const [discrepancies, setDiscrepancies] = useState<Discrepancy[]>([]);
+    const [writeoffs, setWriteoffs] = useState<WriteOff[]>([]);
 
     const addProduct = async (p: Product) => {
         try {
@@ -141,11 +143,86 @@ export const useInventoryState = (
          }
     };
 
+    // ───── Списания ─────
+
+    const createWriteOff = async (
+        writeoff: WriteOff,
+        optionVariants: OptionVariant[] = [],
+        pricingProfiles: PricingProfile[] = [],
+        exchangeRates: Record<Currency, number> = {} as Record<Currency, number>
+    ): Promise<WriteOff> => {
+        const p = products.find(x => x.id === writeoff.productId);
+        if (!p) throw new Error('Товар не найден');
+
+        // 1. Создаём движение Out через InventoryMediator
+        const docData = {
+            id: writeoff.id,
+            productId: writeoff.productId,
+            quantity: -writeoff.quantity,
+            unitCostKzt: writeoff.unitCostKzt,
+            configuration: undefined,
+            description: `Списание: ${writeoff.reasonNote || 'без причины'}`
+        };
+
+        let movementId = '';
+        let actualUnitCostKzt = writeoff.unitCostKzt;
+        await InventoryMediator.processEvent(
+            'WriteOff',
+            'Adjustment',
+            docData,
+            products,
+            optionVariants,
+            pricingProfiles,
+            exchangeRates,
+            stockMovements,
+            (newMvs) => {
+                movementId = newMvs[0]?.id || '';
+                // Берём реальную себестоимость из движения (InventoryMediator считает FIFO)
+                if (newMvs[0]?.unitCostKzt) {
+                    actualUnitCostKzt = newMvs[0].unitCostKzt;
+                }
+                setStockMovements(prev => [...newMvs, ...prev]);
+            }
+        );
+
+        // 2. Сохраняем запись списания
+        const toSave: WriteOff = { ...writeoff, movementId, unitCostKzt: actualUnitCostKzt };
+        const created = await ApiService.create<WriteOff>(TableNames.STOCK_WRITEOFFS, toSave);
+        setWriteoffs(prev => [created, ...prev]);
+        addLog('Create', 'Списание', writeoff.productId, `Списание ${writeoff.quantity} шт. ${writeoff.productName}`);
+        return created;
+    };
+
+    const deleteWriteOff = async (wo: WriteOff) => {
+        // Удаляем движение-сторно
+        if (wo.movementId) {
+            const mv = stockMovements.find(m => m.id === wo.movementId);
+            if (mv) {
+                const reversalMovement: StockMovement = {
+                    ...mv,
+                    id: ApiService.generateId(),
+                    date: new Date().toISOString(),
+                    type: 'In',
+                    quantity: wo.quantity,
+                    description: `Отмена списания (исходный: ${wo.id})`,
+                    statusType: 'Physical' as const,
+                };
+                const created = await ApiService.create<StockMovement>(TableNames.STOCK_MOVEMENTS, reversalMovement);
+                setStockMovements(prev => [created, ...prev]);
+            }
+        }
+        await ApiService.delete(TableNames.STOCK_WRITEOFFS, wo.id);
+        setWriteoffs(prev => prev.filter(x => x.id !== wo.id));
+        addLog('Delete', 'Списание', wo.productId, `Удаление списания ${wo.quantity} шт. ${wo.productName}`);
+    };
+
     return {
         products, setProducts,
         stockMovements, setStockMovements,
         discrepancies, setDiscrepancies,
+        writeoffs, setWriteoffs,
         addProduct, updateProduct, updateProductsBulk, deleteProduct, adjustStock, revertInitialStockEntry,
-        updateDiscrepancy, writeOffDiscrepancy
+        updateDiscrepancy, writeOffDiscrepancy,
+        createWriteOff, deleteWriteOff,
     };
 };

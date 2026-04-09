@@ -1,8 +1,21 @@
 
 import React, { useState } from 'react';
-import { SupplierOrder, OrderItem, SalesOrder, Reception, Shipment, PlannedPayment, OrderStatus, Product, StockMovement, ShipmentItem, ReceptionItem, ReceptionExpense, Currency, SalesOrderItem, OptionVariant, PricingProfile, TrashItem } from '@/types';
+import { SupplierOrder, OrderItem, SalesOrder, Reception, Shipment, PlannedPayment, OrderStatus, Product, StockMovement, ShipmentItem, ReceptionItem, ReceptionExpense, Currency, SalesOrderItem, OptionVariant, PricingProfile, TrashItem, ExpenseCategory } from '@/types';
 import { ApiService } from '@/services/api';
 import { TableNames } from '@/constants';
+
+// Маппинг типов расходов приёмки → категории партии
+const RECEPTION_TO_BATCH_CATEGORY: Record<string, ExpenseCategory> = {
+    'Доставка Китай':        'logistics_urumqi_almaty',
+    'Доставка Алматы-Кар.':  'logistics_almaty_karaganda',
+    'Доставка Алматы–Кар.':  'logistics_almaty_karaganda',
+    'Доставка Алматы-Кар':   'logistics_almaty_karaganda',
+    'СВХ':                   'svh',
+    'Брокер':                'broker',
+    'Сборы':                 'customs',
+    'НДС':                   'customs_vat',
+    'Прочее':                'other',
+};
 import { InventoryMediator } from '@/services/InventoryMediator';
 
 export const useOrderState = (
@@ -279,6 +292,27 @@ export const useOrderState = (
             const savedExpenses = await ApiService.createMany<ReceptionExpense>(TableNames.RECEPTION_EXPENSES, expensesToSave);
             
             const fullReception: Reception = { ...r, id: finalReceptionId, items: savedItems, expenses: savedExpenses };
+
+            // Если приёмка привязана к партии — автоматически создаём BatchExpense записи
+            if (r.batchId && savedExpenses.length > 0) {
+                const batchExpensesToCreate = savedExpenses
+                    .filter(e => Number(e.amount) > 0)
+                    .map(e => {
+                        const category: ExpenseCategory = RECEPTION_TO_BATCH_CATEGORY[e.type] ?? 'other';
+                        return {
+                            id: ApiService.generateId('BE'),
+                            batchId: r.batchId!,
+                            category,
+                            description: `[Приёмка] ${e.type}${r.id ? ' · ' + r.id.slice(-6).toUpperCase() : ''}`,
+                            amountKzt: Number(e.amount),
+                            date: r.date,
+                            receptionId: finalReceptionId,
+                        };
+                    });
+                if (batchExpensesToCreate.length > 0) {
+                    await ApiService.createMany(TableNames.BATCH_EXPENSES, batchExpensesToCreate);
+                }
+            }
 
             if (r.status === 'Posted') {
                 await InventoryMediator.processEvent('Reception', 'Posted', fullReception, products, optionVariants, pricingProfiles, exchangeRates, currentStockMovements, handleNewMovements);

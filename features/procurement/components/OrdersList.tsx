@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { SupplierOrder, PlannedPayment, OrderStatus } from '@/types';
-import { Pencil, Filter, Search, ArrowUpDown, Trash2 } from 'lucide-react';
+import { SupplierOrder, PlannedPayment, OrderStatus, Batch } from '@/types';
+import { Pencil, Filter, Search, ArrowUpDown, Trash2, Layers } from 'lucide-react';
 
 interface OrdersListProps {
     orders: SupplierOrder[];
@@ -11,14 +11,23 @@ interface OrdersListProps {
     plannedPayments: PlannedPayment[];
     onEdit: (order: SupplierOrder) => void;
     onDelete?: (order: SupplierOrder) => void;
+    batches?: Batch[];
 }
 
 type SortField = 'date' | 'id' | 'supplierName' | 'totalAmountForeign' | 'status' | 'name';
 type SortOrder = 'asc' | 'desc';
 
 export const OrdersList: React.FC<OrdersListProps> = ({
-    orders, suppliers, supplierFilter, setSupplierFilter, plannedPayments, onEdit, onDelete
+    orders, suppliers, supplierFilter, setSupplierFilter, plannedPayments, onEdit, onDelete, batches = []
 }) => {
+    // Индекс: orderId → batch для быстрого поиска
+    const orderBatchMap = useMemo(() => {
+        const m: Record<string, Batch> = {};
+        batches.forEach(b => {
+            (b.supplierOrderIds || []).forEach(ordId => { m[ordId] = b; });
+        });
+        return m;
+    }, [batches]);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortField, setSortField] = useState<SortField>('date');
     const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -152,6 +161,7 @@ export const OrdersList: React.FC<OrdersListProps> = ({
                             <tr><td colSpan={8} className="p-12 text-center text-gray-400 italic text-sm">Заказы не найдены</td></tr>
                         ) : filteredAndSortedOrders.map(o => {
                             const { paidAmount, paymentPercent } = getOrderMetrics(o.id, o.totalAmountForeign);
+                            const linkedBatch = orderBatchMap[o.id];
                             return (
                                 <tr key={o.id} className="hover:bg-slate-50/50 transition-colors group">
                                     <td className="px-6 py-4">
@@ -162,6 +172,13 @@ export const OrdersList: React.FC<OrdersListProps> = ({
                                         <div className="text-sm font-medium text-slate-700 truncate max-w-[180px]" title={o.name || 'Без названия'}>
                                             {o.name || <span className="text-slate-300 italic">Без названия</span>}
                                         </div>
+                                        {linkedBatch && (
+                                            <div className="flex items-center gap-1 mt-1">
+                                                <span className="flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-lg text-[8px] font-black uppercase tracking-tight">
+                                                    <Layers size={8}/> {linkedBatch.name}
+                                                </span>
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 text-sm font-bold text-slate-700">{o.supplierName}</td>
                                     <td className="px-6 py-4 text-sm text-right font-mono font-black text-slate-900 whitespace-nowrap">

@@ -87,7 +87,7 @@ export const PreCalculationEditorPage: React.FC = () => {
                 plannedPurchaseKzt,
                 plannedLogisticsUrumqiAlmatyKzt,
                 plannedLogisticsAlmatyKaragandaKzt,
-                plannedLogisticsChinaDomesticKzt: 0,
+                plannedLogisticsChinaDomesticKzt: items.reduce((s, i) => s + ((i.deliveryChinaDomesticKzt || 0) * (i.quantity || 1)), 0),
                 plannedSvhKzt,
                 plannedBrokerKzt,
                 plannedCustomsKzt,

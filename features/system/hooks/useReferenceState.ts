@@ -1,6 +1,7 @@
 
 import { useState } from 'react';
-import { Counterparty, CounterpartyAccount, Manufacturer, OurCompany, Employee, LogEntry, ProductCategory, OptionType, OptionVariant, Bundle, TrashItem, ActionType, Currency, CashFlowItem, CashFlowTag, HSCode } from '@/types';
+import { Counterparty, CounterpartyAccount, Manufacturer, OurCompany, Employee, LogEntry, ProductCategory, OptionType, OptionVariant, Bundle, TrashItem, ActionType, Currency, CashFlowItem, CashFlowTag, CashFlowItemType, HSCode } from '@/types';
+import { WriteOffReasonType } from '@/types/inventory';
 import { ApiService } from '@/services/api';
 import { TableNames, KZT_RATES } from '@/constants';
 
@@ -13,6 +14,7 @@ export const useReferenceState = () => {
     const [categories, setCategories] = useState<ProductCategory[]>([]);
     const [cashFlowItems, setCashFlowItems] = useState<CashFlowItem[]>([]);
     const [cashFlowTags, setCashFlowTags] = useState<CashFlowTag[]>([]);
+    const [cashFlowItemTypes, setCashFlowItemTypes] = useState<CashFlowItemType[]>([]);
     const [hscodes, setHscodes] = useState<HSCode[]>([]);
     const [optionTypes, setOptionTypes] = useState<OptionType[]>([]);
     const [optionVariants, setOptionVariants] = useState<OptionVariant[]>([]);
@@ -20,6 +22,7 @@ export const useReferenceState = () => {
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [trash, setTrash] = useState<TrashItem[]>([]);
     const [exchangeRates, setExchangeRates] = useState<Record<Currency, number>>(KZT_RATES);
+    const [writeoffReasonTypes, setWriteoffReasonTypes] = useState<WriteOffReasonType[]>([]);
 
     const addLog = async (action: ActionType, entity: string, entityId: string, details: string) => {
         const newLog: any = {
@@ -175,6 +178,11 @@ export const useReferenceState = () => {
         setCounterpartyAccounts([...otherAccounts, ...newAccounts]);
         addLog('Update', 'Контрагент', c.id, `Обновлен контрагент: ${c.name}`);
         return updated;
+    };
+
+    const patchCounterpartyCashFlowItems = async (id: string, cashFlowItemIds: string[]) => {
+        await ApiService.update(TableNames.COUNTERPARTIES, id, { cashFlowItemIds });
+        setCounterparties(prev => prev.map(c => c.id === id ? { ...c, cashFlowItemIds } : c));
     };
 
     const deleteCounterparty = async (id: string) => {
@@ -356,6 +364,36 @@ export const useReferenceState = () => {
         return saved;
     };
 
+    // --- Типы статей ДДС ---
+    const addCashFlowItemType = async (type: Omit<CashFlowItemType, 'id'>) => {
+        const saved = await ApiService.create<CashFlowItemType>(TableNames.CASH_FLOW_ITEM_TYPES, type);
+        setCashFlowItemTypes(prev => [...prev, saved]);
+        addLog('Create', 'Тип статьи ДДС', saved.id, `Создан тип: ${saved.name}`);
+        return saved;
+    };
+
+    const updateCashFlowItemType = async (id: string, data: Partial<CashFlowItemType>) => {
+        const saved = await ApiService.update<CashFlowItemType>(TableNames.CASH_FLOW_ITEM_TYPES, id, data);
+        setCashFlowItemTypes(prev => prev.map(x => x.id === id ? { ...x, ...saved } : x));
+        return saved;
+    };
+
+    const deleteCashFlowItemType = async (id: string) => {
+        // Снимаем тип со всех статей
+        const affected = cashFlowItems.filter(x => x.itemTypeId === id);
+        await Promise.all(affected.map(item =>
+            ApiService.update(TableNames.CASH_FLOW_ITEMS, item.id, { itemTypeId: null })
+        ));
+        if (affected.length > 0) {
+            setCashFlowItems(prev => prev.map(x =>
+                x.itemTypeId === id ? { ...x, itemTypeId: null } : x
+            ));
+        }
+        await ApiService.delete(TableNames.CASH_FLOW_ITEM_TYPES, id);
+        setCashFlowItemTypes(prev => prev.filter(x => x.id !== id));
+        addLog('Delete', 'Тип статьи ДДС', id, 'Удалён тип');
+    };
+
     const deleteCashFlowTag = async (id: string) => {
         // Снимаем тег со всех статей
         const affected = cashFlowItems.filter(x => x.tagIds?.includes(id));
@@ -473,6 +511,24 @@ export const useReferenceState = () => {
         }
     };
 
+    // ───── Типы причин списания ─────
+    const addWriteoffReasonType = async (rt: Omit<WriteOffReasonType, 'id' | 'createdAt'>) => {
+        const saved = await ApiService.create<WriteOffReasonType>(TableNames.WRITEOFF_REASON_TYPES, rt);
+        setWriteoffReasonTypes(prev => [...prev, saved].sort((a, b) => a.sortOrder - b.sortOrder));
+        return saved;
+    };
+
+    const updateWriteoffReasonType = async (id: string, data: Partial<WriteOffReasonType>) => {
+        const saved = await ApiService.update<WriteOffReasonType>(TableNames.WRITEOFF_REASON_TYPES, id, data);
+        setWriteoffReasonTypes(prev => prev.map(x => x.id === id ? { ...x, ...saved } : x).sort((a, b) => a.sortOrder - b.sortOrder));
+        return saved;
+    };
+
+    const deleteWriteoffReasonType = async (id: string) => {
+        await ApiService.delete(TableNames.WRITEOFF_REASON_TYPES, id);
+        setWriteoffReasonTypes(prev => prev.filter(x => x.id !== id));
+    };
+
     return {
         counterparties, setCounterparties, counterpartyAccounts, setCounterpartyAccounts,
         manufacturers, setManufacturers,
@@ -480,14 +536,17 @@ export const useReferenceState = () => {
         categories, setCategories,
         cashFlowItems, setCashFlowItems, addCashFlowItem, updateCashFlowItem, deleteCashFlowItem,
         cashFlowTags, setCashFlowTags, addCashFlowTag, updateCashFlowTag, deleteCashFlowTag,
+        cashFlowItemTypes, setCashFlowItemTypes, addCashFlowItemType, updateCashFlowItemType, deleteCashFlowItemType,
         hscodes, setHscodes, addHSCode, updateHSCode, deleteHSCode,
         optionTypes, setOptionTypes, optionVariants, setOptionVariants,
         bundles, setBundles, logs, setLogs, trash, setTrash,
-        exchangeRates, setExchangeRates, addCounterparty, updateCounterparty, deleteCounterparty,
+        exchangeRates, setExchangeRates, addCounterparty, updateCounterparty, deleteCounterparty, patchCounterpartyCashFlowItems,
         addManufacturer, updateManufacturer, deleteManufacturer: deleteManufacturerFromRef, addOurCompany, updateOurCompany, deleteOurCompany: deleteOurCompanyFromRef, addEmployee, updateEmployee, deleteEmployee: deleteEmployeeFromRef,
         addCategory, updateCategory, addCategoriesBulk, deleteCategory, addOptionType, addOptionTypeBulk: addOptionType, addOptionTypesBulk, updateOptionType, deleteOptionType,
         addOptionVariant, upsertOptionVariantsBulk, updateOptionVariant, deleteOptionVariant,
         addBundle, updateBundle, deleteBundle, moveToTrash, restoreFromTrash, permanentlyDelete,
-        updateExchangeRate, addLog
+        updateExchangeRate, addLog,
+        writeoffReasonTypes, setWriteoffReasonTypes,
+        addWriteoffReasonType, updateWriteoffReasonType, deleteWriteoffReasonType,
     };
 };

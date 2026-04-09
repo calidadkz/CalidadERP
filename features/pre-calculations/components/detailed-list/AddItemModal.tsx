@@ -319,7 +319,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, mode, onClos
                 ignoreDimensions: !isMachine,
                 manufacturer: product.manufacturer || '',
                 hsCode: hsCodeObj?.code || '',
-                deliveryUrumqiAlmatyKzt: 0, deliveryAlmatyKaragandaPerItemKzt: 0, svhPerItemKzt: 0, brokerPerItemKzt: 0,
+                deliveryUrumqiAlmatyKzt: 0, deliveryChinaDomesticKzt: 0, deliveryAlmatyKaragandaPerItemKzt: 0, svhPerItemKzt: 0, brokerPerItemKzt: 0,
                 customsFeesPerItemKzt: 0, customsNdsKzt: 0, totalNdsKzt: 0, ndsDifferenceKzt: 0, kpnKzt: 0,
                 salesBonusKzt: 0, preSaleCostKzt: 0, fullCostKzt: 0, profitKzt: 0
             });

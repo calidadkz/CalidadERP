@@ -28,6 +28,7 @@ export interface Counterparty {
     // Other
     description?: string;
     isPaymentIntermediary?: boolean; // Kaspi Bank, маркетплейсы и т.д.
+    cashFlowItemIds?: string[];      // Приоритетные статьи ДДС (первая — автовыбор при импорте выписок)
 }
 
 export type Supplier = Counterparty;

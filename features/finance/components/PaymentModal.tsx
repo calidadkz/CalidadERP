@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ActualPayment, Currency, PlannedPayment, BankAccount, Client, Supplier, PaymentAllocation, Batch, Counterparty, CounterpartyAccount, CounterpartyType } from '@/types';
 import { X, AlertCircle, Landmark, Wallet, Plus, Trash2, UserPlus, Tag, Receipt } from 'lucide-react';
+import { CashFlowSelector } from '@/components/ui/CashFlowSelector';
 import { ApiService } from '@/services/api';
 import { TableNames } from '@/constants';
 import { CounterpartyCreateModal } from '@/features/counterparties/components/CounterpartyCreateModal';
@@ -29,7 +30,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     direction, plan, bankAccounts, clients: initialClients, suppliers: initialSuppliers, onClose, onSubmit
 }) => {
     const { state } = useStore();
-    const { plannedPayments, cashFlowItems } = state;
+    const { plannedPayments } = state;
 
     // --- Основные поля платежа ---
     const [counterpartyId, setCounterpartyId] = useState(plan?.counterpartyId || '');
@@ -63,6 +64,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             (counterpartyId ? p.counterpartyId === counterpartyId : true) &&
             p.currency === currency
         ), [plannedPayments, direction, counterpartyId, currency]);
+
+    // Приоритетные статьи выбранного контрагента
+    const priorityItemIds = useMemo(() => {
+        const all = [...localClients, ...localSuppliers, ...state.counterparties];
+        return all.find(c => c.id === counterpartyId)?.cashFlowItemIds || [];
+    }, [counterpartyId, localClients, localSuppliers, state.counterparties]);
 
     // Дефолтный счёт при смене валюты
     useEffect(() => {
@@ -305,20 +312,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                             </div>
                                         )}
 
-                                        <div className="flex items-center gap-1.5">
-                                            <Tag size={11} className="text-slate-300 shrink-0"/>
-                                            <select
-                                                className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold outline-none disabled:bg-slate-50 disabled:text-slate-400"
-                                                value={line.cashFlowItemId || ''}
-                                                onChange={e => updateLine(line.id, 'cashFlowItemId', e.target.value)}
-                                                disabled={!!line.plannedPaymentId}
-                                            >
-                                                <option value="">— Статья ДДС —</option>
-                                                {cashFlowItems
-                                                    .filter(i => isOutgoing ? i.type === 'Expense' : i.type === 'Income')
-                                                    .map(cf => <option key={cf.id} value={cf.id}>{cf.name}</option>)}
-                                            </select>
-                                        </div>
+                                        <CashFlowSelector
+                                            value={line.cashFlowItemId || ''}
+                                            onChange={id => updateLine(line.id, 'cashFlowItemId', id)}
+                                            direction={isOutgoing ? 'Outgoing' : 'Incoming'}
+                                            disabled={!!line.plannedPaymentId}
+                                            dropdownMinWidth={260}
+                                            priorityItemIds={priorityItemIds}
+                                        />
                                     </div>
 
                                     {/* Сумма */}
