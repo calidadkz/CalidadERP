@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     ArrowLeft, CheckCircle2, Loader2, AlertTriangle,
-    DollarSign, TrendingUp, TrendingDown, BarChart3, FileText, Layers
+    DollarSign, BarChart3, FileText, Layers, CalendarClock, Calendar
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useBatches } from './hooks/useBatches';
@@ -9,9 +9,11 @@ import { BatchMainListTab } from './components/BatchMainListTab';
 import { BatchExpensesTab } from './components/BatchExpensesTab';
 import { BatchComparisonTab } from './components/BatchComparisonTab';
 import { BatchDocumentsTab } from './components/BatchDocumentsTab';
+import { BatchTimelineTab } from './components/BatchTimelineTab';
 import { BatchSidebar, SidebarContext } from './components/BatchSidebar';
+import { useStore } from '@/features/system/context/GlobalStore';
 
-type TabType = 'LIST' | 'EXPENSES' | 'COMPARISON' | 'DOCUMENTS';
+type TabType = 'LIST' | 'EXPENSES' | 'COMPARISON' | 'DOCUMENTS' | 'TIMELINE';
 
 const fmtShort = (v?: number) => {
     if (!v && v !== 0) return '—';
@@ -27,6 +29,9 @@ export const BatchDetailPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabType>('LIST');
     const [sidebarCtx, setSidebarCtx] = useState<SidebarContext>({ type: 'summary' });
 
+    const { state } = useStore();
+    const salesOrders = state.salesOrders;
+
     const {
         batch,
         preCalculation,
@@ -40,9 +45,21 @@ export const BatchDetailPage: React.FC = () => {
         stats,
         addExpense,
         deleteExpense,
+        updateTimeline,
         uploadDocument,
         deleteDocument,
     } = useBatches(id);
+
+    // Самая ранняя крайняя дата поставки по договору среди позиций предрасчёта
+    const earliestDeadline = useMemo(() => {
+        if (!preCalculation) return undefined;
+        const orderIds = preCalculation.items.map(i => i.orderId).filter(Boolean) as string[];
+        const dates = orderIds
+            .map(oid => salesOrders.find(o => o.id === oid)?.contractDeliveryDate)
+            .filter(Boolean) as string[];
+        if (dates.length === 0) return undefined;
+        return dates.sort()[0];
+    }, [preCalculation, salesOrders]);
 
     const handleColumnClick = (ctx: SidebarContext) => {
         setSidebarCtx(ctx);
@@ -97,9 +114,17 @@ export const BatchDetailPage: React.FC = () => {
                             <h1 className="text-lg font-black text-slate-900 uppercase tracking-tight">{batch?.name}</h1>
                             {batch?.status === 'completed' && <CheckCircle2 size={14} className="text-emerald-500" />}
                         </div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                            Основание: предрасчёт от {batch?.date ? new Date(batch.date).toLocaleDateString('ru-RU') : '—'}
-                        </p>
+                        <div className="flex items-center gap-3 mt-0.5">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                                Предрасчёт от {batch?.date ? new Date(batch.date).toLocaleDateString('ru-RU') : '—'}
+                            </p>
+                            {earliestDeadline && (
+                                <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg">
+                                    <Calendar size={9}/>
+                                    Дедлайн: {new Date(earliestDeadline).toLocaleDateString('ru-RU')}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -110,6 +135,7 @@ export const BatchDetailPage: React.FC = () => {
                             { id: 'LIST', label: 'Позиции', icon: Layers },
                             { id: 'EXPENSES', label: 'Расходы', icon: DollarSign },
                             { id: 'COMPARISON', label: 'Сравнение', icon: BarChart3 },
+                            { id: 'TIMELINE', label: 'Сроки', icon: CalendarClock },
                             { id: 'DOCUMENTS', label: 'Документы', icon: FileText },
                         ] as const).map(tab => {
                             const Icon = tab.icon;
@@ -198,6 +224,13 @@ export const BatchDetailPage: React.FC = () => {
                             documents={documents}
                             onUpload={uploadDocument}
                             onDelete={deleteDocument}
+                        />
+                    )}
+                    {activeTab === 'TIMELINE' && (
+                        <BatchTimelineTab
+                            timeline={batch?.timeline}
+                            earliestDeadline={earliestDeadline}
+                            onSave={updateTimeline}
                         />
                     )}
                     {!preCalculation && (activeTab === 'LIST' || activeTab === 'COMPARISON') && (

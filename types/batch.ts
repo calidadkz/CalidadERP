@@ -1,5 +1,15 @@
 export type BatchStatus = 'active' | 'completed' | 'closed';
 
+export interface BatchTimeline {
+  startDate?: string;             // Дата старта (от которой считаются все этапы)
+  approvalDays: number;           // Согласование заявки
+  manufacturingDays: number;      // Изготовление
+  chinaDeliveryDays: number;      // Доставка по Китаю
+  urumqiAlmatyDays: number;       // Доставка Урумчи–Алматы
+  almatyKaragandaDays: number;    // Доставка Алматы–Карагандо
+  commissioningDays: number;      // Пусконаладка
+}
+
 export type ExpenseCategory =
   | 'logistics_urumqi_almaty'      // Доставка Урумчи–Алматы
   | 'logistics_almaty_karaganda'   // Доставка Алматы–Караганда
@@ -47,6 +57,9 @@ export interface Batch {
   // Итоговые (пересчитываются)
   totalPlannedProfit?: number;
   totalActualProfit?: number;
+
+  // Планирование сроков
+  timeline?: BatchTimeline;
 }
 
 export interface BatchItemActuals {

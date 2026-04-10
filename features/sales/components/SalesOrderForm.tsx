@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { SalesOrder, PlannedPayment, Client, Currency, OrderStatus, CounterpartyType, OrderDocument } from '@/types';
-import { Save, UserPlus, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, UserPlus, FileText, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { SalesItemsTab } from './SalesItemsTab';
 import { SalesPaymentsTab } from './SalesPaymentsTab';
 import { CounterpartyCreateModal } from '../../counterparties/components/CounterpartyCreateModal';
@@ -32,6 +32,7 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
         activeFormTab, setActiveFormTab,
         contractUrl, setContractUrl,
         contractName, setContractName,
+        contractDeliveryDate, setContractDeliveryDate,
         additionalDocuments, setAdditionalDocuments,
         totalOrderAmount,
         unallocatedAmount,
@@ -70,6 +71,7 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
             totalItemCount: items.reduce((sum, i) => sum + (i.quantity || 0), 0),
             contractUrl,
             contractName,
+            contractDeliveryDate: contractDeliveryDate || undefined,
             additionalDocuments
         };
 
@@ -155,16 +157,38 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
                     
                     <div className="h-10 w-px bg-slate-200 mx-1"/>
                     
-                    <div className="flex-1 max-w-xs">
-                        <FileUpload 
-                            label="Договор клиента"
-                            value={contractUrl}
-                            fileName={contractName}
-                            onUpload={(url, name) => { setContractUrl(url); setContractName(name); }}
-                            onRemove={() => { setContractUrl(''); setContractName(''); }}
-                            folder={`contracts/sales-orders/${orderId}`}
-                            isContract
-                        />
+                    <div className="flex items-end gap-3">
+                        <div className="max-w-xs">
+                            <FileUpload
+                                label="Договор клиента"
+                                value={contractUrl}
+                                fileName={contractName}
+                                onUpload={(url, name) => { setContractUrl(url); setContractName(name); }}
+                                onRemove={() => { setContractUrl(''); setContractName(''); setContractDeliveryDate(''); }}
+                                folder={`contracts/sales-orders/${orderId}`}
+                                isContract
+                            />
+                        </div>
+                        {contractUrl && (
+                            <div className="flex flex-col">
+                                <label className={`text-[9px] font-black uppercase mb-1.5 ml-1 tracking-widest flex items-center gap-1 ${!contractDeliveryDate ? 'text-red-500' : 'text-slate-400'}`}>
+                                    {!contractDeliveryDate && <AlertCircle size={10}/>}
+                                    Крайняя дата по договору
+                                    <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    value={contractDeliveryDate}
+                                    onChange={e => setContractDeliveryDate(e.target.value)}
+                                    disabled={!isFormWriteable}
+                                    className={`w-44 border p-2 rounded-xl bg-white font-bold text-slate-700 text-xs outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
+                                        !contractDeliveryDate
+                                            ? 'border-red-300 bg-red-50 focus:ring-red-500/10'
+                                            : 'border-slate-200'
+                                    }`}
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex flex-col justify-center min-w-[120px] items-end">

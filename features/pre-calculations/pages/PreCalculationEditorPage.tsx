@@ -1,27 +1,32 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useStore } from '@/features/system/context/GlobalStore';
 import { PreCalculationItem, PreCalculationItemOption, PackingListItem } from '@/types/pre-calculations';
+import { BatchTimeline } from '@/types/batch';
 import { PreCalculationList } from '../components/list/PreCalculationList';
 import { GeneralSettings } from '../components/general-settings/GeneralSettings';
 import { PackingList } from '../components/packing-list/PackingList';
 import { DetailedList } from '../components/detailed-list/DetailedList';
-import { ArrowLeft, Save, List, Settings, Package, Loader2, AlertTriangle, Edit3, Layers } from 'lucide-react';
+import { BatchTimelineTab } from '../../batches/components/BatchTimelineTab';
+import { ArrowLeft, Save, List, Settings, Package, Loader2, AlertTriangle, Edit3, Layers, CalendarClock, Calendar } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { usePreCalculations } from '../hooks/usePreCalculations';
 import { api } from '@/services';
 import { TableNames } from '@/constants';
 
 export const PreCalculationEditorPage: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'DETAILED_LIST' | 'SETTINGS' | 'PACKING_LIST'>('DETAILED_LIST');
+    const [activeTab, setActiveTab] = useState<'DETAILED_LIST' | 'SETTINGS' | 'PACKING_LIST' | 'TIMELINE'>('DETAILED_LIST');
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
 
-    const { 
-        preCalculation, 
-        generalSettings, 
-        items, 
-        packingList, 
-        isLoading, 
+    const { state } = useStore();
+    const salesOrders = state.salesOrders;
+
+    const {
+        preCalculation,
+        generalSettings,
+        items,
+        packingList,
+        isLoading,
         savePreCalculation,
         updateGeneralSetting,
         updateMetadata,
@@ -36,6 +41,20 @@ export const PreCalculationEditorPage: React.FC = () => {
     } = usePreCalculations(id);
 
     const isNew = id === 'new';
+
+    // Самая ранняя крайняя дата поставки по договору среди позиций предрасчёта
+    const earliestDeadline = useMemo(() => {
+        const orderIds = items.map(i => i.orderId).filter(Boolean) as string[];
+        const dates = orderIds
+            .map(oid => salesOrders.find(o => o.id === oid)?.contractDeliveryDate)
+            .filter(Boolean) as string[];
+        return dates.length > 0 ? dates.sort()[0] : undefined;
+    }, [items, salesOrders]);
+
+    const handleSaveTimeline = useCallback(async (timeline: BatchTimeline) => {
+        updateMetadata({ timeline });
+        await savePreCalculation();
+    }, [updateMetadata, savePreCalculation]);
     const hasInitializedRef = useRef(false);
 
     useEffect(() => {
@@ -142,19 +161,27 @@ export const PreCalculationEditorPage: React.FC = () => {
         switch (activeTab) {
             case 'DETAILED_LIST':
                 return (
-                    <DetailedList 
-                        items={items} 
-                        preCalculationName={preCalculation?.name} 
-                        onAddItem={addItem} 
-                        onUpdateItem={updateItem} 
+                    <DetailedList
+                        items={items}
+                        preCalculationName={preCalculation?.name}
+                        onAddItem={addItem}
+                        onUpdateItem={updateItem}
                         onUpdateItemsBatch={updateItemsBatch}
-                        onDeleteItem={deleteItem} 
+                        onDeleteItem={deleteItem}
                     />
                 );
             case 'SETTINGS':
                 return <GeneralSettings settings={generalSettings} onSettingChange={updateGeneralSetting} />;
             case 'PACKING_LIST':
                 return <PackingList items={packingList} onAddItem={addPackingItem} onUpdateItem={updatePackingItem} onDeleteItem={deletePackingItem} />;
+            case 'TIMELINE':
+                return (
+                    <BatchTimelineTab
+                        timeline={preCalculation?.timeline}
+                        earliestDeadline={earliestDeadline}
+                        onSave={handleSaveTimeline}
+                    />
+                );
             default:
                 return null;
         }
@@ -193,6 +220,12 @@ export const PreCalculationEditorPage: React.FC = () => {
                                     </span>
                                 </>
                             )}
+                            {earliestDeadline && (
+                                <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg">
+                                    <Calendar size={9}/>
+                                    Дедлайн: {new Date(earliestDeadline).toLocaleDateString('ru-RU')}
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -223,6 +256,15 @@ export const PreCalculationEditorPage: React.FC = () => {
                             }`}
                         >
                             <Settings size={12} /> Настройки
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('TIMELINE')}
+                            className={`flex items-center gap-1.5 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                                activeTab === 'TIMELINE' ? 'bg-white shadow text-blue-600' : 'text-slate-400 hover:text-slate-600'
+                            }`}
+                        >
+                            <CalendarClock size={12} /> Сроки
+                            {earliestDeadline && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 ml-0.5"/>}
                         </button>
                         <button
                             onClick={() => setActiveTab('PACKING_LIST')}

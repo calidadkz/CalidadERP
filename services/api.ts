@@ -30,16 +30,17 @@ const toSnake = (s: string) => {
 };
 
 const PROTECTED_JSON_FIELDS = [
-    'matrix', 
-    'machineConfig', 
-    'priceOverrides', 
+    'matrix',
+    'machineConfig',
+    'priceOverrides',
     'internalComposition',
     'composition',
     'configuration',
     'settings',
     'items',
     'packingList',
-    'options'
+    'options',
+    'timeline'
 ];
 
 export class ApiService {

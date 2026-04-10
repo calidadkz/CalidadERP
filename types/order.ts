@@ -71,6 +71,7 @@ export interface SalesOrder {
     totalItemCount: number;
     contractUrl?: string;
     contractName?: string;
+    contractDeliveryDate?: string; // Крайняя дата поставки по договору (обязательно если есть договор)
     additionalDocuments?: OrderDocument[];
     isDeleted?: boolean; // Пометка на удаление
 }

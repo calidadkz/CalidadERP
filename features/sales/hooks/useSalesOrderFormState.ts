@@ -32,6 +32,7 @@ export const useSalesOrderFormState = (
 
     const [contractUrl, setContractUrl] = useState(initialOrder?.contractUrl || '');
     const [contractName, setContractName] = useState(initialOrder?.contractName || '');
+    const [contractDeliveryDate, setContractDeliveryDate] = useState(initialOrder?.contractDeliveryDate || '');
     const [additionalDocuments, setAdditionalDocuments] = useState<OrderDocument[]>(initialOrder?.additionalDocuments || []);
 
     const totalOrderAmount = useMemo(() => items.reduce((sum, i) => sum + (Number(i.totalKzt) || 0), 0), [items]);
@@ -66,8 +67,9 @@ export const useSalesOrderFormState = (
         if (items.length === 0) return "Добавьте товары в заказ";
         if (Math.abs(unallocatedAmount) > 0.1) return "Сумма в графике оплат должна соответствовать сумме заказа.";
         if (formPayments.some(p => !p.cashFlowItemId)) return "Для всех траншей должна быть выбрана статья ДДС";
+        if (contractUrl && !contractDeliveryDate) return "Укажите крайнюю дату поставки по договору";
         return null;
-    }, [selectedClientId, items, unallocatedAmount, formPayments]);
+    }, [selectedClientId, items, unallocatedAmount, formPayments, contractUrl, contractDeliveryDate]);
 
     return {
         orderId,
@@ -78,6 +80,7 @@ export const useSalesOrderFormState = (
         activeFormTab, setActiveFormTab,
         contractUrl, setContractUrl,
         contractName, setContractName,
+        contractDeliveryDate, setContractDeliveryDate,
         additionalDocuments, setAdditionalDocuments,
         totalOrderAmount,
         unallocatedAmount,

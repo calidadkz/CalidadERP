@@ -138,7 +138,8 @@ export const usePreCalculations = (id?: string) => {
           status: docData.status === 'Draft' ? 'draft' : 'finalized',
           settings,
           items: mappedItems,
-          packingList: mappedPacking
+          packingList: mappedPacking,
+          timeline: docData.timeline ?? undefined,
       };
 
       setPreCalculation(fullDoc);
@@ -393,6 +394,7 @@ export const usePreCalculations = (id?: string) => {
           chinaDomesticRatePerM3Usd: Number(generalSettings.chinaDomesticRatePerM3Usd) || 0,
           chinaDomesticRatePerTonUsd: Number(generalSettings.chinaDomesticRatePerTonUsd) || 0,
           chinaDomesticFixedKztPerUnit: Number(generalSettings.chinaDomesticFixedKztPerUnit) || 0,
+          timeline: preCalculation.timeline ?? null,
       };
       await api.upsert('pre_calculations', dbDoc, 'id');
 

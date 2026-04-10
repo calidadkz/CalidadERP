@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Batch, BatchExpense, BatchDocument, BatchItemActuals, PreCalculationDocument, PlannedPayment, ActualPayment, Reception } from '@/types';
+import { Batch, BatchExpense, BatchDocument, BatchItemActuals, BatchTimeline, PreCalculationDocument, PlannedPayment, ActualPayment, Reception } from '@/types';
 import { api } from '@/services';
 import { TableNames } from '@/constants';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
@@ -177,6 +177,12 @@ export const useBatches = (id?: string) => {
         }
     };
 
+    const updateTimeline = async (timeline: BatchTimeline) => {
+        if (!id || !batch) return;
+        await api.update<Batch>(TableNames.BATCHES, id, { timeline } as any);
+        setBatch(prev => prev ? { ...prev, timeline } : null);
+    };
+
     const deleteDocument = async (doc: BatchDocument) => {
         try {
             const storageRef = ref(storage, doc.url);
@@ -239,6 +245,7 @@ export const useBatches = (id?: string) => {
         addExpense,
         deleteExpense,
         updateItemActuals,
+        updateTimeline,
         uploadDocument,
         deleteDocument,
         refresh: () => id && loadBatchData(id)

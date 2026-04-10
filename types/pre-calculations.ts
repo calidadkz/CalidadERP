@@ -1,4 +1,6 @@
 
+import { BatchTimeline } from './batch';
+
 export type ChinaDomesticRateMethod = 'volume' | 'weight' | 'fixed';
 
 export interface GeneralSettings {
@@ -106,4 +108,5 @@ export interface PreCalculationDocument {
     settings: GeneralSettings;
     items: PreCalculationItem[];
     packingList: PackingListItem[];
+    timeline?: BatchTimeline;
 }
