@@ -508,7 +508,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, mode, onClos
                 <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-md transition-colors text-slate-400"><X size={18}/></button>
             </div>
             <div className="flex-1 flex overflow-hidden">
-                <div className="w-[300px] border-r border-slate-100 flex flex-col bg-slate-50/20">
+                <div className="w-[360px] border-r border-slate-100 flex flex-col bg-slate-50/20">
                     <div className="p-2.5 space-y-2">
                         <div className="flex gap-1"><div className="relative flex-1"><Search className="absolute left-2.5 top-1.5 text-slate-400" size={12}/><input type="text" placeholder="Поиск..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg py-1 pl-7 pr-3 text-[10px] font-bold outline-none focus:border-blue-500 transition-all shadow-sm" /></div><button onClick={() => setIsFilterOpen(!isFilterOpen)} className={`p-1 rounded-lg border transition-all ${isFilterOpen ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}><Filter size={12}/></button></div>
                         {isFilterOpen && (
@@ -522,7 +522,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, mode, onClos
                         {visibleProducts.map(p => (
                             <button key={p.id} onClick={() => setSelectedProductId(p.id)} className={`w-full text-left p-2 rounded-xl border transition-all flex items-center gap-3 ${selectedProductId === p.id ? 'bg-white border-blue-500 shadow-md shadow-blue-50 ring-1 ring-blue-500/10' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
                                 <ProductImage product={p} className="w-10 h-10 rounded-lg" />
-                                <div className="min-w-0 flex-1"><h4 className={`text-[10px] font-black leading-tight truncate ${selectedProductId === p.id ? 'text-blue-700' : 'text-slate-700'}`}>{p.name}</h4><div className="text-[7px] font-bold text-slate-400 uppercase mt-0.5 truncate">{p.manufacturer || 'Китай'}</div></div>
+                                <div className="min-w-0 flex-1"><h4 className={`text-[10px] font-black leading-tight break-words ${selectedProductId === p.id ? 'text-blue-700' : 'text-slate-700'}`}>{p.name}</h4><div className="text-[7px] font-bold text-slate-400 uppercase mt-0.5 truncate">{p.manufacturer || 'Китай'}</div></div>
                             </button>
                         ))}
                     </div>

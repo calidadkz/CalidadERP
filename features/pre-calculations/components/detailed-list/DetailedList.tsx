@@ -2,15 +2,13 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { PreCalculationItem } from '@/types/pre-calculations';
 import { AddItemModal } from './AddItemModal';
 import {
-  Package, Trash2, Cpu, ShoppingCart, MoreVertical, PlusCircle, FileText, X, Check, ChevronDown, Square, CheckSquare, Info, Truck, Wrench, User, Tag, Loader2,
-  Zap, Layers, Box
+  Package, Trash2, Cpu, ShoppingCart, MoreVertical, PlusCircle, FileText, X, Check, ChevronDown, Square, CheckSquare, Info, Truck, Wrench, User, Tag, Loader2, Box
 } from 'lucide-react';
 import { useStore } from '../../../system/context/GlobalStore';
 import { useAccess } from '../../../auth/hooks/useAccess';
 import { SalesOrderForm } from '../../../../features/sales/components/SalesOrderForm';
 import { SalesOrder, PlannedPayment, OrderStatus, Currency, SalesOrderItem } from '@/types';
 import { ApiService } from '@/services/api';
-import { TableNames } from '@/constants';
 
 interface SalesOrderItemWithSource extends SalesOrderItem {
   preCalcItemId?: string;
@@ -77,15 +75,8 @@ export const DetailedList: React.FC<DetailedListProps> = ({ items, preCalculatio
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [isAssemblyMode, setIsAssemblyMode] = useState(false);
-  const [isQuickEditMode, setIsQuickEditMode] = useState(false);
-  const [isMassEditMode, setIsMassEditMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [massEditValues, setMassEditValues] = useState({
-    supplierName: '', manufacturer: '', categoryId: '', hsCode: '',
-    pricingMethod: '', markupPercentage: ''
-  });
-  const [massEditEnabled, setMassEditEnabled] = useState<Record<string, boolean>>({});
   const [orderFormConfig, setOrderFormConfig] = useState<{ isOpen: boolean; initialOrder: SalesOrder | null; initialPayments: PlannedPayment[]; targetItemIds: string[]; }>({ isOpen: false, initialOrder: null, initialPayments: [], targetItemIds: [] });
 
   useEffect(() => {
@@ -229,119 +220,25 @@ export const DetailedList: React.FC<DetailedListProps> = ({ items, preCalculatio
     else setSelectedIds(new Set(syncedItems.map(i => i.id)));
   };
 
-  const handleMassApply = async () => {
-    const selectedItems = syncedItems.filter(i => selectedIds.has(i.id));
-    const updates = selectedItems.map(item => {
-      const upd: Partial<PreCalculationItem> = {};
-      if (massEditEnabled.supplierName && massEditValues.supplierName) upd.supplierName = massEditValues.supplierName;
-      if (massEditEnabled.manufacturer && massEditValues.manufacturer) upd.manufacturer = massEditValues.manufacturer;
-      if (massEditEnabled.hsCode && massEditValues.hsCode) upd.hsCode = massEditValues.hsCode;
-      if (massEditEnabled.pricingMethod) {
-        if (massEditValues.pricingMethod === 'manual') upd.isRevenueConfirmed = true;
-        if (massEditValues.pricingMethod === 'markup') {
-          upd.isRevenueConfirmed = false;
-          if (massEditEnabled.markupPercentage && massEditValues.markupPercentage)
-            upd.marginPercentage = parseFloat(massEditValues.markupPercentage);
-        }
-      }
-      return { id: item.id, updates: upd };
-    });
-    if (onUpdateItemsBatch) onUpdateItemsBatch(updates);
-
-    if (massEditEnabled.categoryId && massEditValues.categoryId) {
-      const withProduct = selectedItems.filter(i => i.productId);
-      await Promise.all(withProduct.map(i =>
-        ApiService.update(TableNames.PRODUCTS, i.productId!, { categoryId: massEditValues.categoryId })
-      ));
-    }
-
-    setIsMassEditMode(false);
-    setSelectedIds(new Set());
-    setMassEditEnabled({});
-  };
-
-  const enterMassEdit = () => { setIsMassEditMode(true); setIsAssemblyMode(false); setIsQuickEditMode(false); setSelectedIds(new Set()); };
-  const exitMassEdit = () => { setIsMassEditMode(false); setSelectedIds(new Set()); setMassEditEnabled({}); };
-  const enterQuickEdit = () => { setIsQuickEditMode(true); setIsAssemblyMode(false); setIsMassEditMode(false); };
-
   return (
     <div className="flex flex-col h-full space-y-3 animate-in fade-in duration-500 font-sans text-slate-900">
       <div className="flex justify-between items-center px-1 flex-none">
         <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200">
-            {!isAssemblyMode && !isMassEditMode ? (
+            {!isAssemblyMode ? (
               <>
                 <button onClick={() => setModalMode({ isOpen: true, type: 'MACHINE' })} className="group flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-amber-50 text-slate-600 hover:text-amber-700 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all duration-200 border border-transparent hover:border-amber-200/50"><Cpu size={14} className="text-slate-400 group-hover:text-amber-500"/> + СТАНOК</button>
                 <button onClick={() => setModalMode({ isOpen: true, type: 'PART' })} className="group flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-700 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all duration-200 border border-transparent hover:border-blue-200/50"><Package size={14} className="text-slate-400 group-hover:text-blue-500"/> + ЗАПЧАСТЬ</button>
-                <div className="w-px h-6 bg-slate-200 mx-1" /><button onClick={() => setModalMode({ isOpen: true, type: 'ORDER' })} className="group flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all duration-200 border border-transparent hover:border-indigo-200/50"><ShoppingCart size={14} className="text-slate-400 group-hover:text-indigo-500"/> + ИЗ ЗАКАЗА</button>
-                <div className="w-px h-6 bg-slate-200 mx-1" /><button onClick={() => { setIsAssemblyMode(true); setIsQuickEditMode(false); setIsMassEditMode(false); setSelectedIds(new Set()); }} className="group flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all duration-200 shadow-md"><PlusCircle size={14}/> Создать заказ</button>
                 <div className="w-px h-6 bg-slate-200 mx-1" />
-                <button onClick={() => isQuickEditMode ? setIsQuickEditMode(false) : enterQuickEdit()} className={`group flex items-center gap-2 px-4 py-2 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all duration-200 border ${isQuickEditMode ? 'bg-amber-500 text-white border-amber-500 shadow-md' : 'bg-slate-50 hover:bg-amber-50 text-slate-600 hover:text-amber-700 border-transparent hover:border-amber-200/50'}`}>
-                  <Zap size={14} className={isQuickEditMode ? 'text-white' : 'text-slate-400 group-hover:text-amber-500'}/> Быстрое ред.
-                </button>
-                <button onClick={enterMassEdit} className="group flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-700 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all duration-200 border border-transparent hover:border-blue-200/50"><Layers size={14} className="text-slate-400 group-hover:text-blue-500"/> Массовое</button>
+                <button onClick={() => setModalMode({ isOpen: true, type: 'ORDER' })} className="group flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all duration-200 border border-transparent hover:border-indigo-200/50"><ShoppingCart size={14} className="text-slate-400 group-hover:text-indigo-500"/> + ИЗ ЗАКАЗА</button>
+                <div className="w-px h-6 bg-slate-200 mx-1" />
+                <button onClick={() => { setIsAssemblyMode(true); setSelectedIds(new Set()); }} className="group flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all duration-200 shadow-md"><PlusCircle size={14}/> Создать заказ</button>
               </>
-            ) : isAssemblyMode ? (
-              <div className="flex items-center gap-3 animate-in slide-in-from-left-2"><span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest pl-2">Режим сборки заказа: {selectedIds.size} выбрано</span><button onClick={handleConfirmAssembly} disabled={selectedIds.size === 0} className="flex items-center gap-2 px-5 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all shadow-md disabled:opacity-50"><Check size={14}/> Подтвердить выбор</button><button onClick={() => setIsAssemblyMode(false)} className="flex items-center gap-2 px-5 py-2 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all">Отмена</button></div>
             ) : (
-              <div className="flex items-center gap-3 animate-in slide-in-from-left-2">
-                <Layers size={14} className="text-blue-600 ml-2" />
-                <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Массовое редактирование: {selectedIds.size} выбрано</span>
-                <button onClick={handleSelectAll} className="px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-700 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all">{selectedIds.size === syncedItems.length ? 'Снять всё' : 'Выбрать все'}</button>
-                <button onClick={handleMassApply} disabled={selectedIds.size === 0 || !Object.values(massEditEnabled).some(Boolean)} className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all shadow-md disabled:opacity-50"><Check size={14}/> Применить</button>
-                <button onClick={exitMassEdit} className="flex items-center gap-2 px-5 py-2 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all">Отмена</button>
-              </div>
+              <div className="flex items-center gap-3 animate-in slide-in-from-left-2"><span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest pl-2">Режим сборки заказа: {selectedIds.size} выбрано</span><button onClick={handleConfirmAssembly} disabled={selectedIds.size === 0} className="flex items-center gap-2 px-5 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all shadow-md disabled:opacity-50"><Check size={14}/> Подтвердить выбор</button><button onClick={() => setIsAssemblyMode(false)} className="flex items-center gap-2 px-5 py-2 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all">Отмена</button></div>
             )}
         </div>
         <div className="flex items-center gap-4 bg-slate-900 px-4 py-2 rounded-2xl text-white shadow-lg flex-none border border-slate-700"><div className="flex items-center gap-2 border-r border-slate-800 pr-4"><span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Закуп:</span><span className="text-xs font-bold font-mono">{formatCurrency(totals.purchaseKzt)} <span className="text-[9px] text-slate-500">₸</span></span></div><div className="flex items-center gap-2 border-r border-slate-800 pr-4"><span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Выручка:</span><span className="text-xs font-bold font-mono text-blue-400">{formatCurrency(totals.revenueKzt)} <span className="text-[9px] text-blue-700">₸</span></span></div><div className="flex items-center gap-2"><span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Прибыль:</span><span className="text-xs font-bold font-mono text-emerald-400">{formatCurrency(totals.profitKzt)} <span className="text-[9px] text-emerald-600">₸</span></span></div></div>
       </div>
-      {isMassEditMode && (
-        <div className="bg-white border border-blue-200 rounded-2xl p-4 shadow-sm animate-in slide-in-from-top-2 duration-200">
-          <div className="flex flex-wrap gap-2 mb-3">
-            {([
-              { key: 'supplierName', label: 'Поставщик', type: 'text', width: 'w-32' },
-              { key: 'manufacturer', label: 'Производитель', type: 'text', width: 'w-36' },
-              { key: 'hsCode', label: 'Код ТНВЭД', type: 'text', width: 'w-28' },
-            ] as const).map(f => (
-              <label key={f.key} className={`flex items-center gap-2 bg-slate-50 border rounded-xl px-3 py-2 transition-all ${massEditEnabled[f.key] ? 'border-blue-300 bg-blue-50/30' : 'border-slate-200'}`}>
-                <input type="checkbox" checked={!!massEditEnabled[f.key]} onChange={e => setMassEditEnabled(p => ({ ...p, [f.key]: e.target.checked }))} className="w-3.5 h-3.5 rounded accent-blue-600" />
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{f.label}:</span>
-                <input type={f.type} value={(massEditValues as any)[f.key]} onChange={e => setMassEditValues(p => ({ ...p, [f.key]: e.target.value }))} disabled={!massEditEnabled[f.key]} placeholder="новое значение" className={`${f.width} bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-blue-400 disabled:opacity-40 transition-all`} />
-              </label>
-            ))}
-
-            <label className={`flex items-center gap-2 bg-slate-50 border rounded-xl px-3 py-2 transition-all ${massEditEnabled.categoryId ? 'border-blue-300 bg-blue-50/30' : 'border-slate-200'}`}>
-              <input type="checkbox" checked={!!massEditEnabled.categoryId} onChange={e => setMassEditEnabled(p => ({ ...p, categoryId: e.target.checked }))} className="w-3.5 h-3.5 rounded accent-blue-600" />
-              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Категория:</span>
-              <select value={massEditValues.categoryId} onChange={e => setMassEditValues(p => ({ ...p, categoryId: e.target.value }))} disabled={!massEditEnabled.categoryId} className="bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-blue-400 disabled:opacity-40 transition-all max-w-[160px]">
-                <option value="">— выберите —</option>
-                {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </label>
-
-            <label className={`flex items-center gap-2 bg-slate-50 border rounded-xl px-3 py-2 transition-all ${massEditEnabled.pricingMethod ? 'border-blue-300 bg-blue-50/30' : 'border-slate-200'}`}>
-              <input type="checkbox" checked={!!massEditEnabled.pricingMethod} onChange={e => setMassEditEnabled(p => ({ ...p, pricingMethod: e.target.checked }))} className="w-3.5 h-3.5 rounded accent-blue-600" />
-              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Метод цены:</span>
-              <select value={massEditValues.pricingMethod} onChange={e => setMassEditValues(p => ({ ...p, pricingMethod: e.target.value }))} disabled={!massEditEnabled.pricingMethod} className="bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-blue-400 disabled:opacity-40 transition-all">
-                <option value="">— выберите —</option>
-                <option value="markup">Наценка (авто)</option>
-                <option value="manual">Вручную</option>
-              </select>
-            </label>
-
-            {massEditValues.pricingMethod === 'markup' && (
-              <label className={`flex items-center gap-2 bg-slate-50 border rounded-xl px-3 py-2 transition-all ${massEditEnabled.markupPercentage ? 'border-blue-300 bg-blue-50/30' : 'border-slate-200'}`}>
-                <input type="checkbox" checked={!!massEditEnabled.markupPercentage} onChange={e => setMassEditEnabled(p => ({ ...p, markupPercentage: e.target.checked }))} className="w-3.5 h-3.5 rounded accent-blue-600" />
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Наценка %:</span>
-                <input type="number" value={massEditValues.markupPercentage} onChange={e => setMassEditValues(p => ({ ...p, markupPercentage: e.target.value }))} disabled={!massEditEnabled.markupPercentage} className="w-16 bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-blue-400 disabled:opacity-40 transition-all text-right" />
-              </label>
-            )}
-          </div>
-
-          {massEditEnabled.categoryId && (
-            <p className="text-[9px] text-amber-600 font-medium mb-2">* Категория обновится только у позиций с привязанным товаром ({syncedItems.filter(i => selectedIds.has(i.id) && i.productId).length} из {selectedIds.size})</p>
-          )}
-        </div>
-      )}
 
       <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl flex flex-col flex-1 overflow-hidden relative">
         <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar">
@@ -367,8 +264,8 @@ export const DetailedList: React.FC<DetailedListProps> = ({ items, preCalculatio
                 <tr className={`hover:bg-blue-50/20 transition-all duration-75 group text-[11px] ${isAssemblyMode && item.orderId ? 'opacity-40 grayscale' : ''}`}>
                   <td className="px-4 py-2 align-middle relative">
                     <div className="flex items-center gap-2">
-                        {(isAssemblyMode || isMassEditMode) ? (
-                            <button disabled={isAssemblyMode && !!item.orderId} onClick={() => { const n = new Set(selectedIds); if (n.has(item.id)) n.delete(item.id); else n.add(item.id); setSelectedIds(n); }} className={`p-1 rounded-lg transition-all ${selectedIds.has(item.id) ? (isMassEditMode ? 'bg-blue-600 text-white' : 'bg-indigo-600 text-white') : 'text-slate-300 hover:text-indigo-600'} ${isAssemblyMode && item.orderId ? 'cursor-not-allowed opacity-50' : ''}`}>
+                        {isAssemblyMode ? (
+                            <button disabled={!!item.orderId} onClick={() => { const n = new Set(selectedIds); if (n.has(item.id)) n.delete(item.id); else n.add(item.id); setSelectedIds(n); }} className={`p-1 rounded-lg transition-all ${selectedIds.has(item.id) ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-indigo-600'} ${item.orderId ? 'cursor-not-allowed opacity-50' : ''}`}>
                                 {selectedIds.has(item.id) ? <CheckSquare size={20}/> : <Square size={20}/>}
                             </button>
                         ) : (
@@ -489,75 +386,8 @@ export const DetailedList: React.FC<DetailedListProps> = ({ items, preCalculatio
                   <td className="px-3 py-2 align-middle text-right border-r border-slate-200 bg-rose-50/10 font-mono text-rose-600 font-bold">{formatCurrency(item.salesBonusKzt)}</td>
                   <td className="px-3 py-2 align-middle text-right font-mono font-bold text-slate-900 bg-slate-50/50 text-[11px]">{formatCurrency(item.fullCostKzt)}</td>
                   <td className="px-3 py-2 align-middle text-right font-mono font-bold text-slate-600 text-[10px] border-r border-slate-200">{formatCurrency(item.preSaleCostKzt)}</td>
-                  <td className="px-3 py-2 align-middle text-center">{!isAssemblyMode && !isMassEditMode && (<button onClick={() => onDeleteItem(item.id)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 active:scale-90"><Trash2 size={16} /></button>)}</td>
+                  <td className="px-3 py-2 align-middle text-center">{!isAssemblyMode && (<button onClick={() => onDeleteItem(item.id)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 active:scale-90"><Trash2 size={16} /></button>)}</td>
                 </tr>
-                {isQuickEditMode && (
-                  <tr key={`qe-${item.id}`} className="bg-amber-50/20">
-                    <td colSpan={26} className="px-5 py-2.5 border-b border-amber-100/60">
-                      <div className="flex items-start gap-3 flex-wrap">
-                        {/* Поставщик */}
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Поставщик</span>
-                          <input type="text" value={item.supplierName || ''} onChange={e => onUpdateItem(item.id, 'supplierName', e.target.value)} placeholder="введите поставщика" className="w-36 bg-white border border-amber-200 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20 transition-all" />
-                        </div>
-
-                        {/* ТНВЭД */}
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Код ТНВЭД</span>
-                          <input type="text" value={item.hsCode || ''} onChange={e => onUpdateItem(item.id, 'hsCode', e.target.value)} placeholder="ХХХХ ХХХХ" className="w-28 bg-white border border-amber-200 rounded-lg px-2 py-1 text-[11px] font-bold font-mono text-indigo-700 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20 transition-all" />
-                        </div>
-
-                        {/* Метод ценообразования */}
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Метод цены</span>
-                          <select value={getItemPricingMethod(item)} onChange={e => { if (e.target.value === 'manual') onUpdateItem(item.id, 'isRevenueConfirmed', true); else if (e.target.value === 'markup') onUpdateItem(item.id, 'isRevenueConfirmed', false); }} disabled={!!item.orderId} className="bg-white border border-amber-200 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-amber-400 transition-all disabled:opacity-60 disabled:cursor-not-allowed">
-                            <option value="markup">Наценка (авто)</option>
-                            <option value="manual">Вручную</option>
-                            {item.orderId && <option value="order">Из заказа</option>}
-                          </select>
-                        </div>
-
-                        {/* Наценка + расч. цена */}
-                        {getItemPricingMethod(item) === 'markup' && (
-                          <>
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Наценка %</span>
-                              <input type="number" value={item.marginPercentage || 0} onChange={e => onUpdateItem(item.id, 'marginPercentage', parseFloat(e.target.value) || 0)} className="w-20 bg-white border border-amber-200 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20 transition-all text-right font-mono" />
-                            </div>
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Расч. цена</span>
-                              <div className="h-[30px] flex items-center px-2.5 bg-emerald-50 rounded-lg border border-emerald-200">
-                                <span className="text-[11px] font-black text-emerald-700 font-mono">{formatCurrency(item.revenueKzt)} ₸</span>
-                              </div>
-                            </div>
-                          </>
-                        )}
-
-                        {/* Габариты транспортные */}
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Габариты (Д×Ш×В, мм)</span>
-                          {(!item.packages || item.packages.length === 0) ? (
-                            <span className="h-[30px] flex items-center text-[10px] text-slate-400 italic">нет данных — добавьте в карточке</span>
-                          ) : item.packages.length === 1 ? (
-                            <div className="flex items-center gap-1.5">
-                              <input type="number" value={item.packages[0]?.lengthMm || 0} onChange={e => handleUpdatePackageDim(item, 'lengthMm', parseFloat(e.target.value) || 0)} className="w-16 bg-white border border-amber-200 rounded-lg px-1.5 py-1 text-[10px] font-mono text-slate-700 focus:outline-none focus:border-amber-400 text-center" />
-                              <span className="text-[9px] text-slate-400 font-bold">×</span>
-                              <input type="number" value={item.packages[0]?.widthMm || 0} onChange={e => handleUpdatePackageDim(item, 'widthMm', parseFloat(e.target.value) || 0)} className="w-16 bg-white border border-amber-200 rounded-lg px-1.5 py-1 text-[10px] font-mono text-slate-700 focus:outline-none focus:border-amber-400 text-center" />
-                              <span className="text-[9px] text-slate-400 font-bold">×</span>
-                              <input type="number" value={item.packages[0]?.heightMm || 0} onChange={e => handleUpdatePackageDim(item, 'heightMm', parseFloat(e.target.value) || 0)} className="w-16 bg-white border border-amber-200 rounded-lg px-1.5 py-1 text-[10px] font-mono text-slate-700 focus:outline-none focus:border-amber-400 text-center" />
-                            </div>
-                          ) : (
-                            <div className="h-[30px] flex items-center">
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg text-[10px] font-black text-blue-700">
-                                <Box size={11} /> {item.packages.length} мест — откройте карточку
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
                 </React.Fragment>
                 );
               })}
