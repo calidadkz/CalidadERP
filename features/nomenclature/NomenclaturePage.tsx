@@ -5,10 +5,12 @@ import { Download, Upload, Loader2, CheckCircle, AlertCircle, Box, Trash2, Monit
 import { useStore } from '../system/context/GlobalStore';
 import { NomenclatureTable } from './components/NomenclatureTable';
 import { ProductModal } from './components/ProductModal';
+import { MobileNomenclatureView } from './components/MobileNomenclatureView';
 import { useAccess } from '../auth/hooks/useAccess';
 import { useNomenclatureState } from './hooks/useNomenclatureState';
 import { useNomenclatureImportExport } from './hooks/useNomenclatureImportExport';
 import { useNomenclatureCRUD } from './hooks/useNomenclatureCRUD';
+import { useIsMobile } from './hooks/useIsMobile';
 
 const SidebarItem = ({ label, count, isActive, onClick, icon: Icon, isDimmed }: { label: string, count?: number, isActive: boolean, onClick: () => void, icon?: React.ElementType, isDimmed?: boolean }) => (
     <button 
@@ -34,6 +36,7 @@ const SidebarItem = ({ label, count, isActive, onClick, icon: Icon, isDimmed }: 
 export const NomenclaturePage: React.FC = () => {
     const { state, actions } = useStore();
     const access = useAccess('nomenclature');
+    const isMobile = useIsMobile();
 
     const {
         selectedType,
@@ -68,6 +71,7 @@ export const NomenclaturePage: React.FC = () => {
         handleDelete,
         confirmDeleteAction,
         cancelDelete,
+        deleteError,
         onSave,
     } = useNomenclatureCRUD(selectedType);
 
@@ -111,6 +115,21 @@ export const NomenclaturePage: React.FC = () => {
 
     if (!state || !state.products) {
         return <div className="flex items-center justify-center h-full">Загрузка данных...</div>;
+    }
+
+    // Мобильная версия
+    if (isMobile) {
+        return (
+            <MobileNomenclatureView
+                products={state.products || []}
+                suppliers={suppliers}
+                categories={state.categories || []}
+                manufacturers={state.manufacturers || []}
+                exchangeRates={state.exchangeRates}
+                onSave={onSave}
+                onDelete={actions.deleteProduct}
+            />
+        );
     }
 
     return (
@@ -220,13 +239,18 @@ export const NomenclaturePage: React.FC = () => {
 
             {confirmDelete.show && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl p-8 text-center border border-slate-100">
+                    <div className="bg-white rounded-3xl shadow-2xl p-8 text-center border border-slate-100 max-w-sm w-full">
                         <Trash2 size={32} className="text-red-600 mx-auto mb-4" />
                         <h3 className="text-lg font-black text-slate-800 mb-2 uppercase">Удалить в корзину?</h3>
-                        <p className="text-slate-500 text-sm mb-6">Товар "{confirmDelete.name}" будет перемещен в корзину.</p>
+                        <p className="text-slate-500 text-sm mb-4">Товар «{confirmDelete.name}» будет перемещен в корзину.</p>
+                        {deleteError && (
+                            <p className="text-red-600 text-xs font-bold bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 text-left">{deleteError}</p>
+                        )}
                         <div className="flex gap-3">
                             <button onClick={cancelDelete} className="flex-1 py-3 text-slate-400 font-bold hover:bg-slate-50 rounded-xl">Отмена</button>
-                            <button onClick={confirmDeleteAction} className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold">Удалить</button>
+                            {!deleteError && (
+                                <button onClick={confirmDeleteAction} className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold">Удалить</button>
+                            )}
                         </div>
                     </div>
                 </div>

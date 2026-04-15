@@ -6,9 +6,12 @@ import { Box, Disc, Star, Wrench, ShieldAlert } from 'lucide-react';
 import { ConfiguratorBuilder } from './components/ConfiguratorBuilder';
 import { TemplatesGallery } from './components/TemplatesGallery';
 import { OptionsEditor } from './components/OptionsEditor';
+import { MobileOptionsEditor } from './components/MobileOptionsEditor';
 import { useAccess } from '../auth/hooks/useAccess';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export const BundlesPage: React.FC = () => {
+    const isMobile = useIsMobile();
     const accessBundles = useAccess('bundles');
     const accessOptions = useAccess('options_editor');
     
@@ -41,6 +44,10 @@ export const BundlesPage: React.FC = () => {
                 <p className="font-black uppercase tracking-widest text-xs">Доступ к базе опций ограничен</p>
             </div>
         );
+    }
+
+    if (mode === 'options' && isMobile) {
+        return <div className="h-full"><MobileOptionsEditor /></div>;
     }
 
     const handleEditBundle = (bundle: Bundle) => {
