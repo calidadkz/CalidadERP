@@ -1,7 +1,7 @@
 # Architecture — CalidadERP
 > Связанные заметки: [[Tech-Stack]] | [[Session-Log]] | [[DataModel]]
-> Модули: [[Modules/Inventory]] | [[Modules/Bundles-Options]] | [[Modules/Finance]] | [[Modules/Procurement-Sales]] | [[Modules/Batches-PreCalc]] | [[Modules/Списания (WriteOff)]]
-> UI-паттерны: [[Modules/UI-CalidadSelect]]
+> Модули: [[Modules/Inventory]] | [[Modules/Nomenclature]] | [[Modules/Bundles-Options]] | [[Modules/Finance]] | [[Modules/Procurement-Sales]] | [[Modules/Batches-PreCalc]] | [[Modules/Списания (WriteOff)]] | [[Modules/Pricing]]
+> UI-паттерны: [[Modules/UI-CalidadSelect]] | [[Modules/UI-Mobile]]
 
 ## Структура проекта
 

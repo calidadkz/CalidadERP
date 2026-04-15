@@ -82,7 +82,26 @@
 ### composition у вариантов
 Вариант может "раскладываться" на составные товары (`composition`). Используется для учёта расходников/запчастей, входящих в опцию.
 
-## Текущие незакоммиченные изменения
-- `OptionsEditor.tsx` — изменён (незакоммичен)
-- `MassAddModal.tsx` — новый файл (незакоммичен)
-- `VariantForm.tsx` — новый файл (незакоммичен)
+## Мобильная версия (добавлена 2026-04-15)
+
+**Файл:** `features/bundles/components/MobileOptionsEditor.tsx`
+
+Два экрана (локальный `screen: 'types' | 'variants'`):
+1. **types** — список типов с поиском, карточки с кнопками edit/delete, drill-in по тапу на строку
+2. **variants** — кнопка назад, фильтр по категориям (chips), карточки вариантов сгруппированные по `machineCategory`
+
+Вложенные overlays:
+- `SearchOverlay` — `fixed inset-0 z-[500]` — полноэкранный поиск поставщика/категории/производителя
+- `VariantFormSheet` — `fixed inset-0 z-[300]` — форма создания/редактирования варианта
+- Type form — `fixed inset-0 z-[300]` — форма создания/редактирования типа
+- Delete confirm — `fixed inset-0 z-[400]`
+
+**BundlesPage.tsx** — early return для `mode === 'options' && isMobile`:
+```tsx
+if (mode === 'options' && isMobile) {
+    return <div className="h-full"><MobileOptionsEditor /></div>;
+}
+```
+Это позволяет не рендерить десктопную шапку.
+
+Связано: [[Modules/UI-Mobile]]

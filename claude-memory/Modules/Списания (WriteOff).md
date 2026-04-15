@@ -1,19 +1,34 @@
 # Модуль: Списания (WriteOff)
 > Связанные заметки: [[Architecture]] | [[Session-Log]] | [[Modules/Inventory]]
-> Дата документирования: 2026-04-09
+> Дата документирования: 2026-04-13 (обновлено)
 
 ## Назначение
 Прямые ручные списания товара со склада — потери, поломки, инвентаризационные разницы, компенсации за брак.
-Заменяет старый DiscrepancyPage (который был про расхождения при приёмке).
 Маршрут: `/discrepancy` → `WriteOffPage`.
+
+## 2-этапный процесс списания
+
+### Этап 1: Черновик (`status = 'Draft'`)
+- Создаётся через «Новое списание» → `createWriteOff`
+- Запись сохраняется в `stock_writeoffs` без движения по складу
+- `unitCostKzt = 0`, `movementId = null`
+- Можно создать даже если товара нет на складе (черновик-заявка)
+
+### Этап 2: Проведение (`status = 'Posted'`)
+- Кнопка «Провести» в списке (для черновиков) → `postWriteOff`
+- Или автоматически при создании если на складе есть остаток (чекбокс «Провести сразу»)
+- Проверяет: `physicalQty >= quantity` (иначе ошибка)
+- Вычисляет среднюю себестоимость: `totalValueKzt / physicalQty` из `v_inventory_summary`
+- Создаёт движение `Out / Physical / documentType='WriteOff'`
+- Обновляет запись: `status='Posted'`, `movementId`, `unitCostKzt`
 
 ## Ключевые файлы
 | Файл | Назначение |
 |---|---|
-| `features/warehouse/pages/WriteOffPage.tsx` | Точка входа: список списаний, KPI, поиск, сортировка |
-| `features/warehouse/components/WriteOffModal.tsx` | Форма создания списания |
+| `features/warehouse/pages/WriteOffPage.tsx` | Список списаний, KPI, статусы, кнопка «Провести» |
+| `features/warehouse/components/WriteOffModal.tsx` | Форма создания: показывает остаток, себестоимость, чекбокс «Провести сразу» |
 | `features/warehouse/components/ReasonTypesModal.tsx` | CRUD справочника типов причин |
-| `features/inventory/hooks/useInventoryState.ts` | `createWriteOff`, `deleteWriteOff` |
+| `features/inventory/hooks/useInventoryState.ts` | `createWriteOff`, `postWriteOff`, `deleteWriteOff` |
 | `features/system/hooks/useReferenceState.ts` | `writeoffReasonTypes` state + CRUD |
 | `features/system/context/GlobalStore.tsx` | Загрузка + экспорт actions |
 | `types/inventory.ts` | Интерфейсы `WriteOff`, `WriteOffReasonType`, `WriteOffDocument` |
@@ -23,31 +38,19 @@
 ### TypeScript
 ```typescript
 interface WriteOff {
-    id: string;           // Генерируется заранее (временный ID = постоянный)
+    id: string;           // Генерируется заранее (WO-xxxx)
     date: string;
     productId: string;
     productName: string;
     sku: string;
     quantity: number;
-    unitCostKzt: number;  // ⚠ Сейчас всегда 0 — не подтягивается из inventorySummary
+    unitCostKzt: number;  // 0 для черновиков; заполняется при проведении (avg cost)
     reasonNote?: string;
     reasonTypeId?: string;
     documents: WriteOffDocument[];
-    movementId?: string;  // ID связанного stock_movements
+    movementId?: string;  // ID связанного stock_movements (только для Posted)
+    status?: 'Draft' | 'Posted';  // Default 'Posted' для старых записей
     createdAt?: string;
-}
-
-interface WriteOffReasonType {
-    id: string;
-    name: string;
-    color: string;        // 'red' | 'orange' | 'amber' | 'blue' | 'green' | 'purple' | 'slate'
-    sortOrder: number;
-}
-
-interface WriteOffDocument {
-    name: string;
-    url: string;          // Firebase Storage URL
-    uploadedAt: string;
 }
 ```
 
@@ -56,39 +59,54 @@ interface WriteOffDocument {
 - `id text PK`, `date date`, `product_id text FK→products`, `product_name text`, `sku text`
 - `quantity numeric`, `unit_cost_kzt numeric`
 - `reason_note text`, `reason_type_id uuid FK→writeoff_reason_types ON DELETE SET NULL`
-- `documents jsonb DEFAULT '[]'`, `movement_id text`, `created_at timestamptz`
+- `documents jsonb DEFAULT '[]'`, `movement_id text`, `status text DEFAULT 'Draft'`
+- `created_at timestamptz`
 
 **`writeoff_reason_types`** — справочник типов (редактируемый)
 - `id uuid PK`, `name text`, `color text`, `sort_order int`, `created_at timestamptz`
-- Дефолтные: Потеря (red), Поломка (orange), Компенсация за брак (amber), Разница при инвентаризации (blue)
 
 ## Бизнес-логика
 
-### Создание списания (`createWriteOff`)
-1. Генерирует `id = ApiService.generateId('WO')` **при открытии модала** (не при сохранении)
-2. Файлы загружаются в Firebase Storage по пути `writeoffs/{id}/` ещё до сохранения в БД
-3. При сохранении: сначала `InventoryMediator.processEvent('WriteOff', 'Adjustment', ...)` → создаёт движение `Out` в `stock_movements`
-4. Потом `ApiService.create(STOCK_WRITEOFFS, { ...writeoff, movementId })`
-5. Тип движения в `stock_movements.documentType` = `'Adjustment'` (не `'WriteOff'`) — InventoryMediator не поддерживает кастомный documentType
+### `createWriteOff` (Этап 1 — черновик)
+1. Проверяет что товар существует
+2. Сохраняет в `stock_writeoffs` с `status='Draft'`, `unitCostKzt=0`, `movementId=null`
+3. НЕ создаёт движения по складу
 
-### Удаление списания (`deleteWriteOff`)
-- Находит исходное движение по `movementId`
-- Создаёт **сторно-движение** `In` с описанием `"Отмена списания (исходный: {wo.id})"`
-- Удаляет запись из `stock_writeoffs`
-- Запись из `stock_movements` НЕ удаляется — только сторно
+### `postWriteOff` (Этап 2 — проведение)
+1. Находит запись в `inventorySummary` по `productId` (без конфигурации)
+2. Проверяет: `physicalQty >= quantity` (иначе бросает ошибку)
+3. Считает `avgCost = totalValueKzt / physicalQty`
+4. Создаёт `StockMovement { type:'Out', statusType:'Physical', documentType:'WriteOff' }`
+5. Обновляет запись: `status='Posted'`, `movementId`, `unitCostKzt=avgCost`
 
-### Временный ID (паттерн документов)
-Аналогично `SalesOrderForm`: ID генерируется при открытии формы → файлы грузятся в `writeoffs/{id}/` → при сохранении этот же ID становится первичным ключом записи. Нет понятия «временного хранилища» — папка просто создаётся заранее.
+### `deleteWriteOff`
+- `Draft` → просто удаляет запись из `stock_writeoffs`
+- `Posted` → создаёт сторно-движение `In/Physical` + удаляет запись
 
-## Связанные модули
-- [[Modules/Inventory]] — движения попадают в `stock_movements`, влияют на остатки
-- `DiscrepancyPage` — старый модуль расхождений при приёмке (оставлен, но роут перезаписан)
+### Себестоимость
+Используется **средняя** (avg) из `v_inventory_summary.totalValueKzt / stock`.
+Не FIFO — принято намеренно: это проще и консистентно с тем, что видит пользователь в интерфейсе остатков.
+
+## UI паттерны
+
+### WriteOffModal
+- При выборе товара: панель с физическим остатком + средней себестоимостью + суммой потерь (если кол-во введено)
+- Чекбокс «Провести сразу» (по умолчанию включён если есть остаток)
+- Кнопка меняет текст и цвет: «Провести списание» (красная) vs «Создать черновик» (серая)
+
+### WriteOffPage
+- 4 KPI плашки: Всего / Черновиков / Кол-во списано / Сумма потерь
+- Колонка «Статус»: бейдж Черновик (amber) / Проведено (emerald)
+- Строки черновиков подсвечены `bg-amber-50/20`
+- Кнопка «Провести» для черновиков (рядом с удалением)
+- Сумма потерь показывается только для проведённых
 
 ## Известные особенности / ограничения
-- **`unitCostKzt` = 0** при создании — себестоимость не вычисляется автоматически. Нужно подтягивать из `inventorySummary` при выборе товара в форме (TODO)
-- **`documentType` в движении = `'Adjustment'`**, хотя логически это `'WriteOff'` — InventoryMediator не поддерживает произвольный documentType без рефакторинга
-- **Без overflow-hidden в WriteOffModal**: внешний контейнер модала намеренно не имеет `overflow-hidden` — иначе CalidadSelect обрезается. Если добавить скроллируемые секции внутри, нужно помнить об этом
-- Удаление списания не удаляет файлы из Firebase Storage — они остаются навсегда
+- `postWriteOff` работает только для товаров **без конфигурации** (ищет запись с `configuration = []`). Для машин с опциями нужна доработка.
+- После проведения `inventorySummary` в памяти не обновляется — view в Supabase обновится при следующем полном refresh
+- Удаление списания не удаляет файлы из Firebase Storage
+- Старые записи без поля `status` трактуются как `'Posted'` (через `wo.status ?? 'Posted'`)
 
 ## История изменений
-- 2026-04-09: создан модуль (DB, типы, state, UI), задокументирован
+- 2026-04-09: создан модуль (DB, типы, state, UI)
+- 2026-04-13: рефакторинг на 2 этапа (Draft/Posted), исправлен баг с InventoryMediator (не обрабатывал documentType='WriteOff'), добавлен postWriteOff, обновлён UI

@@ -18,7 +18,9 @@
 | `features/pre-calculations/pages/PreCalculationEditorPage.tsx` | Редактор |
 | `features/pre-calculations/components/general-settings/GeneralSettings.tsx` | Параметры расчёта |
 | `features/pre-calculations/components/detailed-list/DetailedList.tsx` | Таблица позиций |
-| `features/pre-calculations/components/detailed-list/AddItemModal.tsx` | Добавление позиции |
+| `features/pre-calculations/components/detailed-list/AddItemModal.tsx` | Роутинг + PART mode |
+| `features/pre-calculations/components/detailed-list/modes/OrderModeModal.tsx` | Добавление из заказа |
+| `features/pre-calculations/components/detailed-list/modes/MachineModeModal.tsx` | Конфигуратор станка |
 | `features/pre-calculations/components/packing-list/PackingList.tsx` | Упаковочный лист |
 | `features/pre-calculations/hooks/usePreCalculations.ts` | Логика и CRUD |
 
@@ -27,7 +29,7 @@
 |---|---|
 | `features/batches/BatchesPage.tsx` | Список партий |
 | `features/batches/BatchDetailPage.tsx` | Детальная страница партии |
-| `features/batches/components/BatchEconomyTab.tsx` | Экономика: план vs факт |
+| `features/batches/components/BatchTimelineTab.tsx` | Диаграмма Ганта + ось дат с маркерами дедлайнов |
 | `features/batches/components/BatchExpensesTab.tsx` | Фактические расходы |
 | `features/batches/components/BatchDocumentsTab.tsx` | Документы партии |
 | `features/batches/hooks/useBatches.ts` | CRUD партий |
@@ -145,3 +147,34 @@ profitDiff%    = (actualProfit - plannedProfit) / |plannedProfit| * 100
 `BatchExpense.plannedPaymentId` → `PlannedPayment.id`
 `PaymentAllocation.batchId` → `Batch.id`
 Позволяет отслеживать полный денежный поток партии.
+
+### Расчёт доставки по Китаю (3 метода в предрасчёте)
+Поле `generalSettings.chinaDomesticRateMethod`:
+- `volume` — `ratePerM3Usd * volumePerItem * exchangeRate` (за единицу)
+- `weight` — `ratePerTonUsd * (weightKg/1000) * exchangeRate` (за единицу)
+- `fixed` — **общая сумма на партию** (`chinaDomesticFixedKztTotal`), распределяется пропорционально объёму:
+  ```
+  deliveryChinaDomesticKzt[i] = fixedTotal * volumePerItem[i] / totalEffectiveVolumeM3
+  ```
+  Позиции с `useDimensions = false` (или без объёма) получают 0.
+  DB-колонка: `china_domestic_fixed_kzt_total` (переименована из `_per_unit` в 2026-04-10).
+
+### Фактические расходы по Китаю (мульти-аллокации, с 2026-04-14)
+`BatchExpense.chinaDistribution?: ChinaDeliveryDistribution` — правила распределения для каждой записи расхода:
+```typescript
+{
+  method: 'volume' | 'weight' | 'manual'
+  targetItemIds: string[]              // [] = все позиции партии
+  manualAmounts?: Record<string, number> // itemId → KZT (для manual)
+}
+```
+Это позволяет: 3 завода в одной партии → 3 платежа с разными `targetItemIds` и методами.
+Управление через `ChinaDeliveryModal` (открывается кликом на заголовок "По Китаю" в таблице позиций).
+
+### Распределение общих расходов (СВХ, Брокер, Таможенные сборы)
+Все три поля в `generalSettings` — это суммы на **всю партию**. Распределяются по позициям через `shareOfTotalVolume`:
+```
+shareOfTotalVolume = (volumePerItem * qty) / totalEffectiveVolumeM3
+svhPerItemKzt = svhKzt * shareOfTotalVolume
+```
+Итого на строку = `svhPerItemKzt` (уже включает qty в числителе).
