@@ -8,6 +8,7 @@ import { MobileConfiguratorBuilder } from './components/MobileConfiguratorBuilde
 import { TemplatesGallery } from './components/TemplatesGallery';
 import { OptionsEditor } from './components/OptionsEditor';
 import { MobileOptionsEditor } from './components/MobileOptionsEditor';
+import { MobileTemplatesGallery } from './components/MobileTemplatesGallery';
 import { useAccess } from '../auth/hooks/useAccess';
 import { useIsMobile } from '@/hooks/useIsMobile';
 
@@ -72,7 +73,7 @@ export const BundlesPage: React.FC = () => {
                 <div className="flex-1 min-h-0 relative">
                     {configTab === 'build'
                         ? <MobileConfiguratorBuilder editingBundle={editingBundle} onSaved={() => { setEditingBundle(null); setConfigTab('templates'); }} />
-                        : <TemplatesGallery onLoad={(bundle) => { setEditingBundle(bundle); setConfigTab('build'); }} />}
+                        : <MobileTemplatesGallery onLoad={(bundle) => { setEditingBundle(bundle); setConfigTab('build'); }} />}
                 </div>
             </div>
         );
