@@ -82,7 +82,31 @@
 ### composition у вариантов
 Вариант может "раскладываться" на составные товары (`composition`). Используется для учёта расходников/запчастей, входящих в опцию.
 
-## Мобильная версия (добавлена 2026-04-15)
+## Мобильная версия ConfiguratorBuilder (добавлена 2026-04-16)
+
+**Файл:** `features/bundles/components/MobileConfiguratorBuilder.tsx`
+
+Два шага в одном компоненте (local `machine` state):
+1. **Шаг 1 — выбор модели** (`!machine`): поиск строкой + 3 фильтр-чипа (категория/поставщик/производитель через SearchOverlay `z-[500]`) + список моделей (карточки с иконкой, ценой, SKU)
+2. **Шаг 2 — настройка опций** (`machine`): sticky header (back + название + copy buttons) + горизонтальный scroll выбранных вариантов + accordion список типов опций + grid-cols-2 карточки + **floating bottom bar** с ценой
+
+**EconomySheet** (`fixed inset-0 z-[300]`) — тёмный bottom sheet:
+- Крупная итоговая цена KZT
+- 3 колонки: Объём / База / Итого закупка
+- Профиль + маржа input
+- Детализация расходов (collapsible)
+- Прибыль
+- Название и описание сборки
+- Кнопка Сохранить шаблон
+
+**BundlesPage.tsx** — early return для `mode === 'configurator' && isMobile`:
+- Мобильный tab bar (Новая сборка | Шаблоны) с `border-b-2` underline индикатором
+- `MobileConfiguratorBuilder` в tab "build"
+- `TemplatesGallery` в tab "templates" (без изменений)
+
+Связано: [[Modules/UI-Mobile]]
+
+## Мобильная версия OptionsEditor (добавлена 2026-04-15)
 
 **Файл:** `features/bundles/components/MobileOptionsEditor.tsx`
 

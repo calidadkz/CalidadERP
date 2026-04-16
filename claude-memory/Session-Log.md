@@ -1,5 +1,24 @@
 # Session Log
 
+## 2026-04-16 — Мобильный ConfiguratorBuilder (Комплектации)
+
+**Что сделано:**
+- Создан `MobileConfiguratorBuilder.tsx` — полноценная мобильная версия "Сборки комплектации"
+  - Шаг 1: поиск модели + фильтры (категория/поставщик/производитель) через SearchOverlay (z-500)
+  - Шаг 2: sticky header с названием модели + copy кнопки + горизонтальный scroll выбранных вариантов
+  - Accordion типов опций + grid-cols-2 карточки вариантов (price, default badge, check)
+  - Floating bottom bar → открывает EconomySheet (dark bottom sheet z-300)
+  - EconomySheet: итого KZT, 3 метрики, детализация расходов (collapsible), маржа, прибыль, название/описание, сохранение
+- Обновлён `BundlesPage.tsx`: early return `mode === 'configurator' && isMobile` с mobile tab bar (Новая сборка | Шаблоны)
+
+**Файлы изменены:**
+- `features/bundles/components/MobileConfiguratorBuilder.tsx` (создан)
+- `features/bundles/BundlesPage.tsx` (добавлен mobile configurator branch)
+- `claude-memory/Modules/Bundles-Options.md` (обновлён)
+
+**Открытые задачи / следующий шаг:** мобильная версия Библиотеки шаблонов (TemplatesGallery) — пока используется десктопная
+**Ссылки:** [[Modules/Bundles-Options]], [[Modules/UI-Mobile]]
+
 ## 2026-04-15 — Мобильная версия Номенклатуры и Опций (завершение)
 
 **Что сделано:**

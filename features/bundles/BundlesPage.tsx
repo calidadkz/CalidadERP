@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Bundle } from '@/types';
 import { Box, Disc, Star, Wrench, ShieldAlert } from 'lucide-react';
 import { ConfiguratorBuilder } from './components/ConfiguratorBuilder';
+import { MobileConfiguratorBuilder } from './components/MobileConfiguratorBuilder';
 import { TemplatesGallery } from './components/TemplatesGallery';
 import { OptionsEditor } from './components/OptionsEditor';
 import { MobileOptionsEditor } from './components/MobileOptionsEditor';
@@ -48,6 +49,33 @@ export const BundlesPage: React.FC = () => {
 
     if (mode === 'options' && isMobile) {
         return <div className="h-full"><MobileOptionsEditor /></div>;
+    }
+
+    if (mode === 'configurator' && isMobile) {
+        return (
+            <div className="h-full flex flex-col overflow-hidden">
+                {/* Мобильный переключатель вкладок */}
+                {canSeeBuild && canSeeTemplates && (
+                    <div className="flex-none flex bg-white border-b border-slate-200">
+                        <button
+                            onClick={() => setConfigTab('build')}
+                            className={`flex-1 py-3 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-1.5 border-b-2 transition-all ${configTab === 'build' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>
+                            <Wrench size={13} /> {editingBundle ? 'Изменение' : 'Новая сборка'}
+                        </button>
+                        <button
+                            onClick={() => { setConfigTab('templates'); setEditingBundle(null); }}
+                            className={`flex-1 py-3 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-1.5 border-b-2 transition-all ${configTab === 'templates' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>
+                            <Star size={13} /> Шаблоны
+                        </button>
+                    </div>
+                )}
+                <div className="flex-1 min-h-0 relative">
+                    {configTab === 'build'
+                        ? <MobileConfiguratorBuilder editingBundle={editingBundle} onSaved={() => { setEditingBundle(null); setConfigTab('templates'); }} />
+                        : <TemplatesGallery onLoad={(bundle) => { setEditingBundle(bundle); setConfigTab('build'); }} />}
+                </div>
+            </div>
+        );
     }
 
     const handleEditBundle = (bundle: Bundle) => {
