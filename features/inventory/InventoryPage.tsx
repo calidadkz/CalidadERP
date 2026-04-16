@@ -15,17 +15,20 @@ import { AdjustmentForm } from './components/AdjustmentForm';
 import { StockTable } from './components/StockTable';
 import { MovementsTable } from './components/MovementsTable';
 import InventoryVerificationReport from './components/InventoryVerificationReport';
+import { MobileInventoryView } from './components/MobileInventoryView';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 const INITIAL_PAGE_SIZE = 50;
 const MOVEMENTS_PAGE_SIZE = 50;
 
 export const InventoryPage: React.FC = () => {
   const { state, actions } = useStore();
-  const { 
+  const {
     products, inventorySummary, categories,
-    exchangeRates, optionVariants, pricingProfiles, optionTypes 
+    exchangeRates, optionVariants, pricingProfiles, optionTypes
   } = state;
   const access = useAccess('inventory');
+  const isMobile = useIsMobile();
   
   const canSeeStock = access.canSee('tabs', 'stock_view');
   const canSeeMovements = access.canSee('tabs', 'movements_view');
@@ -271,8 +274,16 @@ export const InventoryPage: React.FC = () => {
     reader.readAsText(file);
   };
 
+  if (isMobile) {
+    return (
+      <div className="h-full relative">
+        <MobileInventoryView state={state} actions={actions} access={access} />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
         <input type="file" ref={fileInputRef} onChange={handleImport} accept=".csv" className="hidden" />
         {importStatus.show && (
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
@@ -286,7 +297,7 @@ export const InventoryPage: React.FC = () => {
         )}
 
       <div className="flex justify-between items-center">
-        <div><h2 className="text-2xl font-bold text-slate-800 flex items-center"><PackageSearch className="mr-3 text-blue-600" size={28}/> Остатки и Движения</h2><p className="text-slate-500 text-sm font-medium mt-1">Контроль складских запасов и история перемещений</p></div>
+        <div><h2 className="text-xl xl:text-2xl font-bold text-slate-800 flex items-center"><PackageSearch className="mr-2.5 text-blue-600" size={24}/> Остатки и Движения</h2><p className="text-slate-500 text-xs xl:text-sm font-medium mt-0.5">Контроль складских запасов и история перемещений</p></div>
         <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200">
              {canSeeStock && <button onClick={() => setViewMode('stock')} className={`flex items-center px-6 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${viewMode === 'stock' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}><LayoutList size={14} className="mr-2"/> Остатки</button>}
              {canSeeMovements && <button onClick={() => setViewMode('movements')} className={`flex items-center px-6 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${viewMode === 'movements' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}><FileText size={14} className="mr-2"/> Движения</button>}
@@ -296,10 +307,10 @@ export const InventoryPage: React.FC = () => {
       {viewMode === 'stock' && (
           <>
             <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {access.canSee('fields', 'kpi_value') && <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 flex items-center gap-3"><div className="bg-white p-1.5 rounded-lg shadow-sm text-blue-600"><Wallet size={20}/></div><div><div className="text-[9px] text-slate-400 uppercase font-black tracking-widest">ЦЕННОСТЬ СКЛАДА</div><div className="text-lg font-black text-blue-800">{f(totals.warehouseValue)} ₸</div></div></div>}
-                    {access.canSee('fields', 'kpi_revenue') && <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 flex items-center gap-3"><div className="bg-white p-1.5 rounded-lg shadow-sm text-emerald-600"><TrendingUp size={20}/></div><div><div className="text-[9px] text-slate-400 uppercase font-black tracking-widest">ПОТЕНЦ. ВЫРУЧКА</div><div className="text-lg font-black text-emerald-800">{f(totals.potentialRevenue)} ₸</div></div></div>}
-                    <div className="col-span-1 lg:col-span-2 flex justify-end items-center gap-2">
+                <div className="flex flex-wrap gap-3 items-center">
+                    {access.canSee('fields', 'kpi_value') && <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 flex items-center gap-3"><div className="bg-white p-1.5 rounded-lg shadow-sm text-blue-600"><Wallet size={20}/></div><div><div className="text-[10px] text-slate-500 uppercase font-black tracking-widest">ЦЕННОСТЬ СКЛАДА</div><div className="text-lg font-black text-blue-800">{f(totals.warehouseValue)} ₸</div></div></div>}
+                    {access.canSee('fields', 'kpi_revenue') && <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 flex items-center gap-3"><div className="bg-white p-1.5 rounded-lg shadow-sm text-emerald-600"><TrendingUp size={20}/></div><div><div className="text-[10px] text-slate-500 uppercase font-black tracking-widest">ПОТЕНЦ. ВЫРУЧКА</div><div className="text-lg font-black text-emerald-800">{f(totals.potentialRevenue)} ₸</div></div></div>}
+                    <div className="flex-1 flex justify-end items-center gap-2 min-w-[200px]">
                         <div className="relative">
                             <button 
                                 onClick={() => setShowExportOptions(!showExportOptions)} 
@@ -317,14 +328,14 @@ export const InventoryPage: React.FC = () => {
                         <button onClick={() => fileInputRef.current?.click()} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-orange-600 rounded-xl shadow-sm"><Upload size={16}/></button>
                         <div className="relative w-full max-w-xs"><Search size={16} className="absolute left-3 top-[9px] text-slate-400" /><input type="text" className="w-full pl-9 pr-4 py-1.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 transition-all" placeholder="Поиск по названию/SKU..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/></div>
                         {!isAdjusting && access.canWrite('actions', 'adjust_btn') && (
-                            <button onClick={() => setIsAdjusting(true)} className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow font-black uppercase text-[10px] tracking-widest transition-all whitespace-nowrap"><PlusCircle size={16} className="mr-2"/> Ввод</button>
+                            <button onClick={() => setIsAdjusting(true)} className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow font-black uppercase text-[11px] tracking-widest transition-all whitespace-nowrap"><PlusCircle size={16} className="mr-2"/> Ввод</button>
                         )}
                     </div>
                 </div>
                 <div className="border-t border-slate-100 pt-3 flex items-center gap-3">
                     <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200 flex-none">
-                        <button onClick={() => { setActiveType(ProductType.MACHINE); setMachineFilter('all'); setCategoryFilter('all'); }} className={`flex items-center gap-2 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${activeType === ProductType.MACHINE ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><Box size={14}/> Станки</button>
-                        <button onClick={() => { setActiveType(ProductType.PART); setMachineFilter('all'); setCategoryFilter('all'); }} className={`flex items-center gap-2 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${activeType === ProductType.PART ? 'bg-orange-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><Zap size={14}/> Запчасти</button>
+                        <button onClick={() => { setActiveType(ProductType.MACHINE); setMachineFilter('all'); setCategoryFilter('all'); }} className={`flex items-center gap-2 px-3 xl:px-4 py-1.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${activeType === ProductType.MACHINE ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><Box size={14}/> Станки</button>
+                        <button onClick={() => { setActiveType(ProductType.PART); setMachineFilter('all'); setCategoryFilter('all'); }} className={`flex items-center gap-2 px-3 xl:px-4 py-1.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${activeType === ProductType.PART ? 'bg-orange-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><Zap size={14}/> Запчасти</button>
                     </div>
                     {activeType === ProductType.PART && (
                         <CalidadSelect
