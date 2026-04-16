@@ -8,16 +8,29 @@
 ## Ключевые файлы
 | Файл | Назначение |
 |---|---|
-| `features/inventory/InventoryPage.tsx` | Точка входа, таб-навигация |
-| `features/inventory/components/StockTable.tsx` | Таблица остатков |
-| `features/inventory/components/MovementsTable.tsx` | История движений |
+| `features/inventory/InventoryPage.tsx` | Точка входа, таб-навигация (desktop + mobile branch) |
+| `features/inventory/components/StockTable.tsx` | Таблица остатков (desktop) |
+| `features/inventory/components/MovementsTable.tsx` | История движений (desktop) |
+| `features/inventory/components/MobileInventoryView.tsx` | **Мобильный UI** — карточки остатков + движений |
 | `features/inventory/components/AdjustmentForm.tsx` | Форма корректировки остатков |
-| `features/inventory/components/InventoryVerificationReport.tsx` | Акт инвентаризации |
+| `features/inventory/components/InventoryVerificationReport.tsx` | Акт инвентаризации (default export) |
 | `features/inventory/hooks/useInventoryState.ts` | CRUD товаров, движений |
 | `features/inventory/hooks/useInventoryData.ts` | Расчёт агрегированных остатков |
 | `features/inventory/hooks/useInventoryFilters.ts` | Фильтрация/поиск |
 | `services/InventoryService.ts` | Бизнес-расчёты остатков |
 | `services/InventoryMediator.ts` | Оркестрация: создаёт движения при событиях |
+
+## Мобильная версия (добавлена 2026-04-16)
+
+`MobileInventoryView` принимает `{ state, actions, access }` — не использует `useStore` напрямую, получает всё от `InventoryPage`.
+
+**StockCard**: раскрывается при наличии конфигураций (станки) или нескольких breakdown-строк. Grid 4 метрик: Склад / В пути / Резерв / Стоимость.
+
+**MovementCard**: поле `revertInitialStockEntry` доступно только для `documentType === 'Adjustment'` без уже существующего reversal.
+
+**InventoryVerificationReport** — `export default`, не named export. Импортировать без фигурных скобок.
+
+Связано: [[Modules/UI-Mobile]]
 
 ## Модель данных
 

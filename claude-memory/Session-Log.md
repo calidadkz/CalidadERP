@@ -1,5 +1,46 @@
 # Session Log
 
+## 2026-04-16 — Мобильный UI: Комплектации (полностью) + Остатки и Движения
+
+**Что сделано:**
+
+**1. MobileConfiguratorBuilder** — мобильный конфигуратор сборок:
+- Шаг 1: поиск модели + фильтр-чипы (категория/поставщик/производитель) через SearchOverlay z-500
+- Шаг 2: sticky header (назад + название + copy buttons) + accordion опций + grid-cols-2 карточки вариантов + floating bottom bar с ценой
+- EconomySheet (dark bottom sheet z-300): итого KZT, 3 метрики, детализация расходов (collapsible), маржа, прибыль, название/описание, кнопка сохранить
+
+**2. MobileTemplatesGallery** — мобильная библиотека шаблонов:
+- Поиск + кнопка фильтров с red badge-счётчиком
+- FilterSheet (bottom sheet): выбор базовой модели + диапазон цен
+- BundleCard: название модели, горизонтальный скролл чипов вариантов, габариты (объём + рабочие размеры), раскрываемое описание, цена + кнопка Изменить
+- DeleteConfirm bottom sheet (защита от случайного удаления)
+
+**3. MobileInventoryView** — мобильные Остатки и Движения:
+- Tab bar (Остатки / Движения)
+- StockCard: миниатюра + имя/SKU + свободный остаток крупно, grid 4 метрик (Склад/В пути/Резерв/Стоим.), раскрытие конфигураций с чипами опций
+- MovementCard: badge Приход/Расход, дата, товар, статус, документ, цены, кнопка отмены Adjustment
+- FilterSheet: тип (Станки/Запчасти), оборудование, категория
+- KPI chips (ценность/выручка) — горизонтальный скролл, права-зависимые
+- FAB "Ввод" → fullscreen AdjustmentForm overlay
+- Экспорт/импорт CSV, лист сверки через меню Download
+- Infinite scroll для списка остатков (IntersectionObserver)
+- Paginated load-more для движений (50 записей)
+
+**4. BundlesPage.tsx** обновлён: early return для `configurator && isMobile` с mobile tab bar (Новая сборка | Шаблоны), подключены все 3 мобильных компонента
+
+**Файлы изменены:**
+- `features/bundles/components/MobileConfiguratorBuilder.tsx` (создан)
+- `features/bundles/components/MobileTemplatesGallery.tsx` (создан)
+- `features/bundles/BundlesPage.tsx` (mobile branches для configurator + templates)
+- `features/inventory/components/MobileInventoryView.tsx` (создан)
+- `features/inventory/InventoryPage.tsx` (mobile early return)
+
+**Открытые задачи / следующий шаг:** нет — все 3 модуля закрыты, build чистый
+
+**Ссылки:** [[Modules/Bundles-Options]], [[Modules/Inventory]], [[Modules/UI-Mobile]]
+
+---
+
 ## 2026-04-16 — Мобильный ConfiguratorBuilder (Комплектации)
 
 **Что сделано:**
