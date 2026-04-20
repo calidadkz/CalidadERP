@@ -1,14 +1,21 @@
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Bundle } from '@/types';
 import { Box, Disc, Star, Wrench, ShieldAlert } from 'lucide-react';
 import { ConfiguratorBuilder } from './components/ConfiguratorBuilder';
-import { MobileConfiguratorBuilder } from './components/MobileConfiguratorBuilder';
 import { TemplatesGallery } from './components/TemplatesGallery';
 import { OptionsEditor } from './components/OptionsEditor';
-import { MobileOptionsEditor } from './components/MobileOptionsEditor';
-import { MobileTemplatesGallery } from './components/MobileTemplatesGallery';
+
+const MobileConfiguratorBuilder = React.lazy(() =>
+    import('./components/MobileConfiguratorBuilder').then(m => ({ default: m.MobileConfiguratorBuilder }))
+);
+const MobileOptionsEditor = React.lazy(() =>
+    import('./components/MobileOptionsEditor').then(m => ({ default: m.MobileOptionsEditor }))
+);
+const MobileTemplatesGallery = React.lazy(() =>
+    import('./components/MobileTemplatesGallery').then(m => ({ default: m.MobileTemplatesGallery }))
+);
 import { useAccess } from '../auth/hooks/useAccess';
 import { useIsMobile } from '@/hooks/useIsMobile';
 
@@ -49,7 +56,7 @@ export const BundlesPage: React.FC = () => {
     }
 
     if (mode === 'options' && isMobile) {
-        return <div className="h-full"><MobileOptionsEditor /></div>;
+        return <div className="h-full"><Suspense fallback={null}><MobileOptionsEditor /></Suspense></div>;
     }
 
     if (mode === 'configurator' && isMobile) {
@@ -71,9 +78,11 @@ export const BundlesPage: React.FC = () => {
                     </div>
                 )}
                 <div className="flex-1 min-h-0 relative">
-                    {configTab === 'build'
-                        ? <MobileConfiguratorBuilder editingBundle={editingBundle} onSaved={() => { setEditingBundle(null); setConfigTab('templates'); }} />
-                        : <MobileTemplatesGallery onLoad={(bundle) => { setEditingBundle(bundle); setConfigTab('build'); }} />}
+                    <Suspense fallback={null}>
+                        {configTab === 'build'
+                            ? <MobileConfiguratorBuilder editingBundle={editingBundle} onSaved={() => { setEditingBundle(null); setConfigTab('templates'); }} />
+                            : <MobileTemplatesGallery onLoad={(bundle) => { setEditingBundle(bundle); setConfigTab('build'); }} />}
+                    </Suspense>
                 </div>
             </div>
         );

@@ -5,7 +5,15 @@
       "mcp__supabase__execute_sql",
       "mcp__supabase__apply_migration",
       "Bash(npx tsc:*)",
-      "Bash(git -C \"c:/Users/Sergei Calidad/calidadERP/CalidadERP\" status --short)"
+      "Bash(git -C \"c:/Users/Sergei Calidad/calidadERP/CalidadERP\" status --short)",
+      "Bash(node_modules/.bin/tsc --noEmit --skipLibCheck)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(npm list *)",
+      "Bash(\"C:/Users/Sergei Calidad/AppData/Roaming/npm/node_modules/@playwright/mcp/cli.js\" --help)",
+      "Bash(node -e ' *)"
     ]
   }
 }

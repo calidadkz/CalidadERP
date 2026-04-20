@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Pencil, Trash2, X, Check, Hash, Layers } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Pencil, Trash2, X, Check, Hash, Search } from 'lucide-react';
 import { CashFlowItem, CashFlowTag, CashFlowItemType } from '@/types';
-import { TagBadge, TypeBadge } from './CashFlowBadges';
+import { TagBadge } from './CashFlowBadges';
+import { CalidadSelect } from '@/components/ui/CalidadSelect';
 
 export interface ItemRowCallbacks {
     onDelete: (id: string) => void;
@@ -31,12 +32,32 @@ export const ItemRow: React.FC<ItemRowProps> = ({
     const [isEditingName, setIsEditingName] = useState(false);
     const [editName, setEditName] = useState(item.name);
     const [showTagPicker, setShowTagPicker] = useState(false);
-    const [showTypePicker, setShowTypePicker] = useState(false);
+    const [tagSearch, setTagSearch] = useState('');
+    const tagPickerRef = useRef<HTMLDivElement>(null);
 
     const itemTags = tags.filter(t => item.tagIds?.includes(t.id));
     const inheritedTags = tags.filter(t => inheritedTagIds.includes(t.id) && !item.tagIds?.includes(t.id));
-    const currentType = itemTypes.find(t => t.id === item.itemTypeId);
     const groups = allItems.filter(x => x.isGroup && x.type === activeType);
+
+    const typeOptions = itemTypes.map(t => ({ id: t.id, label: t.name }));
+    const groupOptions = groups.map(g => ({ id: g.id, label: g.name }));
+
+    const filteredTags = useMemo(() => {
+        if (!tagSearch) return tags;
+        const q = tagSearch.toLowerCase();
+        return tags.filter(t => t.name.toLowerCase().includes(q));
+    }, [tags, tagSearch]);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (tagPickerRef.current && !tagPickerRef.current.contains(e.target as Node)) {
+                setShowTagPicker(false);
+                setTagSearch('');
+            }
+        };
+        if (showTagPicker) document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showTagPicker]);
 
     const handleSaveName = () => {
         if (editName.trim() && editName !== item.name) onRename(item.id, editName.trim());
@@ -70,10 +91,9 @@ export const ItemRow: React.FC<ItemRowProps> = ({
                                 {item.name}
                             </span>
                         )}
-                        {/* Бейджи тегов и типа */}
-                        {(itemTags.length > 0 || currentType || inheritedTags.length > 0) && (
+                        {/* Бейджи тегов */}
+                        {(itemTags.length > 0 || inheritedTags.length > 0) && (
                             <div className="flex flex-wrap gap-1 mt-1">
-                                {currentType && <TypeBadge type={currentType} onRemove={() => onSetItemType(item.id, null)} />}
                                 {itemTags.map(t => (
                                     <TagBadge
                                         key={t.id}
@@ -97,91 +117,92 @@ export const ItemRow: React.FC<ItemRowProps> = ({
                 </div>
             </td>
 
-            <td className="px-4 py-3.5 text-right">
-                {!item.isGroup && groups.length > 0 && (
-                    <select
-                        className="text-[10px] font-bold text-slate-400 border border-slate-100 rounded-lg px-1.5 py-1 bg-white outline-none hover:border-slate-300 transition-colors"
-                        value={item.parentId || ''}
-                        onChange={e => onMoveToGroup(item.id, e.target.value || null)}
-                        title="Группа"
-                    >
-                        <option value="">Без группы</option>
-                        {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                    </select>
+            <td className="px-4 py-3.5">
+                {!item.isGroup && (
+                    <div className="flex gap-2">
+                        {itemTypes.length > 0 && (
+                            <div className="flex-1 min-w-0">
+                                <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-0.5 ml-0.5">Тип</div>
+                                <CalidadSelect
+                                    options={typeOptions}
+                                    value={item.itemTypeId || ''}
+                                    onChange={id => onSetItemType(item.id, id || null)}
+                                    nullLabel="— Не задан —"
+                                    placeholder="Не задан"
+                                    zIndex="z-[110]"
+                                    dropdownMinWidth="180px"
+                                />
+                            </div>
+                        )}
+                        {groupOptions.length > 0 && (
+                            <div className="flex-1 min-w-0">
+                                <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-0.5 ml-0.5">Группа</div>
+                                <CalidadSelect
+                                    options={groupOptions}
+                                    value={item.parentId || ''}
+                                    onChange={id => onMoveToGroup(item.id, id || null)}
+                                    nullLabel="— Без группы —"
+                                    placeholder="Без группы"
+                                    zIndex="z-[110]"
+                                    dropdownMinWidth="180px"
+                                />
+                            </div>
+                        )}
+                    </div>
                 )}
             </td>
 
             <td className="px-4 py-3.5 text-right">
-                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {/* Тип статьи */}
-                    {!item.isGroup && itemTypes.length > 0 && (
-                        <div className="relative">
-                            <button
-                                onClick={() => { setShowTypePicker(p => !p); setShowTagPicker(false); }}
-                                className="p-1.5 text-slate-300 hover:text-violet-500 hover:bg-violet-50 rounded-lg transition-all"
-                                title="Тип"
-                            >
-                                <Layers size={15} />
-                            </button>
-                            {showTypePicker && (
-                                <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl p-2.5 z-50 min-w-[160px] space-y-1">
-                                    <button
-                                        onClick={() => { onSetItemType(item.id, null); setShowTypePicker(false); }}
-                                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-50 transition-colors text-left"
-                                    >
-                                        <div className="w-2.5 h-2.5 rounded-full bg-slate-300" />
-                                        <span className="text-xs font-bold text-slate-400 flex-1">Не задан</span>
-                                        {!item.itemTypeId && <Check size={11} className="text-emerald-500" />}
-                                    </button>
-                                    {itemTypes.map(t => (
-                                        <button
-                                            key={t.id}
-                                            onClick={() => { onSetItemType(item.id, t.id); setShowTypePicker(false); }}
-                                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-50 transition-colors text-left"
-                                        >
-                                            <div className="w-2.5 h-2.5 rounded-md" style={{ backgroundColor: t.color }} />
-                                            <span className="text-xs font-bold text-slate-700 flex-1">{t.name}</span>
-                                            {item.itemTypeId === t.id && <Check size={11} className="text-emerald-500" />}
-                                        </button>
-                                    ))}
-                                    <button onClick={() => setShowTypePicker(false)} className="w-full text-center text-[9px] text-slate-300 pt-1 hover:text-slate-500">закрыть</button>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                <div className="flex items-center justify-end gap-1 transition-all">
 
                     {/* Теги */}
                     {!item.isGroup && tags.length > 0 && (
-                        <div className="relative">
+                        <div className="relative" ref={tagPickerRef}>
                             <button
-                                onClick={() => { setShowTagPicker(p => !p); setShowTypePicker(false); }}
-                                className="p-1.5 text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-all"
+                                onClick={() => { setShowTagPicker(p => !p); if (!showTagPicker) setTagSearch(''); }}
+                                className="p-1.5 text-slate-200 group-hover:text-slate-400 hover:!text-indigo-500 hover:bg-indigo-50 rounded-lg transition-all"
                                 title="Теги"
                             >
                                 <Hash size={15} />
                             </button>
                             {showTagPicker && (
-                                <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl p-2.5 z-50 min-w-[160px] space-y-1">
-                                    {tags.map(tag => {
-                                        const active = item.tagIds?.includes(tag.id);
-                                        return (
-                                            <button
-                                                key={tag.id}
-                                                onClick={() => {
-                                                    const next = active
-                                                        ? item.tagIds.filter(t => t !== tag.id)
-                                                        : [...(item.tagIds || []), tag.id];
-                                                    onToggleTags(item.id, next);
-                                                }}
-                                                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-50 transition-colors text-left"
-                                            >
-                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tag.color }} />
-                                                <span className="text-xs font-bold text-slate-700 flex-1">{tag.name}</span>
-                                                {active && <Check size={11} className="text-emerald-500" />}
-                                            </button>
-                                        );
-                                    })}
-                                    <button onClick={() => setShowTagPicker(false)} className="w-full text-center text-[9px] text-slate-300 pt-1 hover:text-slate-500">закрыть</button>
+                                <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl z-[110] min-w-[200px] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                                    <div className="p-2 border-b bg-slate-50">
+                                        <div className="relative">
+                                            <Search size={12} className="absolute left-2.5 top-2 text-slate-400" />
+                                            <input
+                                                autoFocus
+                                                className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold outline-none focus:border-blue-400"
+                                                placeholder="Начните ввод..."
+                                                value={tagSearch}
+                                                onChange={e => setTagSearch(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="max-h-56 overflow-y-auto p-1 custom-scrollbar">
+                                        {filteredTags.length === 0 && (
+                                            <div className="px-3 py-2 text-[11px] text-slate-400 italic">Нет совпадений</div>
+                                        )}
+                                        {filteredTags.map(tag => {
+                                            const active = item.tagIds?.includes(tag.id);
+                                            return (
+                                                <div
+                                                    key={tag.id}
+                                                    onClick={() => {
+                                                        const next = active
+                                                            ? item.tagIds.filter(t => t !== tag.id)
+                                                            : [...(item.tagIds || []), tag.id];
+                                                        onToggleTags(item.id, next);
+                                                    }}
+                                                    className={`px-3 py-2 rounded-lg cursor-pointer text-[11px] flex items-center gap-2 transition-all ${active ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-600'}`}
+                                                >
+                                                    <div className="w-2.5 h-2.5 rounded-full flex-none" style={{ backgroundColor: tag.color }} />
+                                                    <span className="font-bold flex-1">{tag.name}</span>
+                                                    {active && <Check size={11} className="text-blue-500 flex-none" />}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -190,7 +211,7 @@ export const ItemRow: React.FC<ItemRowProps> = ({
                     {/* Переименовать */}
                     <button
                         onClick={() => setIsEditingName(true)}
-                        className="p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                        className="p-1.5 text-slate-200 group-hover:text-slate-400 hover:!text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
                         title="Переименовать"
                     >
                         <Pencil size={15} />
@@ -205,7 +226,7 @@ export const ItemRow: React.FC<ItemRowProps> = ({
                                 <button onClick={() => setConfirmDelete(false)} className="p-1.5 bg-slate-100 text-slate-500 rounded-lg transition-all active:scale-90"><X size={14} /></button>
                             </>
                         ) : (
-                            <button onClick={() => setConfirmDelete(true)} className="p-1.5 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={15} /></button>
+                            <button onClick={() => setConfirmDelete(true)} className="p-1.5 text-slate-200 group-hover:text-slate-400 hover:!text-red-500 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={15} /></button>
                         )
                     )}
                 </div>

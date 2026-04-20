@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { BatchTimeline } from '@/types';
 import { Save, AlertTriangle, Calendar, ChevronRight } from 'lucide-react';
 
@@ -7,15 +7,16 @@ interface Stage {
   label: string;
   color: string;
   bg: string;
+  barColor: string;
 }
 
 const STAGES: Stage[] = [
-  { key: 'approvalDays',        label: 'Согласование заявки',     color: 'bg-violet-500',  bg: 'bg-violet-50' },
-  { key: 'manufacturingDays',   label: 'Изготовление',            color: 'bg-blue-500',    bg: 'bg-blue-50' },
-  { key: 'chinaDeliveryDays',   label: 'Доставка по Китаю',       color: 'bg-sky-500',     bg: 'bg-sky-50' },
-  { key: 'urumqiAlmatyDays',    label: 'Доставка Урумчи–Алматы',  color: 'bg-amber-500',   bg: 'bg-amber-50' },
-  { key: 'almatyKaragandaDays', label: 'Доставка Алматы–Карагандо', color: 'bg-orange-500', bg: 'bg-orange-50' },
-  { key: 'commissioningDays',   label: 'Пусконаладка',            color: 'bg-emerald-500', bg: 'bg-emerald-50' },
+  { key: 'approvalDays',        label: 'Согласование заявки',     color: 'bg-violet-500',  bg: 'bg-violet-50',  barColor: '#8b5cf6' },
+  { key: 'manufacturingDays',   label: 'Изготовление',            color: 'bg-blue-500',    bg: 'bg-blue-50',    barColor: '#3b82f6' },
+  { key: 'chinaDeliveryDays',   label: 'Доставка по Китаю',       color: 'bg-sky-500',     bg: 'bg-sky-50',     barColor: '#0ea5e9' },
+  { key: 'urumqiAlmatyDays',    label: 'Доставка Урумчи–Алматы',  color: 'bg-amber-500',   bg: 'bg-amber-50',   barColor: '#f59e0b' },
+  { key: 'almatyKaragandaDays', label: 'Доставка Алматы–Караганда', color: 'bg-orange-500', bg: 'bg-orange-50', barColor: '#f97316' },
+  { key: 'commissioningDays',   label: 'Пусконаладка',            color: 'bg-emerald-500', bg: 'bg-emerald-50', barColor: '#10b981' },
 ];
 
 const EMPTY: BatchTimeline = {
@@ -38,13 +39,301 @@ function fmtDate(d: Date): string {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function fmtDateShort(d: Date): string {
+  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+}
+
+export interface ContractDeadline {
+  orderId: string;
+  date: string;        // ISO date
+  clientName?: string;
+  orderNumber?: string;
+}
+
 interface Props {
   timeline?: BatchTimeline;
-  earliestDeadline?: string; // ISO date string
+  earliestDeadline?: string;
+  contractDeadlines?: ContractDeadline[];
   onSave: (timeline: BatchTimeline) => void;
 }
 
-export const BatchTimelineTab: React.FC<Props> = ({ timeline, earliestDeadline, onSave }) => {
+// ── Ось дат с маркерами ──────────────────────────────────────────────────────
+
+interface GanttAxisProps {
+  startDate: string;
+  totalDays: number;
+  completionDate: Date;
+  contractDeadlines: ContractDeadline[];
+  earliestDeadline?: string;
+}
+
+const GanttAxis: React.FC<GanttAxisProps> = ({
+  startDate,
+  totalDays,
+  completionDate,
+  contractDeadlines,
+  earliestDeadline,
+}) => {
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  const axisStart = new Date(startDate).getTime();
+  // Расширяем ось немного за дедлайны и дату завершения
+  const maxDeadlineMs = contractDeadlines.length > 0
+    ? Math.max(...contractDeadlines.map(d => new Date(d.date).getTime()))
+    : 0;
+  const axisEndMs = Math.max(completionDate.getTime(), maxDeadlineMs) + 86400000 * 3;
+  const spanMs = axisEndMs - axisStart;
+
+  const pct = (dateMs: number) => Math.max(0, Math.min(100, ((dateMs - axisStart) / spanMs) * 100));
+
+  // Тики на оси: каждые ~10% или ключевые точки
+  const tickCount = 6;
+  const ticks = Array.from({ length: tickCount + 1 }, (_, i) => {
+    const ms = axisStart + (spanMs / tickCount) * i;
+    return new Date(ms);
+  });
+
+  const completionPct = pct(completionDate.getTime());
+
+  return (
+    <div className="relative select-none">
+      {/* SVG-ось */}
+      <svg
+        ref={svgRef}
+        className="w-full overflow-visible"
+        height={52}
+        style={{ display: 'block' }}
+        onMouseLeave={() => setTooltip(null)}
+      >
+        {/* Линия оси */}
+        <line x1="0" y1="28" x2="100%" y2="28" stroke="#e2e8f0" strokeWidth="2" />
+
+        {/* Тики */}
+        {ticks.map((t, i) => {
+          const x = `${(i / tickCount) * 100}%`;
+          return (
+            <g key={i}>
+              <line x1={x} y1="24" x2={x} y2="32" stroke="#cbd5e1" strokeWidth="1" />
+              <text
+                x={x}
+                y="44"
+                textAnchor="middle"
+                fontSize="9"
+                fontWeight="600"
+                fill="#94a3b8"
+                fontFamily="system-ui"
+              >
+                {fmtDateShort(t)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Маркер завершения */}
+        <g>
+          <line
+            x1={`${completionPct}%`} y1="12"
+            x2={`${completionPct}%`} y2="32"
+            stroke="#6366f1" strokeWidth="2" strokeDasharray="4 2"
+          />
+          <circle cx={`${completionPct}%`} cy="12" r="5" fill="#6366f1" />
+          <text
+            x={`${completionPct}%`}
+            y="8"
+            textAnchor="middle"
+            fontSize="8"
+            fontWeight="700"
+            fill="#6366f1"
+            fontFamily="system-ui"
+          >
+            Кон.
+          </text>
+        </g>
+
+        {/* Маркеры дедлайнов */}
+        {contractDeadlines.map((dl) => {
+          const dlMs = new Date(dl.date).getTime();
+          const x = pct(dlMs);
+          const isEarliest = dl.date === earliestDeadline;
+          const color = isEarliest ? '#ef4444' : '#f97316';
+          const label = dl.clientName ? dl.clientName.slice(0, 12) : (dl.orderNumber || 'Заказ');
+
+          return (
+            <g
+              key={dl.orderId}
+              style={{ cursor: 'pointer' }}
+              onMouseEnter={(e) => {
+                const svg = svgRef.current;
+                if (!svg) return;
+                const rect = svg.getBoundingClientRect();
+                const cx = rect.left + (rect.width * x / 100);
+                setTooltip({
+                  x: cx,
+                  y: rect.top,
+                  content: `${isEarliest ? '★ Ранний · ' : ''}${dl.clientName || 'Заказ'}\nДедлайн: ${new Date(dl.date).toLocaleDateString('ru-RU')}`,
+                });
+              }}
+              onMouseLeave={() => setTooltip(null)}
+            >
+              {/* Вертикальная линия */}
+              <line
+                x1={`${x}%`} y1="0"
+                x2={`${x}%`} y2="32"
+                stroke={color} strokeWidth={isEarliest ? 2 : 1.5}
+              />
+              {/* Точка */}
+              <circle
+                cx={`${x}%`} cy="14"
+                r={isEarliest ? 7 : 5}
+                fill={color}
+                opacity={isEarliest ? 1 : 0.8}
+              />
+              {isEarliest && (
+                <text
+                  x={`${x}%`} y="18"
+                  textAnchor="middle"
+                  fontSize="8"
+                  fontWeight="900"
+                  fill="white"
+                  fontFamily="system-ui"
+                >
+                  !
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Тултип через портал-like абсолютный div */}
+      {tooltip && (
+        <div
+          className="fixed z-50 bg-slate-800 text-white text-[10px] font-bold rounded-xl px-3 py-2 shadow-xl pointer-events-none whitespace-pre"
+          style={{ left: tooltip.x, top: tooltip.y - 60, transform: 'translateX(-50%)' }}
+        >
+          {tooltip.content}
+        </div>
+      )}
+
+      {/* Легенда */}
+      <div className="flex items-center gap-4 mt-1">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-0.5 bg-indigo-500 rounded-full" style={{ borderStyle: 'dashed' }} />
+          <span className="text-[9px] font-bold text-slate-400">Завершение</span>
+        </div>
+        {contractDeadlines.length > 0 && (
+          <>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
+              <span className="text-[9px] font-bold text-slate-400">Ранний дедлайн</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
+              <span className="text-[9px] font-bold text-slate-400">Дедлайн по договору</span>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Диаграмма Ганта ──────────────────────────────────────────────────────────
+
+interface GanttChartProps {
+  local: BatchTimeline;
+  totalDays: number;
+  stageTimings: { stage: Stage; start: Date; end: Date; days: number }[] | null;
+  completionDate: Date | null;
+  contractDeadlines: ContractDeadline[];
+  earliestDeadline?: string;
+}
+
+const GanttChart: React.FC<GanttChartProps> = ({
+  local, totalDays, stageTimings, completionDate, contractDeadlines, earliestDeadline,
+}) => {
+  if (totalDays === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-slate-300 text-xs font-bold uppercase tracking-widest border-2 border-dashed border-slate-100 rounded-2xl h-40">
+        Введите количество дней для отображения диаграммы
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {STAGES.map((s, idx) => {
+        const days = Number(local[s.key]) || 0;
+        const widthPct = totalDays > 0 ? (days / totalDays) * 100 : 0;
+        const offsetPct = totalDays > 0
+          ? (STAGES.slice(0, idx).reduce((sum, ss) => sum + (Number(local[ss.key]) || 0), 0) / totalDays) * 100
+          : 0;
+
+        return (
+          <div key={s.key} className="flex items-center gap-3">
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest w-40 shrink-0 truncate">
+              {s.label}
+            </span>
+            <div className="flex-1 h-7 bg-slate-100 rounded-lg overflow-hidden relative">
+              <div
+                className={`absolute top-0 h-full rounded-lg ${s.color} opacity-80 flex items-center justify-end pr-2 transition-all duration-300`}
+                style={{ left: `${offsetPct}%`, width: `${widthPct}%` }}
+              >
+                {days > 0 && <span className="text-white text-[9px] font-black leading-none">{days}д</span>}
+              </div>
+            </div>
+            {stageTimings && stageTimings[idx] && days > 0 && (
+              <div className="text-[9px] font-bold text-slate-400 w-40 shrink-0 flex items-center gap-1">
+                <ChevronRight size={8} />
+                {fmtDate(stageTimings[idx].end)}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Итог */}
+      <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200">
+        <span className="text-[9px] font-black text-slate-700 uppercase tracking-widest w-40 shrink-0">
+          Итого
+        </span>
+        <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-violet-500 to-emerald-500 rounded-full" />
+        </div>
+        <div className="text-[9px] font-black text-slate-700 w-40 shrink-0">
+          {totalDays} дней
+          {completionDate && <span className="text-slate-400 font-bold"> → {fmtDate(completionDate)}</span>}
+        </div>
+      </div>
+
+      {/* Ось дат с маркерами */}
+      {completionDate && local.startDate && (
+        <div className="mt-3 px-1">
+          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">
+            Временная ось
+          </div>
+          <GanttAxis
+            startDate={local.startDate}
+            totalDays={totalDays}
+            completionDate={completionDate}
+            contractDeadlines={contractDeadlines}
+            earliestDeadline={earliestDeadline}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Основной компонент ───────────────────────────────────────────────────────
+
+export const BatchTimelineTab: React.FC<Props> = ({
+  timeline,
+  earliestDeadline,
+  contractDeadlines = [],
+  onSave,
+}) => {
   const [local, setLocal] = useState<BatchTimeline>(() => timeline ? { ...EMPTY, ...timeline } : { ...EMPTY });
   const [dirty, setDirty] = useState(false);
 
@@ -58,7 +347,6 @@ export const BatchTimelineTab: React.FC<Props> = ({ timeline, earliestDeadline, 
     [local]
   );
 
-  // Даты начала/конца каждого этапа
   const stageTimings = useMemo(() => {
     if (!local.startDate) return null;
     let cursor = 0;
@@ -129,7 +417,7 @@ export const BatchTimelineTab: React.FC<Props> = ({ timeline, earliestDeadline, 
         <div className="flex flex-col gap-3">
           <div className="flex flex-col">
             <label className="text-[9px] font-black text-slate-400 uppercase mb-1.5 tracking-widest flex items-center gap-1">
-              <Calendar size={10}/> Дата старта
+              <Calendar size={10} /> Дата старта
             </label>
             <input
               type="date"
@@ -142,7 +430,7 @@ export const BatchTimelineTab: React.FC<Props> = ({ timeline, earliestDeadline, 
           {STAGES.map((s, idx) => (
             <div key={s.key} className={`flex flex-col rounded-xl p-3 ${s.bg} border border-white/60`}>
               <div className="flex items-center gap-2 mb-1.5">
-                <span className={`w-2 h-2 rounded-full ${s.color}`}/>
+                <span className={`w-2 h-2 rounded-full ${s.color}`} />
                 <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest leading-tight">{idx + 1}. {s.label}</label>
               </div>
               <div className="flex items-center gap-2">
@@ -165,78 +453,21 @@ export const BatchTimelineTab: React.FC<Props> = ({ timeline, earliestDeadline, 
           ))}
         </div>
 
-        {/* Правая колонка: диаграмма Ганта */}
+        {/* Правая колонка: диаграмма */}
         <div className="flex flex-col gap-2">
           <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">
             Диаграмма Ганта
             {totalDays > 0 && <span className="ml-2 text-slate-600">{totalDays} дней</span>}
           </div>
 
-          {totalDays === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-slate-300 text-xs font-bold uppercase tracking-widest border-2 border-dashed border-slate-100 rounded-2xl">
-              Введите количество дней для отображения диаграммы
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {STAGES.map((s, idx) => {
-                const days = Number(local[s.key]) || 0;
-                const widthPct = totalDays > 0 ? (days / totalDays) * 100 : 0;
-                const offsetPct = totalDays > 0
-                  ? (STAGES.slice(0, idx).reduce((sum, ss) => sum + (Number(local[ss.key]) || 0), 0) / totalDays) * 100
-                  : 0;
-
-                return (
-                  <div key={s.key} className="flex items-center gap-3">
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest w-40 shrink-0 truncate">
-                      {s.label}
-                    </span>
-                    <div className="flex-1 h-7 bg-slate-100 rounded-lg overflow-hidden relative">
-                      <div
-                        className={`absolute top-0 h-full rounded-lg ${s.color} opacity-80 flex items-center justify-end pr-2 transition-all duration-300`}
-                        style={{ left: `${offsetPct}%`, width: `${widthPct}%` }}
-                      >
-                        {days > 0 && <span className="text-white text-[9px] font-black leading-none">{days}д</span>}
-                      </div>
-                    </div>
-                    {stageTimings && stageTimings[idx] && days > 0 && (
-                      <div className="text-[9px] font-bold text-slate-400 w-40 shrink-0 flex items-center gap-1">
-                        <ChevronRight size={8}/>
-                        {fmtDate(stageTimings[idx].end)}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Итог */}
-              <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200">
-                <span className="text-[9px] font-black text-slate-700 uppercase tracking-widest w-40 shrink-0">
-                  Итого
-                </span>
-                <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-violet-500 to-emerald-500 rounded-full"/>
-                </div>
-                <div className="text-[9px] font-black text-slate-700 w-40 shrink-0">
-                  {totalDays} дней
-                  {completionDate && <span className="text-slate-400 font-bold"> → {fmtDate(completionDate)}</span>}
-                </div>
-              </div>
-
-              {/* Дедлайн-маркер */}
-              {earliestDeadline && local.startDate && (
-                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                  Крайняя дата по договору: <span className={`font-black ${deadlineDiff !== null && deadlineDiff < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                    {new Date(earliestDeadline).toLocaleDateString('ru-RU')}
-                  </span>
-                  {deadlineDiff !== null && (
-                    <span className={`ml-2 ${deadlineDiff >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                      ({deadlineDiff >= 0 ? '+' : ''}{deadlineDiff} дней)
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+          <GanttChart
+            local={local}
+            totalDays={totalDays}
+            stageTimings={stageTimings}
+            completionDate={completionDate}
+            contractDeadlines={contractDeadlines}
+            earliestDeadline={earliestDeadline}
+          />
         </div>
       </div>
     </div>

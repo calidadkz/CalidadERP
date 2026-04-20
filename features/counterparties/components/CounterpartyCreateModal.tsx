@@ -10,6 +10,7 @@ interface CounterpartyCreateModalProps {
     onClose: () => void;
     onSubmit: (counterparty: Counterparty, accounts: CounterpartyAccount[]) => Promise<void>;
     initialType?: CounterpartyType;
+    lockedType?: CounterpartyType; // Если задан — тип нельзя изменить
     editingCounterparty?: Counterparty | null;
     initialAccounts?: CounterpartyAccount[];
     autoFillData?: {
@@ -25,6 +26,7 @@ export const CounterpartyCreateModal: React.FC<CounterpartyCreateModalProps> = (
     onClose,
     onSubmit,
     initialType = CounterpartyType.CLIENT,
+    lockedType,
     editingCounterparty = null,
     initialAccounts = [],
     autoFillData
@@ -41,6 +43,7 @@ export const CounterpartyCreateModal: React.FC<CounterpartyCreateModalProps> = (
     const [legalEmail, setLegalEmail] = useState('');
     const [contactPerson, setContactPerson] = useState('');
     const [phone, setPhone] = useState('');
+    const [position, setPosition] = useState('');
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [accounts, setAccounts] = useState<Partial<CounterpartyAccount>[]>([]);
 
@@ -58,6 +61,7 @@ export const CounterpartyCreateModal: React.FC<CounterpartyCreateModalProps> = (
             setLegalEmail(editingCounterparty.legalEmail || '');
             setContactPerson(editingCounterparty.contactPerson || '');
             setPhone(editingCounterparty.phone || '');
+            setPosition(editingCounterparty.position || '');
             setAccounts(initialAccounts.length > 0 ? initialAccounts.map(a => ({...a})) : []);
             setCashFlowItemIds(editingCounterparty.cashFlowItemIds || []);
         } else if (autoFillData) {
@@ -125,6 +129,7 @@ export const CounterpartyCreateModal: React.FC<CounterpartyCreateModalProps> = (
                 contactPerson: contactPerson.trim() || undefined,
                 phone: phone.trim() || undefined,
                 cashFlowItemIds: cashFlowItemIds.length > 0 ? cashFlowItemIds : undefined,
+                position: roles.includes(CounterpartyType.EMPLOYEE) ? (position.trim() || undefined) : undefined,
             };
 
             const validAccounts = (accounts as CounterpartyAccount[]).filter(a => a.iik);
@@ -158,21 +163,23 @@ export const CounterpartyCreateModal: React.FC<CounterpartyCreateModalProps> = (
                             <input className="w-full border-2 border-slate-100 rounded-2xl p-4 font-bold text-slate-700 bg-slate-50/50 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all" value={name} onChange={e => setName(e.target.value)} placeholder="Наименование организации или ФИО" />
                         </div>
                         
-                        <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Роли контрагента (можно выбрать несколько)</label>
-                            <div className="flex flex-wrap gap-3">
-                                {roleOptions.map(role => (
-                                    <button 
-                                        key={role.id}
-                                        onClick={() => toggleRole(role.id)}
-                                        className={`px-6 py-3 rounded-xl border-2 font-black uppercase text-[10px] tracking-widest transition-all flex items-center gap-2 ${roles.includes(role.id) ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
-                                    >
-                                        {roles.includes(role.id) && <CheckCircle2 size={14}/>}
-                                        {role.label}
-                                    </button>
-                                ))}
+                        {!lockedType && (
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Роли контрагента (можно выбрать несколько)</label>
+                                <div className="flex flex-wrap gap-3">
+                                    {roleOptions.map(role => (
+                                        <button
+                                            key={role.id}
+                                            onClick={() => toggleRole(role.id)}
+                                            className={`px-6 py-3 rounded-xl border-2 font-black uppercase text-[10px] tracking-widest transition-all flex items-center gap-2 ${roles.includes(role.id) ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                        >
+                                            {roles.includes(role.id) && <CheckCircle2 size={14}/>}
+                                            {role.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -191,6 +198,27 @@ export const CounterpartyCreateModal: React.FC<CounterpartyCreateModalProps> = (
                                     <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1">Email</label>
                                     <input type="email" className="w-full border border-slate-200 rounded-xl p-3 text-sm font-bold bg-white" value={legalEmail} onChange={e => setLegalEmail(e.target.value)} />
                                 </div>
+                                {roles.includes(CounterpartyType.EMPLOYEE) && (
+                                    <div>
+                                        <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1">Должность</label>
+                                        <select
+                                            className="w-full border border-slate-200 rounded-xl p-3 text-sm font-bold bg-white outline-none focus:ring-2 focus:ring-blue-500/20"
+                                            value={position}
+                                            onChange={e => setPosition(e.target.value)}
+                                        >
+                                            <option value="">— Не указана —</option>
+                                            <option>Исполнительный директор</option>
+                                            <option>Руководитель отдела продаж</option>
+                                            <option>Менеджер по продажам</option>
+                                            <option>Технический специалист</option>
+                                            <option>Контент менеджер</option>
+                                            <option>Бизнес-аналитик</option>
+                                            <option>Снабженец</option>
+                                            <option>IT-специалист</option>
+                                            <option>Кладовщик</option>
+                                        </select>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

@@ -16,7 +16,7 @@ describe('calculateBatchStats', () => {
   ];
 
   const mockExpenses: BatchExpense[] = [
-    { id: 'e1', batchId: 'b1', category: 'logistics_china', description: 'Logistics', amountKzt: 1000, date: '2024-01-01' },
+    { id: 'e1', batchId: 'b1', category: 'logistics_urumqi_almaty', description: 'Logistics', amountKzt: 1000, date: '2024-01-01' },
     { id: 'e2', batchId: 'b1', category: 'customs', description: 'Customs', amountKzt: 800, date: '2024-01-01' },
     { id: 'e3', batchId: 'b1', category: 'other', description: 'Broker', amountKzt: 200, date: '2024-01-01' }
   ];

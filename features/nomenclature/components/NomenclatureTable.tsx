@@ -12,6 +12,8 @@ import {
 import { useAccess } from '@/features/auth/hooks/useAccess';
 import { ImageModal } from '@/components/ui/ImageModal';
 import { CalidadSelect, CalidadSelectOption } from '@/components/ui/CalidadSelect';
+import { FilterCombobox } from '@/components/ui/FilterCombobox';
+
 
 interface NomenclatureTableProps {
     products: Product[];
@@ -19,6 +21,7 @@ interface NomenclatureTableProps {
     categories: ProductCategory[];
     hscodes?: HSCode[];
     manufacturers?: string[];
+    exchangeRates?: Record<string, number>;
     onEdit: (p: Product) => void;
     onCopy: (p: Product) => void;
     onDelete: (id: string, name: string) => void;
@@ -43,6 +46,7 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
     categories = [],
     hscodes = [],
     manufacturers = [],
+    exchangeRates = {},
     onEdit,
     onCopy,
     onDelete,
@@ -74,8 +78,26 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
     const [massEnabled, setMassEnabled] = useState<Record<string, boolean>>({});
 
     const canSeePurchase = access.canSee('fields', 'basePrice');
+    const canSeeMarkup   = access.canSee('fields', 'markup');
     const canWrite = access.canWrite('actions', 'edit');
     const colCount = canSeePurchase ? 9 : 8;
+
+    // ── Предложения для фильтров ──
+    const nameSuggestions = useMemo(() => {
+        const names = new Set<string>();
+        products.forEach(p => { if (p.name) names.add(p.name); if (p.sku) names.add(p.sku); });
+        return [...names].sort();
+    }, [products]);
+
+    const categorySuggestions = useMemo(() =>
+        categories.map(c => c.name).sort(), [categories]);
+
+    const supplierMfgSuggestions = useMemo(() => {
+        const items = new Set<string>();
+        suppliers.forEach(s => items.add(s.name));
+        products.forEach(p => { if (p.manufacturer) items.add(p.manufacturer); });
+        return [...items].sort();
+    }, [suppliers, products]);
 
     // ── Опции для CalidadSelect ──
     const supplierOptions = useMemo<CalidadSelectOption[]>(() =>
@@ -138,15 +160,42 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
     const getField = (product: Product, key: keyof Product): any =>
         (inlineEdits[product.id] as any)?.[key] ?? (product as any)[key];
 
-    const setInlineField = (productId: string, key: keyof Product, value: any) => {
-        setInlineEdits(prev => ({ ...prev, [productId]: { ...prev[productId], [key]: value } }));
+    // Рассчитать salesPrice из закупочной цены, наценки и курса
+    const calcSalesPrice = (basePrice: number, currency: string, markup: number): number => {
+        const rate = exchangeRates[currency] || 1;
+        return Math.round(basePrice * rate * (1 + markup / 100));
     };
 
-    const saveInline = (product: Product) => {
-        const diff = inlineEdits[product.id];
-        if (!diff || Object.keys(diff).length === 0) return;
-        const updated: Product = { ...product, ...diff };
-        onInlineUpdate?.(updated);
+    const setInlineField = (productId: string, key: keyof Product, value: any) => {
+        setInlineEdits(prev => {
+            const current = prev[productId] || {};
+            const next = { ...current, [key]: value };
+            return { ...prev, [productId]: next };
+        });
+    };
+
+    // Применить пересчёт цены к объединённому продукту
+    const applyPriceRecalc = (merged: Product): Product => {
+        const pm = merged.pricingMethod;
+        if (pm === PricingMethod.MARKUP_WITHOUT_VAT || pm === PricingMethod.MARKUP_WITH_VAT) {
+            return {
+                ...merged,
+                salesPrice: calcSalesPrice(
+                    Number(merged.basePrice) || 0,
+                    merged.currency || 'CNY',
+                    Number(merged.markupPercentage) || 0
+                )
+            };
+        }
+        return merged;
+    };
+
+    // Сохранить текущий буфер с возможными доп. overrides
+    const saveInline = (product: Product, overrides?: Partial<Product>) => {
+        const diff = { ...(inlineEdits[product.id] || {}), ...(overrides || {}) };
+        if (Object.keys(diff).length === 0) return;
+        const merged = applyPriceRecalc({ ...product, ...diff });
+        onInlineUpdate?.(merged);
         setInlineEdits(prev => { const n = { ...prev }; delete n[product.id]; return n; });
     };
 
@@ -328,16 +377,31 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
                             {isMassEditMode && <th className="px-1 py-1.5 border-b"></th>}
                             <th className="px-1 py-1.5 border-b"></th>
                             <th className="px-2 py-1.5 border-b">
-                                <div className="relative">
-                                    <Search size={10} className="absolute left-2 top-2.5 text-gray-400" />
-                                    <input className="w-full min-w-0 pl-6 pr-2 py-1 text-[11px] border border-slate-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500/10 font-bold" placeholder="Поиск..." value={filters.name_sku} onChange={e => { setFilters(p => ({ ...p, name_sku: e.target.value })); setCurrentPage(1); }} />
-                                </div>
+                                <FilterCombobox
+                                    value={filters.name_sku}
+                                    onChange={v => { setFilters(p => ({ ...p, name_sku: v })); setCurrentPage(1); }}
+                                    suggestions={nameSuggestions}
+                                    placeholder="Поиск..."
+                                    showIcon
+                                />
                             </th>
                             <th className="px-1.5 py-1.5 border-b">
-                                <input className="w-full min-w-0 px-2 py-1 text-[11px] border border-slate-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500/10 font-bold" placeholder="Категория..." value={filters.categoryId} onChange={e => { setFilters(p => ({ ...p, categoryId: e.target.value })); setCurrentPage(1); }} />
+                                <FilterCombobox
+                                    value={filters.categoryId}
+                                    onChange={v => { setFilters(p => ({ ...p, categoryId: v })); setCurrentPage(1); }}
+                                    suggestions={categorySuggestions}
+                                    placeholder="Категория..."
+                                    showOnEmpty
+                                />
                             </th>
                             <th className="px-1.5 py-1.5 border-b">
-                                <input className="w-full min-w-0 px-2 py-1 text-[11px] border border-slate-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500/10 font-bold" placeholder="Поставщик / Произв..." value={filters.supplier_mfg} onChange={e => { setFilters(p => ({ ...p, supplier_mfg: e.target.value })); setCurrentPage(1); }} />
+                                <FilterCombobox
+                                    value={filters.supplier_mfg}
+                                    onChange={v => { setFilters(p => ({ ...p, supplier_mfg: v })); setCurrentPage(1); }}
+                                    suggestions={supplierMfgSuggestions}
+                                    placeholder="Поставщик / Произв..."
+                                    showOnEmpty
+                                />
                             </th>
                             {canSeePurchase && <th className="px-1.5 py-1.5 border-b"></th>}
                             <th className="px-1.5 py-1.5 border-b bg-green-50/20"></th>
@@ -408,7 +472,7 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
                                         {canSeePurchase && (
                                             <td className="px-1.5 py-3 text-right">
                                                 <div className="text-slate-600 font-bold font-mono tracking-tighter whitespace-nowrap text-xs">
-                                                    {(product.basePrice || 0).toLocaleString()} <span className="text-[8px] text-slate-300">{product.currency}</span>
+                                                    {(product.basePrice || 0).toLocaleString()} <span className="text-[10px] text-slate-400">{product.currency}</span>
                                                 </div>
                                             </td>
                                         )}
@@ -416,7 +480,7 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
                                             <div className="text-green-700 font-black font-mono whitespace-nowrap text-xs">
                                                 {(product.salesPrice || 0).toLocaleString()} <span className="text-[8px] opacity-60">₸</span>
                                             </div>
-                                            {product.pricingMethod && (
+                                            {canSeeMarkup && product.pricingMethod && (
                                                 <div className="text-[8px] text-slate-400 font-medium truncate max-w-[70px] text-right">
                                                     {product.pricingMethod === PricingMethod.MARKUP_WITHOUT_VAT ? 'б/НДС'
                                                         : product.pricingMethod === PricingMethod.MARKUP_WITH_VAT ? 'с/НДС'
@@ -427,7 +491,7 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
                                         </td>
                                         <td className="px-1.5 py-3 text-right font-mono">
                                             <div className="font-black text-slate-600 text-xs">
-                                                {(product.packages?.reduce((s, p) => s + (p.volumeM3 || 0), 0) || 0).toFixed(3)} <span className="text-[9px] font-bold text-slate-300">m³</span>
+                                                {(product.packages?.reduce((s, p) => s + (p.volumeM3 || 0), 0) || 0).toFixed(3)} <span className="text-[11px] font-bold text-slate-400">m³</span>
                                             </div>
                                         </td>
                                         <td className="px-1.5 py-3 text-center font-mono">
@@ -435,11 +499,11 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
                                         </td>
                                         <td className="px-1 py-3 text-center">
                                             <div className="flex justify-center gap-0.5">
-                                                <button onClick={() => onEdit(product)} className={`p-1 rounded-md transition-all ${canWrite ? 'text-slate-300 hover:text-blue-600 hover:bg-blue-50' : 'text-blue-500 bg-blue-50 hover:bg-blue-100'}`}>
+                                                <button onClick={() => onEdit(product)} className={`p-1 rounded-md transition-all ${canWrite ? 'text-slate-400 hover:text-blue-600 hover:bg-blue-50' : 'text-blue-500 bg-blue-50 hover:bg-blue-100'}`}>
                                                     {canWrite ? <Pencil size={12} /> : <Eye size={12} />}
                                                 </button>
-                                                {canWrite && <button onClick={() => onCopy(product)} className="p-1 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all"><Copy size={12} /></button>}
-                                                {access.canWrite('actions', 'delete') && <button onClick={() => onDelete(product.id, product.name)} className="p-1 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"><Trash2 size={12} /></button>}
+                                                {canWrite && <button onClick={() => onCopy(product)} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all"><Copy size={12} /></button>}
+                                                {access.canWrite('actions', 'delete') && <button onClick={() => onDelete(product.id, product.name)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"><Trash2 size={12} /></button>}
                                             </div>
                                         </td>
                                     </tr>
@@ -484,7 +548,7 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
                                                         <CalidadSelect
                                                             options={pricingOptions}
                                                             value={getField(product, 'pricingMethod') || ''}
-                                                            onChange={v => { setInlineField(product.id, 'pricingMethod', v || undefined); }}
+                                                            onChange={v => saveInline(product, { pricingMethod: v as PricingMethod | undefined || undefined })}
                                                             placeholder="не задан"
                                                             nullLabel="— Не задан —"
                                                             className="w-44"
@@ -492,8 +556,8 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
                                                         />
                                                     </div>
 
-                                                    {/* Наценка + цена продажи — только если метод с наценкой */}
-                                                    {isMarkupMethod(getField(product, 'pricingMethod') || '') && (
+                                                    {/* Наценка + цена продажи — только если метод с наценкой И права есть */}
+                                                    {canSeeMarkup && isMarkupMethod(getField(product, 'pricingMethod') || '') && (
                                                         <>
                                                             <div className="flex flex-col gap-0.5">
                                                                 <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Наценка %</span>
@@ -510,7 +574,11 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
                                                                 <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Расч. цена</span>
                                                                 <div className="h-[30px] flex items-center px-2.5 bg-emerald-50 rounded-lg border border-emerald-200">
                                                                     <span className="text-[11px] font-black text-emerald-700 font-mono">
-                                                                        {(product.salesPrice || 0).toLocaleString()} ₸
+                                                                        {calcSalesPrice(
+                                                                            Number(getField(product, 'basePrice')) || 0,
+                                                                            getField(product, 'currency') || product.currency || 'CNY',
+                                                                            Number(getField(product, 'markupPercentage')) || 0
+                                                                        ).toLocaleString()} ₸
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -619,7 +687,7 @@ export const NomenclatureTable: React.FC<NomenclatureTableProps> = ({
                         <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30"><ChevronsLeft size={14} /></button>
                         <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30"><ChevronLeft size={14} /></button>
                         <div className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 font-black min-w-[30px] text-center">{currentPage}</div>
-                        <span className="text-slate-300 font-bold">/</span>
+                        <span className="text-slate-400 font-bold">/</span>
                         <div className="px-2 text-slate-500 font-bold">{totalPages}</div>
                         <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30"><ChevronRight size={14} /></button>
                         <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30"><ChevronsRight size={14} /></button>

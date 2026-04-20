@@ -534,6 +534,7 @@ export const MobileInventoryView: React.FC<Props> = ({ state, actions, access })
                     </div>
                     <div className="flex-1 p-4">
                         <AdjustmentForm
+                            isMobile={true}
                             onClose={() => setShowAdjustSheet(false)}
                             products={products}
                             stockMovements={localMovements}

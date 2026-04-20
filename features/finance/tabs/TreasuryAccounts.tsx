@@ -162,13 +162,13 @@ export const TreasuryAccounts: React.FC = () => {
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                     <span className="text-[8px] text-slate-400 font-bold uppercase tracking-tighter truncate">{acc.bank}</span>
                                     <span className="w-0.5 h-0.5 bg-slate-200 rounded-full"></span>
-                                    <span className="text-[8px] text-slate-400 font-mono tracking-tighter truncate opacity-60">*{acc.number.slice(-4)}</span>
+                                    <span className="text-[10px] text-slate-400 font-mono tracking-tighter truncate">*{acc.number.slice(-4)}</span>
                                 </div>
                             </div>
 
                             <div className="pt-2 border-t border-slate-50 flex justify-between items-end">
                                 <div className="text-sm font-black text-slate-900 tracking-tighter leading-none">{f(acc.balance)}</div>
-                                <div className="text-[7px] font-black text-slate-300 uppercase tracking-widest">Баланс</div>
+                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Баланс</div>
                             </div>
 
                             {isActive && (
@@ -329,16 +329,16 @@ export const TreasuryAccounts: React.FC = () => {
                                     <div key={stack.id} className="p-3.5 border-2 rounded-xl transition-all relative overflow-hidden bg-white border-slate-50 hover:border-blue-100 hover:shadow-sm">
                                         <div className="flex justify-between items-start mb-2.5 relative z-10">
                                             <div>
-                                                <div className="text-[8px] font-black text-slate-300 uppercase tracking-widest mb-0.5 flex items-center gap-1">
-                                                    {dateOnly} {stack.id.startsWith('LOT-INIT') && <ShieldCheck size={10} className="text-blue-300" />}
+                                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 flex items-center gap-1">
+                                                    {dateOnly} {stack.id.startsWith('LOT-INIT') && <ShieldCheck size={10} className="text-blue-400" />}
                                                 </div>
                                                 <div className="flex items-baseline gap-1.5">
                                                     <span className="text-base font-black text-slate-800 leading-none">{f(stack.amountRemaining)}</span>
-                                                    <span className="text-[10px] font-bold text-slate-300">/ {f(stack.amountOriginal)} {stack.currency}</span>
+                                                    <span className="text-[10px] font-bold text-slate-400">/ {f(stack.amountOriginal)} {stack.currency}</span>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <div className="text-[8px] font-black text-slate-300 uppercase tracking-widest">Себест.</div>
+                                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Себест.</div>
                                                 <div className="text-sm font-black text-blue-600 font-mono leading-none mt-1">
                                                     {stack.rate.toFixed(2)} <span className="text-[9px]">₸</span>
                                                 </div>

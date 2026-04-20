@@ -3,16 +3,17 @@ import { supabase } from '../../../services/supabaseClient';
 import { TableNames } from '../../../constants';
 import { ApiService } from '../../../services/api';
 import { useAuth } from './AuthContext';
+import { CounterpartyType } from '../../../types/counterparty';
 import {
     Product, Counterparty, CounterpartyAccount, Manufacturer, OurCompany, Employee, ProductCategory, OptionType, OptionVariant,
     Bundle, LogItem, TrashItem, Currency, PricingProfile,
     SupplierOrder, SalesOrder, Reception, Shipment, PlannedPayment,
     ActualPayment, InternalTransaction, BankAccount, CurrencyLot, StockMovement, Discrepancy,
     OrderItem, SalesOrderItem, ReceptionItem, ReceptionExpense, ShipmentItem, PaymentAllocation,
-    CashFlowItem, CashFlowTag, CashFlowItemType, HSCode, ActionType, ProductType
+    CashFlowItem, CashFlowTag, CashFlowItemType, HSCode, ActionType, ProductType, MoneyMovement
 } from '../../../types';
 import { WriteOff, WriteOffReasonType } from '../../../types/inventory';
-import { PreCalculationDocument, PreCalculationItem, PackingListItem, GeneralSettings } from '../../../types/pre-calculations';
+import { PreCalculationDocument, PreCalculationItem, GeneralSettings } from '../../../types/pre-calculations';
 import { useReferenceState } from '../hooks/useReferenceState';
 import { useInventoryState } from '../../inventory/hooks/useInventoryState';
 import { useOrderState } from '../../procurement/hooks/useOrderState';
@@ -58,6 +59,7 @@ interface AppState {
     bankAccounts: BankAccount[];
     currencyLots: CurrencyLot[];
     currencyStacks: CurrencyLot[];
+    moneyMovements: MoneyMovement[];
     stockMovements: StockMovement[];
     discrepancies: Discrepancy[];
     writeoffs: WriteOff[];
@@ -67,7 +69,6 @@ interface AppState {
     defaultCurrency: Currency;
     generalSettings: GeneralSettings;
     detailedListItems: PreCalculationItem[];
-    packingListItems: PackingListItem[];
     inventorySummary: any[];
 }
 
@@ -133,6 +134,7 @@ interface AppActions {
     deleteSalesOrder: (id: string) => Promise<void>;
     addPlannedPayment: (p: PlannedPayment) => Promise<void>;
     executePayment: (p: ActualPayment) => Promise<void>;
+    deleteActualPayment: (id: string) => Promise<void>;
     allocatePayment: (pId: string, al: PaymentAllocation[]) => Promise<void>;
     addInternalTransaction: (tx: InternalTransaction) => Promise<void>;
     addBankAccount: (acc: BankAccount, rate?: number) => Promise<void>;
@@ -143,6 +145,7 @@ interface AppActions {
     writeOffDiscrepancy: (d: Discrepancy) => Promise<void>;
     writeOff: (d: Discrepancy) => Promise<void>;
     createWriteOff: (wo: WriteOff) => Promise<WriteOff>;
+    postWriteOff: (wo: WriteOff) => Promise<void>;
     deleteWriteOff: (wo: WriteOff) => Promise<void>;
     addWriteoffReasonType: (rt: Omit<WriteOffReasonType, 'id' | 'createdAt'>) => Promise<WriteOffReasonType>;
     updateWriteoffReasonType: (id: string, data: Partial<WriteOffReasonType>) => Promise<WriteOffReasonType>;
@@ -151,9 +154,6 @@ interface AppActions {
     addDetailedListItem: () => void;
     updateDetailedListItem: (id: string, key: keyof PreCalculationItem, value: any) => void;
     deleteDetailedListItem: (id: string) => void;
-    addPackingListItem: () => void;
-    updatePackingListItem: (id: string, key: keyof PackingListItem, value: any) => void;
-    deletePackingListItem: (id: string) => void;
     deletePreCalculation: (id: string) => Promise<void>;
     refreshOperationalData: () => Promise<void>;
     refreshInventorySummary: () => Promise<void>;
@@ -208,7 +208,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Стабилизируем сеттеры, чтобы они не вызывали бесконечный цикл
     const { setProducts, setDiscrepancies, setWriteoffs } = inventory;
     const { setCounterparties, setCounterpartyAccounts, setManufacturers, setOurCompanies, setEmployees, setCategories, setCashFlowItems, setCashFlowTags, setCashFlowItemTypes, setHscodes, setOptionTypes, setOptionVariants, setBundles, setExchangeRates, setTrash, setWriteoffReasonTypes } = references;
-    const { setPlannedPayments, setActualPayments, setInternalTransactions, setBankAccounts, setCurrencyStacks } = finance;
+    const { setPlannedPayments, setActualPayments, setInternalTransactions, setBankAccounts, setCurrencyStacks, setMoneyMovements } = finance;
     const { setOrders, setSalesOrders, setReceptions, setShipments } = orders;
 
     const loadReferences = useCallback(async () => {
@@ -299,7 +299,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 supplierOrders, salesOrders, receptions, shipments, plannedPayments,
                 actualPayments, internalTransactions, bankAccounts, currencyLots,
                 discrepancies, writeoffsData, supplierOrderItems, salesOrderItems,
-                receptionItems, receptionExpenses, shipmentItems, paymentAllocations
+                receptionItems, receptionExpenses, shipmentItems, paymentAllocations,
+                moneyMovementsData
             ] = await Promise.all([
                 ApiService.fetchAll<SupplierOrder>(TableNames.SUPPLIER_ORDERS),
                 ApiService.fetchAll<SalesOrder>(TableNames.SALES_ORDERS),
@@ -318,6 +319,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 ApiService.fetchAll<ReceptionExpense>(TableNames.RECEPTION_EXPENSES),
                 ApiService.fetchAll<ShipmentItem>(TableNames.SHIPMENT_ITEMS, 'shipment_id'),
                 ApiService.fetchAll<PaymentAllocation>(TableNames.PAYMENT_ALLOCATIONS, 'actual_payment_id'),
+                ApiService.fetchAll<MoneyMovement>(TableNames.MONEY_MOVEMENTS, 'date'),
             ]);
 
             setOrders(supplierOrders.map(o => ({ ...o, items: supplierOrderItems.filter(i => i.supplierOrderId === o.id) })));
@@ -337,12 +339,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             setInternalTransactions(unique(internalTransactions));
             setBankAccounts(unique(bankAccounts));
             setCurrencyStacks(unique(currencyLots));
+            setMoneyMovements([...moneyMovementsData].sort((a, b) => b.date.localeCompare(a.date)));
             setDiscrepancies(unique(discrepancies));
             setWriteoffs(unique(writeoffsData));
         } catch (e) {
             console.error("OPERATIONAL LOAD ERROR", e);
         }
-    }, [session, setOrders, setSalesOrders, setReceptions, setShipments, setPlannedPayments, setActualPayments, setInternalTransactions, setBankAccounts, setCurrencyStacks, setDiscrepancies, setWriteoffs]);
+    }, [session, setOrders, setSalesOrders, setReceptions, setShipments, setPlannedPayments, setActualPayments, setInternalTransactions, setBankAccounts, setCurrencyStacks, setMoneyMovements, setDiscrepancies, setWriteoffs]);
 
     const load = useCallback(async () => {
         if (!session || isInitialLoading.current) return;
@@ -361,7 +364,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     // Manufacturers теперь вычисляются системно из Counterparties
     const manufacturers = useMemo(() => 
-        references.counterparties.filter(c => c.roles?.includes('Manufacturer')), 
+        references.counterparties.filter(c => c.roles?.includes(CounterpartyType.MANUFACTURER)),
         [references.counterparties]
     );
 
@@ -396,6 +399,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         bankAccounts: finance.bankAccounts,
         currencyLots: finance.currencyStacks,
         currencyStacks: finance.currencyStacks,
+        moneyMovements: finance.moneyMovements,
         stockMovements: inventory.stockMovements,
         discrepancies: inventory.discrepancies,
         writeoffs: inventory.writeoffs,
@@ -405,7 +409,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         defaultCurrency: Currency.Kzt,
         generalSettings: preCalculations.generalSettings,
         detailedListItems: preCalculations.items,
-        packingListItems: preCalculations.packingList,
         inventorySummary: inventorySummary
     }), [
         inventory.products, inventory.stockMovements, inventory.discrepancies, inventory.writeoffs,
@@ -419,7 +422,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         finance.plannedPayments, finance.actualPayments, finance.internalTransactions,
         finance.bankAccounts, finance.currencyStacks,
         isLoading, finance.isProcessing,
-        preCalculations.generalSettings, preCalculations.items, preCalculations.packingList,
+        preCalculations.generalSettings, preCalculations.items,
         inventorySummary
     ]);
 
@@ -486,6 +489,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         deleteSalesOrder: id => orders.deleteSalesOrder(id),
         addPlannedPayment: p => finance.addPlannedPayment(p),
         executePayment: p => finance.executePayment(p),
+        deleteActualPayment: id => finance.deleteActualPayment(id),
         allocatePayment: (id, al) => finance.allocatePayment(id, al),
         addInternalTransaction: tx => finance.addInternalTransaction(tx),
         addBankAccount: (acc, rate) => finance.addBankAccount(acc, rate),
@@ -514,7 +518,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateDiscrepancy: d => inventory.updateDiscrepancy(d),
         writeOffDiscrepancy: d => inventory.writeOffDiscrepancy(d),
         writeOff: d => inventory.writeOffDiscrepancy(d),
-        createWriteOff: wo => inventory.createWriteOff(wo, references.optionVariants, pricingProfiles, references.exchangeRates),
+        createWriteOff: wo => inventory.createWriteOff(wo),
+        postWriteOff: wo => inventory.postWriteOff(wo, inventorySummary),
         deleteWriteOff: wo => inventory.deleteWriteOff(wo),
         addWriteoffReasonType: rt => references.addWriteoffReasonType(rt),
         updateWriteoffReasonType: (id, data) => references.updateWriteoffReasonType(id, data),
@@ -523,18 +528,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addDetailedListItem: () => preCalculations.addItem({} as any),
         updateDetailedListItem: (id, k, v) => preCalculations.updateItem(id, k, v),
         deleteDetailedListItem: id => preCalculations.deleteItem(id),
-        addPackingListItem: () => preCalculations.addPackingItem(),
-        updatePackingListItem: (id, k, v) => preCalculations.updatePackingItem(id, k, v),
-        deletePackingListItem: id => preCalculations.deletePackingItem(id),
         deletePreCalculation: async (id) => {
             const pc = await ApiService.fetchOne<any>(TableNames.PRE_CALCULATIONS, id);
             if (pc) {
-                const items = await ApiService.fetchAll<any>(TableNames.PRE_CALC_ITEMS, { preCalculationId: id });
-                const packages = await ApiService.fetchAll<any>(TableNames.PRE_CALC_PACKAGES, { preCalculationId: id });
+                const items = await ApiService.fetchAll<any>(TableNames.PRE_CALCULATION_ITEMS, { preCalculationId: id });
+                const packages = await ApiService.fetchAll<any>(TableNames.PRE_CALCULATION_PACKAGES, { preCalculationId: id });
                 const fullData = { ...pc, items, packages };
                 await references.moveToTrash(id, 'PreCalculation' as any, pc.name, fullData);
-                await ApiService.deleteByField(TableNames.PRE_CALC_ITEMS, 'preCalculationId', id);
-                await ApiService.deleteByField(TableNames.PRE_CALC_PACKAGES, 'preCalculationId', id);
+                await ApiService.deleteByField(TableNames.PRE_CALCULATION_ITEMS, 'preCalculationId', id);
+                await ApiService.deleteByField(TableNames.PRE_CALCULATION_PACKAGES, 'preCalculationId', id);
                 await ApiService.delete(TableNames.PRE_CALCULATIONS, id);
                 references.addLog('Delete', 'PreCalculation', id, `Предрасчет "${pc.name}" перемещен в корзину`);
             }

@@ -315,6 +315,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                                 isImagesLoading={isImagesLoading}
                                 onUploadImage={uploadImage}
                                 exchangeRates={exchangeRates}
+                                products={products}
                             />
                         )}
                         {activeTab === 'options' && (

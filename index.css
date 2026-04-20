@@ -67,3 +67,67 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 input[type="date"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   ТИПОГРАФИЧЕСКИЙ МИНИМУМ
+   text-[7px] / text-[8px] / text-[9px] встречаются в 77 файлах.
+   Вместо правки каждого — глобальный размерный пол.
+   Tailwind utilities попадают в @layer utilities (низкий приоритет),
+   правила вне @layer их перекрывают без !important.
+═══════════════════════════════════════════════════════════════ */
+
+/* Базовые и responsive-варианты (lg:/xl:/2xl:text-[Xpx]) */
+.text-\[7px\],  .lg\:text-\[7px\],  .xl\:text-\[7px\],  .2xl\:text-\[7px\],
+.text-\[8px\],  .lg\:text-\[8px\],  .xl\:text-\[8px\],  .2xl\:text-\[8px\]  { font-size: 10px; }
+.text-\[9px\],  .lg\:text-\[9px\],  .xl\:text-\[9px\],  .2xl\:text-\[9px\]  { font-size: 11px; }
+
+/* font-mono + text-slate-300 = ID-подтексты в таблицах.
+   slate-300 (#cbd5e1) на белом → контраст 1.8:1 — нечитаемо.
+   Поднимаем до slate-400 (#94a3b8 → контраст 3.0:1).
+   font-mono используется только для кода/ID, не для иконок и рамок — безопасно. */
+.font-mono.text-slate-300 { color: #94a3b8; }
+
+/* ═══════════════════════════════════════════════════════════════
+   СЕМАНТИЧЕСКИЕ УТИЛИТЫ
+   Единые классы для повторяющихся паттернов.
+   Использовать в новом коде вместо портянок Tailwind-классов.
+═══════════════════════════════════════════════════════════════ */
+
+@layer utilities {
+  /* Лейбл поля формы: "Название заказа", "Клиент" и т.д. */
+  .ui-label {
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b; /* slate-500 */
+    line-height: 1.2;
+  }
+
+  /* Мета-текст: ID записи, дата, вторичная подпись */
+  .ui-meta {
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8; /* slate-400 */
+    line-height: 1.2;
+  }
+
+  /* Заголовок раздела / секции в таблице */
+  .ui-section-label {
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #94a3b8; /* slate-400 */
+  }
+
+  /* Крупная итоговая сумма */
+  .ui-total {
+    font-size: 1.25rem; /* xl */
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: #2563eb; /* blue-600 */
+  }
+}

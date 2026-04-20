@@ -1,14 +1,28 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, Suspense } from 'react';
 import { useStore } from '@/features/system/context/GlobalStore';
 import { ProductCategory, ProductType } from '@/types';
 import { List, Plus, Trash2, Box, Zap, Briefcase, X, Check, AlertCircle, ShieldAlert, Download, Upload, Loader2, CheckCircle, Search, Edit2 } from 'lucide-react';
 import { useAccess } from '@/features/auth/hooks/useAccess';
 import { ApiService } from '@/services/api';
+import { useIsMobile } from '@/hooks/useIsMobile';
+
+const MobileCategoriesView = React.lazy(() =>
+    import('./MobileCategoriesView').then(m => ({ default: m.MobileCategoriesView }))
+);
 
 export const CategoriesPage: React.FC = () => {
     const { state, actions } = useStore();
     const access = useAccess('categories');
+    const isMobile = useIsMobile();
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    if (isMobile) {
+        return (
+            <Suspense fallback={null}>
+                <MobileCategoriesView/>
+            </Suspense>
+        );
+    }
     
     const { categories } = state;
     const [activeType, setActiveType] = useState<ProductType>(ProductType.MACHINE);

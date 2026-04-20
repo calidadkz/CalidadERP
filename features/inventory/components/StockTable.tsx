@@ -72,51 +72,55 @@ const StockRow = React.memo(({
             <td className="text-center">
                 {canExpand ? (isExpanded ? <ChevronDown size={14}/> : <ChevronRight size={14}/>) : null}
             </td>
-            <td className="px-6 py-3">
-                <div className="flex items-center">
-                    <div 
-                        className={`w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden mr-3 shadow-sm shrink-0 transition-transform hover:scale-110 active:scale-95 ${product.imageUrl ? 'cursor-zoom-in' : ''}`}
-                        onClick={handleImgClick}
-                    >
-                        {product.imageUrl ? (
-                            <img src={product.imageUrl} alt={product.sku} className="w-full h-full object-contain" />
-                        ) : (
-                            product.type === ProductType.MACHINE ? <Cpu className="text-blue-500" size={14} /> : <Settings className="text-orange-500" size={14} />
-                        )}
+            {access.canSee('fields', 'col_model') && (
+                <td className="px-6 py-3">
+                    <div className="flex items-center">
+                        <div
+                            className={`w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden mr-3 shadow-sm shrink-0 transition-transform hover:scale-110 active:scale-95 ${product.imageUrl ? 'cursor-zoom-in' : ''}`}
+                            onClick={handleImgClick}
+                        >
+                            {product.imageUrl ? (
+                                <img src={product.imageUrl} alt={product.sku} className="w-full h-full object-contain" />
+                            ) : (
+                                product.type === ProductType.MACHINE ? <Cpu className="text-blue-500" size={14} /> : <Settings className="text-orange-500" size={14} />
+                            )}
+                        </div>
+                        <div>
+                            <div className="text-xs font-bold text-slate-700">{product.name}</div>
+                            <div className="text-[10px] text-slate-400 font-mono leading-tight">{product.sku}</div>
+                        </div>
                     </div>
-                    <div>
-                        <div className="text-xs font-bold text-slate-700">{product.name}</div>
-                        <div className="text-[10px] text-slate-400 font-mono leading-tight">{product.sku}</div>
-                    </div>
-                </div>
-            </td>
-            <td className="px-4 py-4 text-right font-mono font-bold text-xs">{f(stats.aggStock)}</td>
-            <td className="px-4 py-4 text-right font-mono text-xs text-orange-600">{f(stats.aggIncoming)}</td>
-            <td className="px-4 py-4 text-right font-mono text-xs text-red-500">{f(stats.aggReserved)}</td>
-            <td className={`px-4 py-4 text-right font-mono font-black text-xs ${stats.free < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{f(stats.free)}</td>
-            <PriceCell value={stats.aggStock > 0 ? stats.aggValue / stats.aggStock : 0} color="text-slate-500" bg="bg-blue-50/10" />
-            <PriceCell value={stats.aggValue} color="text-blue-700" bg="bg-blue-100/10" />
-            <PriceCell value={stats.aggStock > 0 ? stats.aggSalesValue / stats.aggStock : 0} color="text-emerald-600" bg="bg-emerald-50/10" />
-            <PriceCell value={stats.aggSalesValue} color="text-emerald-800" bg="bg-emerald-100/10" />
+                </td>
+            )}
+            {access.canSee('fields', 'col_stock') && <td className="px-4 py-4 text-right font-mono font-bold text-xs">{f(stats.aggStock)}</td>}
+            {access.canSee('fields', 'col_incoming') && <td className="px-4 py-4 text-right font-mono text-xs text-orange-600">{f(stats.aggIncoming)}</td>}
+            {access.canSee('fields', 'col_reserved') && <td className="px-4 py-4 text-right font-mono text-xs text-red-500">{f(stats.aggReserved)}</td>}
+            {access.canSee('fields', 'col_free') && <td className={`px-4 py-4 text-right font-mono font-black text-xs ${stats.free < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{f(stats.free)}</td>}
+            {access.canSee('fields', 'col_cost') && <PriceCell value={stats.aggStock > 0 ? stats.aggValue / stats.aggStock : 0} color="text-slate-500" bg="bg-blue-50/10" />}
+            {access.canSee('fields', 'col_total_cost') && <PriceCell value={stats.aggValue} color="text-blue-700" bg="bg-blue-100/10" />}
+            {access.canSee('fields', 'col_sales_price') && <PriceCell value={stats.aggStock > 0 ? stats.aggSalesValue / stats.aggStock : 0} color="text-emerald-600" bg="bg-emerald-50/10" />}
+            {access.canSee('fields', 'col_revenue') && <PriceCell value={stats.aggSalesValue} color="text-emerald-800" bg="bg-emerald-100/10" />}
         </tr>
         {isExpanded && canExpand && breakdown.map((conf, idx) => (
             <tr key={idx} className="bg-slate-50/30 border-b animate-in fade-in">
                 <td className="py-2 text-center text-blue-300 text-[10px]">•</td>
-                <td className="px-10 py-2">
-                    <div className="flex flex-wrap gap-1">
-                        {conf.optionsInfo.length === 0 ? <span className="text-[10px] font-bold text-slate-400 italic">Базовая</span> : conf.optionsInfo.map((opt: string, i: number) => (
-                            <span key={i} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-bold border border-blue-100">{opt}</span>
-                        ))}
-                    </div>
-                </td>
-                <td className="px-4 py-2 text-right font-mono text-[11px] font-bold">{f(conf.stock)}</td>
-                <td className="px-4 py-2 text-right font-mono text-[11px] text-orange-400">{f(conf.incoming)}</td>
-                <td className="px-4 py-2 text-right font-mono text-[11px] text-red-400">{f(conf.reserved)}</td>
-                <td className="px-4 py-2 text-right font-mono text-[11px] font-black">{f(conf.stock + conf.incoming - conf.reserved)}</td>
-                <PriceCell value={conf.stock > 0 ? conf.totalValueKzt / conf.stock : 0} color="text-slate-400" bg="bg-blue-50/5" />
-                <PriceCell value={conf.totalValueKzt} color="text-blue-600" bg="bg-blue-100/5" />
-                <PriceCell value={conf.stock > 0 ? conf.totalSalesValueKzt / conf.stock : 0} color="text-emerald-600" bg="bg-emerald-50/5" />
-                <PriceCell value={conf.totalSalesValueKzt} color="text-emerald-800" bg="bg-emerald-100/5" />
+                {access.canSee('fields', 'col_model') && (
+                    <td className="px-10 py-2">
+                        <div className="flex flex-wrap gap-1">
+                            {conf.optionsInfo.length === 0 ? <span className="text-[10px] font-bold text-slate-400 italic">Базовая</span> : conf.optionsInfo.map((opt: string, i: number) => (
+                                <span key={i} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-bold border border-blue-100">{opt}</span>
+                            ))}
+                        </div>
+                    </td>
+                )}
+                {access.canSee('fields', 'col_stock') && <td className="px-4 py-2 text-right font-mono text-[11px] font-bold">{f(conf.stock)}</td>}
+                {access.canSee('fields', 'col_incoming') && <td className="px-4 py-2 text-right font-mono text-[11px] text-orange-400">{f(conf.incoming)}</td>}
+                {access.canSee('fields', 'col_reserved') && <td className="px-4 py-2 text-right font-mono text-[11px] text-red-400">{f(conf.reserved)}</td>}
+                {access.canSee('fields', 'col_free') && <td className="px-4 py-2 text-right font-mono text-[11px] font-black">{f(conf.stock + conf.incoming - conf.reserved)}</td>}
+                {access.canSee('fields', 'col_cost') && <PriceCell value={conf.stock > 0 ? conf.totalValueKzt / conf.stock : 0} color="text-slate-400" bg="bg-blue-50/5" />}
+                {access.canSee('fields', 'col_total_cost') && <PriceCell value={conf.totalValueKzt} color="text-blue-600" bg="bg-blue-100/5" />}
+                {access.canSee('fields', 'col_sales_price') && <PriceCell value={conf.stock > 0 ? conf.totalSalesValueKzt / conf.stock : 0} color="text-emerald-600" bg="bg-emerald-50/5" />}
+                {access.canSee('fields', 'col_revenue') && <PriceCell value={conf.totalSalesValueKzt} color="text-emerald-800" bg="bg-emerald-100/5" />}
             </tr>
         ))}
         {product.imageUrl && (

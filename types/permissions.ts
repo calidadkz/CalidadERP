@@ -26,4 +26,5 @@ export interface UserProfile {
     fullName?: string;
     role: AppRole;
     permissions: RolePermissions;
+    employeeId?: string;  // Привязка к сотруднику (для фильтрации заказов)
 }

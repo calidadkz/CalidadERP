@@ -40,7 +40,10 @@ const PROTECTED_JSON_FIELDS = [
     'items',
     'packingList',
     'options',
-    'timeline'
+    'timeline',
+    'categoryOverrides',
+    'chinaDistribution',
+    'consumedLots',
 ];
 
 export class ApiService {
@@ -53,7 +56,14 @@ export class ApiService {
     }
 
     static generateUUID(): string {
-        return crypto.randomUUID();
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+        // Fallback для HTTP (не-secure context, например доступ по LAN IP)
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+            const r = Math.random() * 16 | 0;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
     }
 
     static keysToCamel(o: any): any {
@@ -301,6 +311,12 @@ export class ApiService {
         if (error) throw error;
     }
 
+    static async updateByField(tableName: string, field: string, value: string | number, data: Record<string, any>): Promise<void> {
+        const snakeData = this.keysToSnake(data);
+        const { error } = await supabase.from(tableName).update(snakeData).eq(toSnake(field), value);
+        if (error) throw error;
+    }
+
     static async updateExchangeRate(currency: Currency, rate: number): Promise<void> {
         await this.upsert(TableNames.EXCHANGE_RATES, { currency, rate }, 'currency');
     }
@@ -318,6 +334,7 @@ export class ApiService {
     async upsert<T>(t: string, d: Partial<T>, c: string = 'id'): Promise<T> { return ApiService.upsert<T>(t, d, c); }
     async upsertMany<T>(t: string, d: Partial<T>[], c: string = 'id'): Promise<T[]> { return ApiService.upsertMany<T>(t, d, c); }
     async deleteByField(t: string, f: string, v: string | number): Promise<void> { return ApiService.deleteByField(t, f, v); }
+    async updateByField(t: string, f: string, v: string | number, d: Record<string, any>): Promise<void> { return ApiService.updateByField(t, f, v, d); }
 }
 
 export const api = new ApiService();

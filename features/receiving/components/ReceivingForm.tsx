@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ReceptionItem, ReceptionExpense, SupplierOrder } from '@/types';
+import { ReceptionItem, ReceptionExpense, SupplierOrder, PreCalculationItem } from '@/types';
 import { Package, Save, Layers } from 'lucide-react';
 import { ExpenseForm } from './ExpenseForm';
 import { EconomySummary } from './EconomySummary';
@@ -12,12 +12,13 @@ interface ReceivingFormProps {
     actions: any;
     onCancel: () => void;
     onSave: (reception: any) => void;
-    batchId?: string;       // если заказ привязан к партии
-    batchName?: string;     // название партии для отображения
+    batchId?: string;
+    batchName?: string;
+    preCalcItems?: PreCalculationItem[];
 }
 
 export const ReceivingForm: React.FC<ReceivingFormProps> = ({
-    order, state, actions, onCancel, onSave, batchId, batchName
+    order, state, actions, onCancel, onSave, batchId, batchName, preCalcItems
 }) => {
     const [items, setItems] = useState<ReceptionItem[]>(order.items.map(i => {
         const product = state.products.find((p: any) => p.id === i.productId);
@@ -113,7 +114,16 @@ export const ReceivingForm: React.FC<ReceivingFormProps> = ({
                             </tbody>
                         </table>
                     </div>
-                    <ExpenseForm expenses={expenses} setExpenses={setExpenses} items={currentFinalItems} />
+                    <ExpenseForm
+                        expenses={expenses}
+                        setExpenses={setExpenses}
+                        items={currentFinalItems}
+                        batchId={batchId}
+                        preCalcItems={preCalcItems}
+                        actualPayments={state.actualPayments}
+                        plannedPayments={state.plannedPayments}
+                        orderId={order.id}
+                    />
                 </div>
                 <div className="col-span-12 lg:col-span-4">
                     <EconomySummary effectiveInfo={effectiveInfo} totalExpensesKzt={totalExpensesKzt} finalTotalKzt={finalTotalKzt} totalQty={totalQty} />

@@ -45,6 +45,7 @@ export interface WriteOff {
     reasonTypeId?: string;
     documents: WriteOffDocument[];
     movementId?: string;
+    status?: 'Draft' | 'Posted';
     createdAt?: string;
 }
 
@@ -86,6 +87,9 @@ export interface ReceptionExpense {
     allocationMethod: ExpenseAllocationMethod;
     targetItemId?: string;
     receptionId?: string;
+    paymentId?: string;         // Привязка к actual_payments (Выписка)
+    plannedPaymentId?: string;  // Привязка к planned_payments (ПП)
+    sourceMode?: 'batch' | 'manual'; // Источник: из партии или вручную
 }
 
 export interface Shipment {

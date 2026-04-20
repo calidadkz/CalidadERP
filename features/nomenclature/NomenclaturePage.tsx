@@ -1,12 +1,15 @@
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, Suspense } from 'react';
 import { Product, ProductType, Currency, Counterparty, OptionType, OptionVariant } from '@/types';
 import { Download, Upload, Loader2, CheckCircle, AlertCircle, Box, Trash2, Monitor, Filter, Layers, ChevronRight, ChevronLeft, Hash, Tags } from 'lucide-react';
 import { useStore } from '../system/context/GlobalStore';
 import { NomenclatureTable } from './components/NomenclatureTable';
 import { ProductModal } from './components/ProductModal';
-import { MobileNomenclatureView } from './components/MobileNomenclatureView';
 import { useAccess } from '../auth/hooks/useAccess';
+
+const MobileNomenclatureView = React.lazy(() =>
+    import('./components/MobileNomenclatureView').then(m => ({ default: m.MobileNomenclatureView }))
+);
 import { useNomenclatureState } from './hooks/useNomenclatureState';
 import { useNomenclatureImportExport } from './hooks/useNomenclatureImportExport';
 import { useNomenclatureCRUD } from './hooks/useNomenclatureCRUD';
@@ -120,15 +123,17 @@ export const NomenclaturePage: React.FC = () => {
     // Мобильная версия
     if (isMobile) {
         return (
-            <MobileNomenclatureView
-                products={state.products || []}
-                suppliers={suppliers}
-                categories={state.categories || []}
-                manufacturers={state.manufacturers || []}
-                exchangeRates={state.exchangeRates}
-                onSave={onSave}
-                onDelete={actions.deleteProduct}
-            />
+            <Suspense fallback={null}>
+                <MobileNomenclatureView
+                    products={state.products || []}
+                    suppliers={suppliers}
+                    categories={state.categories || []}
+                    manufacturers={state.manufacturers || []}
+                    exchangeRates={state.exchangeRates}
+                    onSave={onSave}
+                    onDelete={actions.deleteProduct}
+                />
+            </Suspense>
         );
     }
 
@@ -216,6 +221,7 @@ export const NomenclaturePage: React.FC = () => {
                         categories={state.categories || []}
                         hscodes={state.hscodes || []}
                         manufacturers={(state.manufacturers || []).map((m: any) => m.name || m)}
+                        exchangeRates={state.exchangeRates}
                         onEdit={handleEdit}
                         onCopy={handleCopy}
                         onDelete={handleDelete}

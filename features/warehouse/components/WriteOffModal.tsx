@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
-import { X, AlertTriangle, Save } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { X, AlertTriangle, Save, Package, CheckCircle2, Info } from 'lucide-react';
 import { Product } from '@/types';
 import { WriteOff, WriteOffDocument, WriteOffReasonType } from '@/types/inventory';
 import { ApiService } from '@/services/api';
@@ -17,14 +17,19 @@ const COLOR_MAP: Record<string, string> = {
     purple: 'bg-purple-100 text-purple-700 border-purple-200',
 };
 
+const f = (v: number) => Math.round(v).toLocaleString('ru-RU');
+
 interface WriteOffModalProps {
     products: Product[];
     reasonTypes: WriteOffReasonType[];
-    onSubmit: (wo: WriteOff) => Promise<void>;
+    inventorySummary: any[];
+    onSubmit: (wo: WriteOff, postImmediately: boolean) => Promise<void>;
     onClose: () => void;
 }
 
-export const WriteOffModal: React.FC<WriteOffModalProps> = ({ products, reasonTypes, onSubmit, onClose }) => {
+export const WriteOffModal: React.FC<WriteOffModalProps> = ({
+    products, reasonTypes, inventorySummary, onSubmit, onClose
+}) => {
     const writeoffId = useMemo(() => ApiService.generateId('WO'), []);
 
     const [productId, setProductId] = useState('');
@@ -32,6 +37,7 @@ export const WriteOffModal: React.FC<WriteOffModalProps> = ({ products, reasonTy
     const [reasonTypeId, setReasonTypeId] = useState('');
     const [reasonNote, setReasonNote] = useState('');
     const [documents, setDocuments] = useState<WriteOffDocument[]>([]);
+    const [postImmediately, setPostImmediately] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
 
@@ -41,6 +47,33 @@ export const WriteOffModal: React.FC<WriteOffModalProps> = ({ products, reasonTy
     );
 
     const selectedProduct = products.find(p => p.id === productId);
+
+    // Данные об остатке выбранного товара
+    const stockInfo = useMemo(() => {
+        if (!productId) return null;
+        const entry = inventorySummary.find(e =>
+            e.productId === productId &&
+            (!e.configuration || e.configuration.length === 0)
+        );
+        if (!entry) return { physicalQty: 0, avgCost: 0 };
+        const physicalQty = Number(entry.stock) || 0;
+        const totalValue = Number(entry.totalValueKzt) || 0;
+        const avgCost = physicalQty > 0 ? totalValue / physicalQty : 0;
+        return { physicalQty, avgCost };
+    }, [productId, inventorySummary]);
+
+    const qty = parseFloat(quantity) || 0;
+    const canPostImmediately = (stockInfo?.physicalQty ?? 0) >= qty && qty > 0;
+    const lossAmount = canPostImmediately ? qty * (stockInfo?.avgCost ?? 0) : 0;
+
+    // Если товар есть на складе — предлагать провести сразу (по умолчанию)
+    useEffect(() => {
+        if (stockInfo && stockInfo.physicalQty > 0) {
+            setPostImmediately(true);
+        } else {
+            setPostImmediately(false);
+        }
+    }, [productId, stockInfo?.physicalQty]);
 
     const handleAddDoc = (url: string, name: string) => {
         setDocuments(prev => [...prev, { name, url, uploadedAt: new Date().toISOString() }]);
@@ -52,8 +85,11 @@ export const WriteOffModal: React.FC<WriteOffModalProps> = ({ products, reasonTy
 
     const handleSubmit = async () => {
         if (!productId) { setError('Выберите товар'); return; }
-        const qty = parseFloat(quantity);
         if (!qty || qty <= 0) { setError('Укажите количество > 0'); return; }
+        if (postImmediately && stockInfo && qty > stockInfo.physicalQty) {
+            setError(`Недостаточно товара: на складе ${f(stockInfo.physicalQty)} шт.`);
+            return;
+        }
 
         setIsSaving(true);
         setError('');
@@ -70,7 +106,7 @@ export const WriteOffModal: React.FC<WriteOffModalProps> = ({ products, reasonTy
                 reasonNote: reasonNote.trim() || undefined,
                 documents,
             };
-            await onSubmit(wo);
+            await onSubmit(wo, postImmediately && canPostImmediately);
             onClose();
         } catch (e: any) {
             setError(e.message || 'Ошибка при сохранении');
@@ -110,6 +146,44 @@ export const WriteOffModal: React.FC<WriteOffModalProps> = ({ products, reasonTy
                             className="w-full"
                         />
                     </div>
+
+                    {/* Панель остатка — показывается после выбора товара */}
+                    {productId && stockInfo && (
+                        <div className={`rounded-2xl border px-4 py-3 flex items-center gap-4 ${
+                            stockInfo.physicalQty > 0
+                                ? 'bg-emerald-50/60 border-emerald-200'
+                                : 'bg-amber-50/60 border-amber-200'
+                        }`}>
+                            <Package size={16} className={stockInfo.physicalQty > 0 ? 'text-emerald-500 shrink-0' : 'text-amber-500 shrink-0'}/>
+                            <div className="flex-1 flex flex-wrap gap-x-6 gap-y-1">
+                                <div>
+                                    <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">Физический остаток</div>
+                                    <div className={`text-sm font-black ${stockInfo.physicalQty > 0 ? 'text-emerald-700' : 'text-amber-600'}`}>
+                                        {f(stockInfo.physicalQty)} шт.
+                                    </div>
+                                </div>
+                                {stockInfo.physicalQty > 0 && (
+                                    <>
+                                        <div>
+                                            <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">Средняя себестоимость</div>
+                                            <div className="text-sm font-black text-slate-700">{f(stockInfo.avgCost)} ₸/шт.</div>
+                                        </div>
+                                        {lossAmount > 0 && (
+                                            <div>
+                                                <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">Сумма потерь</div>
+                                                <div className="text-sm font-black text-red-600">{f(lossAmount)} ₸</div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                                {stockInfo.physicalQty === 0 && (
+                                    <div className="text-xs font-bold text-amber-700">
+                                        Товара нет на складе — будет создан черновик
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Количество */}
                     <div>
@@ -191,6 +265,39 @@ export const WriteOffModal: React.FC<WriteOffModalProps> = ({ products, reasonTy
                         </div>
                     </div>
 
+                    {/* Чекбокс «Провести сразу» — только если товар есть на складе */}
+                    {productId && stockInfo && stockInfo.physicalQty > 0 && (
+                        <label className={`flex items-center gap-3 px-4 py-3 rounded-2xl border cursor-pointer transition-all ${
+                            postImmediately
+                                ? 'bg-red-50 border-red-200'
+                                : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                        }`}>
+                            <div
+                                className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                                    postImmediately ? 'bg-red-600 border-red-600' : 'border-slate-300 bg-white'
+                                }`}
+                                onClick={() => {
+                                    if (canPostImmediately || !postImmediately) setPostImmediately(v => !v);
+                                }}
+                            >
+                                {postImmediately && <CheckCircle2 size={13} className="text-white"/>}
+                            </div>
+                            <div>
+                                <div className="text-xs font-black text-slate-700">Провести списание сразу</div>
+                                <div className="text-[10px] text-slate-400 font-medium">
+                                    {canPostImmediately
+                                        ? `Спишет ${f(qty)} шт. со склада и создаст движение Out на ${f(lossAmount)} ₸`
+                                        : qty > 0
+                                            ? `Кол-во (${f(qty)}) превышает остаток (${f(stockInfo.physicalQty)}) — нельзя провести`
+                                            : 'Укажите количество'}
+                                </div>
+                            </div>
+                            {!canPostImmediately && qty > 0 && (
+                                <Info size={14} className="text-amber-500 ml-auto shrink-0"/>
+                            )}
+                        </label>
+                    )}
+
                     {error && (
                         <div className="flex items-center gap-2 text-red-600 text-xs font-bold bg-red-50 px-4 py-3 rounded-xl border border-red-100">
                             <AlertTriangle size={14}/>
@@ -200,18 +307,33 @@ export const WriteOffModal: React.FC<WriteOffModalProps> = ({ products, reasonTy
                 </div>
 
                 {/* Футер */}
-                <div className="px-8 py-4 border-t border-slate-100 flex justify-end gap-3">
-                    <button onClick={onClose} className="px-5 py-2 text-slate-400 hover:text-slate-600 text-xs font-black uppercase tracking-widest transition-colors">
-                        Отмена
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={isSaving}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow transition-all disabled:opacity-50"
-                    >
-                        <Save size={14}/>
-                        {isSaving ? 'Сохранение...' : 'Провести списание'}
-                    </button>
+                <div className="px-8 py-4 border-t border-slate-100 flex justify-between items-center gap-3">
+                    <div className="text-[10px] text-slate-400 font-medium">
+                        {postImmediately && canPostImmediately
+                            ? '✓ Будет сразу проведено в остатки'
+                            : 'Будет создан черновик — провести можно позже'}
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={onClose} className="px-5 py-2 text-slate-400 hover:text-slate-600 text-xs font-black uppercase tracking-widest transition-colors">
+                            Отмена
+                        </button>
+                        <button
+                            onClick={handleSubmit}
+                            disabled={isSaving}
+                            className={`flex items-center gap-2 px-6 py-2.5 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow transition-all disabled:opacity-50 ${
+                                postImmediately && canPostImmediately
+                                    ? 'bg-red-600 hover:bg-red-700'
+                                    : 'bg-slate-600 hover:bg-slate-700'
+                            }`}
+                        >
+                            <Save size={14}/>
+                            {isSaving
+                                ? 'Сохранение...'
+                                : postImmediately && canPostImmediately
+                                    ? 'Провести списание'
+                                    : 'Создать черновик'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

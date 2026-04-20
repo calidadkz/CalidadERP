@@ -237,39 +237,39 @@ export const PricingManagerPage: React.FC = () => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/50">
-                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Название</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Тип</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Поставщик</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Производитель</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Категории</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Маржа</th>
-                                <th className="px-6 py-4"></th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Название</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Тип</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Поставщик</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Производитель</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Категории</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Маржа</th>
+                                <th className="px-4 py-3"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                             {pricingProfiles.map(p => (
                                 <tr key={p.id} className="group hover:bg-blue-50/30 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="font-bold text-slate-700 flex items-center gap-2">{p.name} <span title={`ID: ${p.id}`}><Info size={12} className="text-slate-300"/></span></div>
+                                    <td className="px-4 py-3">
+                                        <div className="font-bold text-slate-700 flex items-center gap-2">{p.name} <span title={`ID: ${p.id}`}><Info size={12} className="text-slate-400"/></span></div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 py-3">
                                         <span className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter w-fit ${p.type === ProductType.MACHINE ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
                                             {p.type === ProductType.MACHINE ? <Truck size={12}/> : <Users size={12}/>} {p.type}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-xs font-bold text-slate-500">
-                                        {p.supplierId ? (suppliers.find(s => s.id === p.supplierId)?.name || '-') : <span className="text-slate-300 italic font-medium">Все</span>}
+                                    <td className="px-4 py-3 text-xs font-bold text-slate-500">
+                                        {p.supplierId ? (suppliers.find(s => s.id === p.supplierId)?.name || '-') : <span className="text-slate-400 italic font-medium">Все</span>}
                                     </td>
-                                    <td className="px-6 py-4 text-xs font-bold text-slate-500">
-                                        {p.applicableManufacturer || <span className="text-slate-300 italic font-medium">Все</span>}
+                                    <td className="px-4 py-3 text-xs font-bold text-slate-500">
+                                        {p.applicableManufacturer || <span className="text-slate-400 italic font-medium">Все</span>}
                                     </td>
-                                    <td className="px-6 py-4 text-xs font-bold text-slate-500">
-                                        {p.applicableCategoryIds.length > 0 ? p.applicableCategoryIds.map(id => categories.find(c => c.id === id)?.name || id).join(', ') : <span className="text-slate-300 italic font-medium">Все</span>}
+                                    <td className="px-4 py-3 text-xs font-bold text-slate-500">
+                                        {p.applicableCategoryIds.length > 0 ? p.applicableCategoryIds.map(id => categories.find(c => c.id === id)?.name || id).join(', ') : <span className="text-slate-400 italic font-medium">Все</span>}
                                     </td>
-                                    <td className="px-6 py-4 text-right">
+                                    <td className="px-4 py-3 text-right">
                                         <div className="font-black text-emerald-600 flex items-center gap-1 justify-end"><Target size={12}/> {p.targetNetMarginPercent}%</div>
                                     </td>
-                                    <td className="px-6 py-4 text-right">
+                                    <td className="px-4 py-3 text-right">
                                         <div className="flex items-center justify-end gap-1">
                                             {recalcResult?.profileId === p.id && (
                                                 <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
@@ -281,7 +281,7 @@ export const PricingManagerPage: React.FC = () => {
                                                     onClick={() => handleRecalculateProfile(p)}
                                                     disabled={recalcingId === p.id}
                                                     title="Пересчитать цены для этого профиля"
-                                                    className="p-2 text-slate-300 hover:text-amber-500 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                                                    className="p-2 text-slate-400 hover:text-amber-500 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
                                                 >
                                                     {recalcingId === p.id ? <Loader2 size={15} className="animate-spin text-amber-500"/> : <RefreshCw size={15}/>}
                                                 </button>
@@ -404,10 +404,10 @@ const PricingProfileModal: React.FC<PricingProfileModalProps> = ({ profileId, on
         } else {
             setProfile({
                 name: '', type: ProductType.MACHINE, applicableCategoryIds: [],
-                logisticsRateUsd: 160, batchVolumeM3: 70, batchShippingCostKzt: 1200000,
-                batchSvhCostKzt: 250000, brokerCostKzt: 150000, customsFeesKzt: 60000,
-                vatRate: 12, citRate: 20, salesBonusRate: 1, pnrCostKzt: 50000,
-                deliveryKzt: 100000, targetNetMarginPercent: 25
+                logisticsRateUsd: 150, batchVolumeM3: 20, batchShippingCostKzt: 1200000,
+                batchSvhCostKzt: 100000, brokerCostKzt: 104000, customsFeesKzt: 52000,
+                vatRate: 16, citRate: 0, salesBonusRate: 3, pnrCostKzt: 0,
+                deliveryKzt: 0, targetNetMarginPercent: 25
             });
         }
     }, [profileId, pricingProfiles, categories]);
@@ -501,7 +501,7 @@ const PricingProfileModal: React.FC<PricingProfileModalProps> = ({ profileId, on
                                 <span className={selectedSupplierName ? 'text-slate-800' : 'text-slate-400 italic font-medium text-sm'}>
                                     {selectedSupplierName || 'Все'}
                                 </span>
-                                <ChevronDown size={14} className={`text-slate-300 transition-transform flex-shrink-0 ${isSupplierOpen ? 'rotate-180' : ''}`}/>
+                                <ChevronDown size={14} className={`text-slate-400 transition-transform flex-shrink-0 ${isSupplierOpen ? 'rotate-180' : ''}`}/>
                             </div>
                             {isSupplierOpen && (
                                 <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-[200] animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden">
@@ -537,7 +537,7 @@ const PricingProfileModal: React.FC<PricingProfileModalProps> = ({ profileId, on
                                 <span className={profile.applicableManufacturer ? 'text-slate-800' : 'text-slate-400 italic font-medium text-sm'}>
                                     {profile.applicableManufacturer || 'Все'}
                                 </span>
-                                <ChevronDown size={14} className={`text-slate-300 transition-transform flex-shrink-0 ${isManufOpen ? 'rotate-180' : ''}`}/>
+                                <ChevronDown size={14} className={`text-slate-400 transition-transform flex-shrink-0 ${isManufOpen ? 'rotate-180' : ''}`}/>
                             </div>
                             {isManufOpen && (
                                 <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-[200] animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden">
@@ -577,7 +577,7 @@ const PricingProfileModal: React.FC<PricingProfileModalProps> = ({ profileId, on
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                         <FormCard title="Логистика" icon={<Truck size={16}/>} color="blue">
-                            <StyledInput label="Тариф Китай ($/m³)" value={profile.logisticsRateUsd ?? ''} onChange={e => handleChange('logisticsRateUsd', parseFloat(e.target.value))} type="number" />
+                            <StyledInput label="Доставка Урумчи-Алматы ($/м³)" value={profile.logisticsRateUsd ?? ''} onChange={e => handleChange('logisticsRateUsd', parseFloat(e.target.value))} type="number" />
                             <div className="grid grid-cols-2 gap-3">
                                 <StyledInput label="Объем партии (m³)" value={profile.batchVolumeM3 ?? ''} onChange={e => handleChange('batchVolumeM3', parseFloat(e.target.value))} type="number" />
                                 <StyledInput label="Доставка КРГ (₸)" value={profile.batchShippingCostKzt ?? ''} onChange={e => handleChange('batchShippingCostKzt', parseFloat(e.target.value))} type="number" />
@@ -601,7 +601,7 @@ const PricingProfileModal: React.FC<PricingProfileModalProps> = ({ profileId, on
                             <FormCard title="Сервис и Цель" icon={<Users size={16}/>} color="purple">
                                  <div className="grid grid-cols-2 gap-3">
                                     <StyledInput label="ПНР (₸)" value={profile.pnrCostKzt ?? ''} onChange={e => handleChange('pnrCostKzt', parseFloat(e.target.value))} type="number" />
-                                    <StyledInput label="Доставка (₸)" value={profile.deliveryKzt ?? ''} onChange={e => handleChange('deliveryKzt', parseFloat(e.target.value))} type="number" />
+                                    <StyledInput label="Доставка до клиента (₸)" value={profile.deliveryKzt ?? ''} onChange={e => handleChange('deliveryKzt', parseFloat(e.target.value))} type="number" />
                                 </div>
                             </FormCard>
                             <div className="bg-emerald-50/80 p-4 rounded-2xl border-2 border-emerald-300/50 shadow-sm text-center">

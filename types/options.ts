@@ -1,13 +1,19 @@
 import { Currency } from './currency';
 
+export interface OptionTypeCategoryOverride {
+    isRequired?: boolean;
+    isSingleSelect?: boolean;
+}
+
 export interface OptionType {
     id: string;
     name: string;
     isRequired: boolean;
     isSingleSelect: boolean;
-    categoryId?: string; 
-    supplierId?: string; 
-    manufacturer?: string; 
+    categoryId?: string;
+    supplierId?: string;
+    manufacturer?: string;
+    categoryOverrides?: Record<string, OptionTypeCategoryOverride>;
     variants?: OptionVariant[];
 }
 

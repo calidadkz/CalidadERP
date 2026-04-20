@@ -38,7 +38,7 @@ export const DiscrepancyPage: React.FC = () => {
 
   const handleExecuteWriteOff = (disc: Discrepancy) => {
       if (confirm(`Списать со склада ${disc.missingQty} шт. товара ${disc.sku}?`)) {
-          actions.writeOff(disc.productId, disc.missingQty, `Брак по документу ${disc.id}`, disc.id);
+          actions.writeOffDiscrepancy(disc);
       }
   };
 

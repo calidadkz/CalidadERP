@@ -6,15 +6,22 @@ import { TableNames } from '@/constants';
 
 // Маппинг типов расходов приёмки → категории партии
 const RECEPTION_TO_BATCH_CATEGORY: Record<string, ExpenseCategory> = {
-    'Доставка Китай':        'logistics_urumqi_almaty',
-    'Доставка Алматы-Кар.':  'logistics_almaty_karaganda',
-    'Доставка Алматы–Кар.':  'logistics_almaty_karaganda',
-    'Доставка Алматы-Кар':   'logistics_almaty_karaganda',
-    'СВХ':                   'svh',
-    'Брокер':                'broker',
-    'Сборы':                 'customs',
-    'НДС':                   'customs_vat',
-    'Прочее':                'other',
+    // Новые типы (из режима "По партии")
+    'Доставка по Китаю':        'logistics_china_domestic',
+    'Доставка Урумчи-Алматы':   'logistics_urumqi_almaty',
+    'Доставка Алматы-Кар.':     'logistics_almaty_karaganda',
+    'ПНР':                      'pnr',
+    'Доставка до клиента':      'delivery_local',
+    // Устаревшие типы (обратная совместимость)
+    'Доставка Китай':           'logistics_urumqi_almaty',
+    'Доставка Алматы–Кар.':     'logistics_almaty_karaganda',
+    'Доставка Алматы-Кар':      'logistics_almaty_karaganda',
+    // Общие
+    'СВХ':                      'svh',
+    'Брокер':                   'broker',
+    'Сборы':                    'customs',
+    'НДС':                      'customs_vat',
+    'Прочее':                   'other',
 };
 import { InventoryMediator } from '@/services/InventoryMediator';
 
@@ -131,14 +138,23 @@ export const useOrderState = (
             const order = orders.find(o => o.id === id);
             if (!order) return;
 
-            const hasPayments = order.paidAmountForeign > 0;
-            if (hasPayments) {
+            // Блокировать если есть фактические оплаты
+            if (order.paidAmountForeign > 0) {
                 alert("Нельзя удалить заказ, по которому уже проведены фактические оплаты.");
                 return;
             }
 
+            // Блокировать если есть проведённые приёмки (движения склада уже созданы)
+            const postedReceptions = receptions.filter(r => r.orderId === id && r.status === 'Posted');
+            if (postedReceptions.length > 0) {
+                alert("Нельзя удалить заказ: по нему есть проведённые приёмки. Сначала отмените приёмки.");
+                return;
+            }
+
+            // Soft-delete заказа
             await ApiService.update(TableNames.SUPPLIER_ORDERS, id, { isDeleted: true });
-            
+
+            // Soft-delete связанных ПП
             const relatedPlans = await ApiService.fetchAll<PlannedPayment>(TableNames.PLANNED_PAYMENTS, { sourceDocId: id });
             if (relatedPlans && relatedPlans.length > 0) {
                 for (const p of relatedPlans) {
@@ -147,12 +163,28 @@ export const useOrderState = (
                 }
             }
 
+            // Удалить Incoming-движения склада созданные при подтверждении заказа
+            await ApiService.deleteByField(TableNames.STOCK_MOVEMENTS, 'documentId', id);
+
+            // Удалить черновики приёмок
+            const draftReceptions = receptions.filter(r => r.orderId === id && r.status !== 'Posted');
+            for (const dr of draftReceptions) {
+                await ApiService.deleteByField(TableNames.RECEPTION_ITEMS, 'receptionId', dr.id);
+                await ApiService.deleteByField(TableNames.RECEPTION_EXPENSES, 'receptionId', dr.id);
+                await ApiService.delete(TableNames.RECEPTIONS, dr.id);
+            }
+
+            // Очистить привязку заказа в позициях предрасчётов
+            await ApiService.updateByField(TableNames.PRE_CALCULATION_ITEMS, 'orderId', id, { orderId: null });
+
             await moveToTrash(id, 'Order', order.name || `Заказ ${id}`, order);
 
             setOrders(prev => prev.map(o => o.id === id ? { ...o, isDeleted: true } : o));
             setPlannedPayments(prev => prev.map(p => p.sourceDocId === id ? { ...p, isDeleted: true } : p));
+            setStockMovements(prev => prev.filter(m => m.documentId !== id));
+            setReceptions(prev => prev.filter(r => r.orderId !== id || r.status === 'Posted'));
 
-            addLog('Delete', 'Order', id, 'Заказ и его ПП помечены на удаление');
+            addLog('Delete', 'Order', id, 'Заказ и его ПП помечены на удаление, движения склада очищены, привязки предрасчётов сброшены');
         } catch (e: any) {
             console.error("[ORDER_STATE] Error deleting order:", e);
             alert("Ошибка при удалении заказа: " + e.message);
@@ -235,13 +267,23 @@ export const useOrderState = (
             const order = salesOrders.find(o => o.id === id);
             if (!order) return;
 
+            // Блокировать если есть фактические оплаты
             if (order.paidAmount > 0) {
                 alert("Нельзя удалить заказ клиента, по которому уже проведены фактические оплаты.");
                 return;
             }
 
+            // Блокировать если есть проведённые отгрузки (движения склада уже созданы)
+            const postedShipments = shipments.filter(s => s.salesOrderId === id && s.status === 'Posted');
+            if (postedShipments.length > 0) {
+                alert("Нельзя удалить заказ клиента: по нему есть проведённые отгрузки. Сначала отмените отгрузки.");
+                return;
+            }
+
+            // Soft-delete заказа
             await ApiService.update(TableNames.SALES_ORDERS, id, { isDeleted: true });
-            
+
+            // Soft-delete связанных ПП
             const relatedPlans = await ApiService.fetchAll<PlannedPayment>(TableNames.PLANNED_PAYMENTS, { sourceDocId: id });
             if (relatedPlans && relatedPlans.length > 0) {
                 for (const p of relatedPlans) {
@@ -250,12 +292,32 @@ export const useOrderState = (
                 }
             }
 
+            // Удалить Reserved-движения склада созданные при подтверждении заказа
+            await ApiService.deleteByField(TableNames.STOCK_MOVEMENTS, 'documentId', id);
+
+            // Удалить черновики отгрузок
+            const draftShipments = shipments.filter(s => s.salesOrderId === id && s.status !== 'Posted');
+            for (const ds of draftShipments) {
+                await ApiService.deleteByField(TableNames.SHIPMENT_ITEMS, 'shipmentId', ds.id);
+                await ApiService.delete(TableNames.SHIPMENTS, ds.id);
+            }
+
+            // Очистить привязку заказа в позициях предрасчётов
+            await ApiService.updateByField(TableNames.PRE_CALCULATION_ITEMS, 'orderId', id, {
+                orderId: null,
+                clientName: null,
+                sellingPriceKzt: null,
+                isRevenueConfirmed: false
+            });
+
             await moveToTrash(id, 'SalesOrder', order.name || `Заказ клиента ${id}`, order);
 
             setSalesOrders(prev => prev.map(o => o.id === id ? { ...o, isDeleted: true } : o));
             setPlannedPayments(prev => prev.map(p => p.sourceDocId === id ? { ...p, isDeleted: true } : p));
+            setStockMovements(prev => prev.filter(m => m.documentId !== id));
+            setShipments(prev => prev.filter(s => s.salesOrderId !== id || s.status === 'Posted'));
 
-            addLog('Delete', 'SalesOrder', id, 'Заказ клиента и его ПП помечены на удаление');
+            addLog('Delete', 'SalesOrder', id, 'Заказ клиента и его ПП помечены на удаление, движения склада очищены, привязки предрасчётов сброшены');
         } catch (e: any) {
             console.error("[ORDER_STATE] Error deleting sales order:", e);
             alert("Ошибка при удалении заказа клиента: " + e.message);

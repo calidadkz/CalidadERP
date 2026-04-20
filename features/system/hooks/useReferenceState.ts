@@ -138,7 +138,20 @@ export const useReferenceState = () => {
 
     const permanentlyDelete = async (trashRecord: TrashItem) => {
         try {
-            if (['Order', 'SalesOrder', 'PlannedPayment', 'OptionVariant'].includes(trashRecord.type)) {
+            if (trashRecord.type === 'Product') {
+                // Пробуем удалить из products (может быть уже удалён — тогда игнорируем)
+                try {
+                    await ApiService.delete(TableNames.PRODUCTS, trashRecord.originalId);
+                } catch (e: any) {
+                    if (e?.code === '23503') {
+                        const detail: string = e?.details || '';
+                        const tableMatch = detail.match(/table "([^"]+)"/);
+                        const tableName = tableMatch ? tableMatch[1] : 'другой таблице';
+                        throw new Error(`Товар используется в "${tableName}" — удалите связанные записи перед окончательным удалением.`);
+                    }
+                    // 404 / "not found" — продукт уже удалён, это нормально
+                }
+            } else if (['Order', 'SalesOrder', 'PlannedPayment', 'OptionVariant'].includes(trashRecord.type)) {
                 if (trashRecord.type === 'Order') {
                     await ApiService.deleteByField(TableNames.SUPPLIER_ORDER_ITEMS, 'supplierOrderId', trashRecord.originalId);
                     await ApiService.delete(TableNames.SUPPLIER_ORDERS, trashRecord.originalId);
@@ -188,9 +201,10 @@ export const useReferenceState = () => {
     const deleteCounterparty = async (id: string) => {
         const item = counterparties.find(x => x.id === id);
         if (item) {
-            await moveToTrash(id, 'Counterparty', item.name, item);
-            await ApiService.delete(TableNames.COUNTERPARTIES, id);
+            // Сначала удаляем — если есть FK-зависимости, упадёт 409 до записи в корзину
             await ApiService.deleteByField(TableNames.COUNTERPARTY_ACCOUNTS, 'counterpartyId', id);
+            await ApiService.delete(TableNames.COUNTERPARTIES, id);
+            await moveToTrash(id, 'Counterparty', item.name, item);
             setCounterparties(prev => prev.filter(x => x.id !== id));
             setCounterpartyAccounts(prev => prev.filter(acc => acc.counterpartyId !== id));
         }

@@ -4,6 +4,7 @@ import { Product, Currency, OptionVariant, PricingProfile, OptionType, Bundle, S
 import { X, Settings, Layers, Calculator, Zap, Check } from 'lucide-react';
 import { useStore } from '@/features/system/context/GlobalStore';
 import { PricingService } from '@/services/PricingService';
+import { useAccess } from '@/features/auth/hooks/useAccess';
 
 interface ConfiguratorModalProps {
     isOpen: boolean;
@@ -18,6 +19,8 @@ export const ConfiguratorModal: React.FC<ConfiguratorModalProps> = ({
 }) => {
     const { state } = useStore();
     const { optionTypes = [], optionVariants = [], bundles = [], stockMovements = [], exchangeRates = {} as Record<string, number>, pricingProfiles = [] } = state;
+    const access = useAccess('nomenclature');
+    const canSeePricingDetails = access.canSee('fields', 'pricingDetails');
 
     const [configTab, setConfigTab] = useState<'manual' | 'favorites' | 'warehouse'>('manual');
     const [selectedOptions, setSelectedOptions] = useState<Record<string, string[]>>({});
@@ -164,6 +167,8 @@ export const ConfiguratorModal: React.FC<ConfiguratorModalProps> = ({
                         ) : allowedOptionTypes.map(type => {
                             const configEntry = baseMachine.machineConfig?.find(mc => mc.typeId === type.id);
                             const allowedVarIds = configEntry?.allowedVariantIds || [];
+                            const machineCatId = baseMachine.categoryId ?? '';
+                            const effectiveSingle = type.categoryOverrides?.[machineCatId]?.isSingleSelect ?? type.isSingleSelect;
 
                             return (
                                 <div key={type.id} className="space-y-3">
@@ -178,12 +183,14 @@ export const ConfiguratorModal: React.FC<ConfiguratorModalProps> = ({
                                                 const price = configEntry?.priceOverrides?.[variant.id] ?? variant.price;
 
                                                 return (
-                                                    <div key={variant.id} onClick={() => toggleOption(type.id, variant.id, type.isSingleSelect)} 
+                                                    <div key={variant.id} onClick={() => toggleOption(type.id, variant.id, effectiveSingle)}
                                                         className={`px-4 py-3 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between group ${isSelected ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-50' : 'border-slate-50 hover:border-slate-200 bg-white'}`}>
                                                         <span className={`text-xs font-bold ${isSelected ? 'text-blue-800' : 'text-slate-600'}`}>{variant.name}</span>
-                                                        <span className={`text-[10px] font-black font-mono ${isSelected ? 'text-blue-600' : 'text-slate-400'}`}>
-                                                           {f(price)} {variant.currency}
-                                                        </span>
+                                                        {(canSeePricingDetails || mode === 'procurement') && (
+                                                            <span className={`text-[10px] font-black font-mono ${isSelected ? 'text-blue-600' : 'text-slate-400'}`}>
+                                                               {f(price)} {variant.currency}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 );
                                             })}
@@ -292,13 +299,15 @@ export const ConfiguratorModal: React.FC<ConfiguratorModalProps> = ({
                         </div>
                         {mode === 'sales' && currentEconomy.details && (
                             <div className="flex items-center gap-6 border-l border-white/10 pl-6 flex-1 overflow-hidden">
-                                <div className="min-w-0"><span className="text-[8px] font-bold text-slate-500 uppercase block mb-0.5">1. Прибыль</span><div className="text-sm font-black text-emerald-400 truncate">+{f(currentEconomy.details.netProfit)} <span className="text-[9px] opacity-60">₸</span></div></div>
-                                <div className="w-px h-8 bg-white/5 flex-none"/>
-                                <div className="min-w-0"><span className="text-[8px] font-bold text-slate-500 uppercase block mb-0.5">2. Себестоимость</span><div className="text-sm font-black text-blue-300 truncate">{f(currentEconomy.details.purchaseKzt)} <span className="text-[9px] opacity-60">₸</span></div></div>
-                                <div className="w-px h-8 bg-white/5 flex-none"/>
-                                <div className="min-w-0"><span className="text-[8px] font-bold text-slate-500 uppercase block mb-0.5">3. Доп. расходы</span><div className="text-sm font-black text-orange-400 truncate">+{ f(currentEconomy.details.totalExpenses - currentEconomy.details.purchaseKzt) } <span className="text-[9px] opacity-60">₸</span></div></div>
-                                <div className="w-px h-8 bg-white/5 flex-none"/>
-                                <div className="bg-slate-800/40 px-3 py-1.5 rounded-lg border border-white/5 min-w-0"><span className="text-[8px] font-bold text-slate-400 uppercase block mb-0.5">4. Полная себестоимость</span><div className="text-sm font-black text-white truncate">{f(currentEconomy.details.totalExpenses)} <span className="text-[9px] opacity-60">₸</span></div></div>
+                                <div className="min-w-0"><span className="text-[8px] font-bold text-slate-500 uppercase block mb-0.5">Прибыль</span><div className="text-sm font-black text-emerald-400 truncate">+{f(currentEconomy.details.netProfit)} <span className="text-[9px] opacity-60">₸</span></div></div>
+                                {canSeePricingDetails && (<>
+                                    <div className="w-px h-8 bg-white/5 flex-none"/>
+                                    <div className="min-w-0"><span className="text-[8px] font-bold text-slate-500 uppercase block mb-0.5">Себестоимость</span><div className="text-sm font-black text-blue-300 truncate">{f(currentEconomy.details.purchaseKzt)} <span className="text-[9px] opacity-60">₸</span></div></div>
+                                    <div className="w-px h-8 bg-white/5 flex-none"/>
+                                    <div className="min-w-0"><span className="text-[8px] font-bold text-slate-500 uppercase block mb-0.5">Доп. расходы</span><div className="text-sm font-black text-orange-400 truncate">+{f(currentEconomy.details.totalExpenses - currentEconomy.details.purchaseKzt)} <span className="text-[9px] opacity-60">₸</span></div></div>
+                                    <div className="w-px h-8 bg-white/5 flex-none"/>
+                                    <div className="bg-slate-800/40 px-3 py-1.5 rounded-lg border border-white/5 min-w-0"><span className="text-[8px] font-bold text-slate-400 uppercase block mb-0.5">Полная себестоимость</span><div className="text-sm font-black text-white truncate">{f(currentEconomy.details.totalExpenses)} <span className="text-[9px] opacity-60">₸</span></div></div>
+                                </>)}
                             </div>
                         )}
                     </div>

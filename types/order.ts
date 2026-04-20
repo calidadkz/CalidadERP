@@ -71,7 +71,11 @@ export interface SalesOrder {
     totalItemCount: number;
     contractUrl?: string;
     contractName?: string;
-    contractDeliveryDate?: string; // Крайняя дата поставки по договору (обязательно если есть договор)
+    contractStartDate?: string;    // Дата начала договора (для расчёта дедлайна)
+    contractWorkingDays?: number;  // Срок по договору в рабочих днях
+    contractDeliveryDate?: string; // Крайняя дата поставки (рассчитывается из start + workingDays)
     additionalDocuments?: OrderDocument[];
+    responsibleEmployeeId?: string;   // Ответственный менеджер
+    responsibleEmployeeName?: string;
     isDeleted?: boolean; // Пометка на удаление
 }

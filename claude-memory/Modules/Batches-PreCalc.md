@@ -29,6 +29,7 @@
 |---|---|
 | `features/batches/BatchesPage.tsx` | Список партий |
 | `features/batches/BatchDetailPage.tsx` | Детальная страница партии |
+| `features/batches/components/BatchMainListTab.tsx` | **Дэшборд Партии** — вкладка "Позиции": таблица товаров/расходов/доходов с планом vs фактом |
 | `features/batches/components/BatchTimelineTab.tsx` | Диаграмма Ганта + ось дат с маркерами дедлайнов |
 | `features/batches/components/BatchExpensesTab.tsx` | Фактические расходы |
 | `features/batches/components/BatchDocumentsTab.tsx` | Документы партии |
@@ -114,11 +115,42 @@
 }
 ```
 
+## Фазовая модель партии (2026-04-16)
+
+Файл: `features/batches/utils/batchPhase.ts`
+
+| Фаза | Статусы | Предрасчёт | Партия |
+|---|---|---|---|
+| `open` | `open` | Редактируемый | Отражает изменения PreCalc |
+| `manufacturing` | `manufacturing` | **Read-only** (баннер) | Центральный объект: добавление, мягкое удаление позиций |
+| `locked` | все остальные | **Read-only** | Позиции заблокированы; только привязка заказов к позициям без заказа |
+
+### Мягкое удаление позиций в manufacturing
+- `batch.deletedItemIds: string[]` — хранится в `batches.deleted_item_ids` (jsonb)
+- Помечены → секция "Корзина" в `BatchMainListTab`
+- Кнопки: "Восстановить" (`unmarkItemForDeletion`) | "Удалить навсегда" (`permanentDeleteItem` → физически удаляет `pre_calculation_item`)
+
+### Привязка заказа к позиции (manufacturing / locked)
+- Позиции без `orderId` показывают кнопку "Привязать заказ"
+- `attachOrderToItem(itemId, orderId)` — обновляет `pre_calculation_items.order_id` напрямую
+- Если заказ новый — создаётся через `api.create` (не через GlobalStore) чтобы получить ID
+
+### Важно: savePreCalculation в open-фазе
+`savePreCalculation` делает `deleteByField + createMany` для ALL items. При open-фазе это нормально.
+В manufacturing/locked фазах PreCalc заблокирован (save недоступен), поэтому опасности нет.
+
 ## Бизнес-логика
 
 ### Поток: Предрасчёт → Партия
 ```
-PreCalculation (draft) → finalized → Batch (active)
+PreCalculation (draft) → finalized → Batch (open)
+                                          ↓ (статус: manufacturing)
+                              Партия = центральный объект
+                              PreCalc = read-only
+                              Добавление/удаление позиций через Партию
+                                          ↓ (transit_china → ... → completed)
+                              Оба заблокированы
+                              Только привязка заказов к позициям
                                           ↓
                               Фиксируются фактические расходы
                               Привязываются платежи из выписки

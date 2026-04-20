@@ -1,14 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { PackageCheck, ArrowLeft } from 'lucide-react';
 import { useStore } from '../system/context/GlobalStore';
 import { PendingOrders } from './components/PendingOrders';
 import { ReceivingHistory } from './components/ReceivingHistory';
 import { ReceivingForm } from './components/ReceivingForm';
 import { api } from '@/services';
+
+const MobileReceivingView = React.lazy(() =>
+    import('./components/MobileReceivingView').then(m => ({ default: m.MobileReceivingView }))
+);
 import { TableNames } from '@/constants';
-import { Batch } from '@/types';
+import { Batch, PreCalculationItem } from '@/types';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export const ReceivingPage: React.FC = () => {
+    const isMobile = useIsMobile();
+    if (isMobile) return <Suspense fallback={null}><MobileReceivingView /></Suspense>;
+
     const { state, actions } = useStore();
     const [view, setView] = useState<'list' | 'form'>('list');
     const [selectedOrderId, setSelectedOrderId] = useState('');
@@ -16,6 +24,8 @@ export const ReceivingPage: React.FC = () => {
 
     // Загружаем все партии для поиска связи order → batch
     const [batches, setBatches] = useState<Batch[]>([]);
+    const [preCalcItems, setPreCalcItems] = useState<PreCalculationItem[]>([]);
+
     useEffect(() => {
         api.fetchAll<Batch>(TableNames.BATCHES).then(setBatches).catch(() => {});
     }, []);
@@ -27,6 +37,16 @@ export const ReceivingPage: React.FC = () => {
         );
         setSelectedOrderId(orderId);
         setSelectedBatchId(linkedBatch?.id);
+        setPreCalcItems([]);
+
+        // Загружаем позиции предрасчёта для режима "По партии"
+        if (linkedBatch?.preCalculationId) {
+            api.fetchAll<PreCalculationItem>(
+                TableNames.PRE_CALCULATION_ITEMS,
+                { preCalculationId: linkedBatch.preCalculationId }
+            ).then(setPreCalcItems).catch(() => {});
+        }
+
         setView('form');
     };
 
@@ -73,6 +93,7 @@ export const ReceivingPage: React.FC = () => {
                     actions={actions}
                     batchId={selectedBatchId}
                     batchName={linkedBatch?.name}
+                    preCalcItems={preCalcItems}
                     onCancel={() => setView('list')}
                     onSave={handleSaveReception}
                 />

@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useStore } from '@/features/system/context/GlobalStore';
-import { ProductType, OptionType, OptionVariant, Currency, Product, MachineConfigEntry } from '@/types';
+import { ProductType, OptionType, OptionTypeCategoryOverride, OptionVariant, Currency, Product, MachineConfigEntry } from '@/types';
 import { Plus, Trash2, Pencil, X, Settings, Download, Upload, AlertCircle, Loader2, CheckCircle, Factory, Box, LayoutList, User, Search, List, Copy, Filter, ChevronDown, ChevronRight, MousePointer2, Check, ArrowRight, AlertTriangle, Layers } from 'lucide-react';
 import { ApiService } from '@/services/api';
 import { useAccess } from '@/features/auth/hooks/useAccess';
@@ -165,6 +165,27 @@ export const OptionsEditor: React.FC = () => {
 
     const toggleSectionCollapse = (catId: string) =>
         setCollapsedSections(prev => prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId]);
+
+    const handleToggleCategoryOverride = async (catId: string, field: keyof OptionTypeCategoryOverride) => {
+        if (!canWriteGroups || !selectedTypeId) return;
+        const type = optionTypes.find(t => t.id === selectedTypeId);
+        if (!type) return;
+        const overrides = { ...(type.categoryOverrides || {}) };
+        const current = overrides[catId] || {};
+        // Эффективное значение: оверрайд или глобальное
+        const effectiveValue = current[field] !== undefined ? current[field] : type[field];
+        const newValue = !effectiveValue;
+        const globalValue = type[field];
+        if (newValue === globalValue) {
+            // Убираем оверрайд для этого поля, если он совпал с глобальным
+            const { [field]: _, ...rest } = current;
+            if (Object.keys(rest).length === 0) delete overrides[catId];
+            else overrides[catId] = rest;
+        } else {
+            overrides[catId] = { ...current, [field]: newValue };
+        }
+        await actions.updateOptionType({ ...type, categoryOverrides: overrides });
+    };
 
     const handleSaveType = async () => {
         if (!canWriteGroups || !newType.name) return;
@@ -578,6 +599,12 @@ export const OptionsEditor: React.FC = () => {
                                     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ru'));
                                 const isFormOpen = variantFormCategoryId === catId;
                                 const isCollapsed = collapsedSections.includes(catId);
+                                const selectedType = optionTypes.find(t => t.id === selectedTypeId)!;
+                                const catOverride = selectedType?.categoryOverrides?.[catId];
+                                const effectiveSingleSelect = catOverride?.isSingleSelect !== undefined ? catOverride.isSingleSelect : selectedType?.isSingleSelect;
+                                const effectiveRequired = catOverride?.isRequired !== undefined ? catOverride.isRequired : selectedType?.isRequired;
+                                const isSingleOverridden = catOverride?.isSingleSelect !== undefined;
+                                const isRequiredOverridden = catOverride?.isRequired !== undefined;
 
                                 return (
                                     <div key={catId} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -587,6 +614,22 @@ export const OptionsEditor: React.FC = () => {
                                                     {isCollapsed ? <ChevronRight size={14}/> : <ChevronDown size={14}/>}
                                                 </button>
                                                 <span className="text-xs font-black text-slate-800 truncate cursor-pointer" onClick={() => toggleSectionCollapse(catId)}>{category?.name}</span>
+                                                <button
+                                                    onClick={() => canWriteGroups && handleToggleCategoryOverride(catId, 'isSingleSelect')}
+                                                    title={isSingleOverridden ? 'Переопределено для категории · нажмите чтобы изменить' : 'Глобальное значение · нажмите чтобы переопределить'}
+                                                    className={`px-1.5 py-0.5 rounded text-[8px] font-black border transition-colors ${isSingleOverridden ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'} ${canWriteGroups ? 'cursor-pointer' : 'cursor-default'}`}
+                                                >
+                                                    {effectiveSingleSelect ? 'Один' : 'Много'}
+                                                    {isSingleOverridden && <span className="ml-0.5 text-amber-500">●</span>}
+                                                </button>
+                                                <button
+                                                    onClick={() => canWriteGroups && handleToggleCategoryOverride(catId, 'isRequired')}
+                                                    title={isRequiredOverridden ? 'Переопределено для категории · нажмите чтобы изменить' : 'Глобальное значение · нажмите чтобы переопределить'}
+                                                    className={`px-1.5 py-0.5 rounded text-[8px] font-black border transition-colors ${effectiveRequired ? isRequiredOverridden ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100' : 'bg-red-50 border-red-100 text-red-500 hover:border-red-200' : isRequiredOverridden ? 'bg-amber-50 border-amber-300 text-amber-400 hover:bg-amber-100' : 'bg-white border-slate-200 text-slate-300 hover:border-slate-300'} ${canWriteGroups ? 'cursor-pointer' : 'cursor-default'}`}
+                                                >
+                                                    Обяз.
+                                                    {isRequiredOverridden && <span className="ml-0.5 text-amber-500">●</span>}
+                                                </button>
                                                 {canWriteVariants && !isFormOpen && !isCollapsed && (
                                                     <div className="flex items-center gap-2">
                                                         <button onClick={() => handleOpenVariantForm(catId)} className="ml-2 px-3 py-1 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-all font-black text-[9px] flex items-center gap-1 uppercase tracking-widest shadow-sm whitespace-nowrap">

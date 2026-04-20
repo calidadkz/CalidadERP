@@ -1,13 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { ActualPayment, PaymentAllocation, PlannedPayment, InternalTransaction, SalesOrder, Currency, OrderStatus } from '@/types';
 import {
-    ChevronDown, ChevronRight, Link, X, Loader2, ArrowUpRight, ArrowDownLeft,
-    Search, Filter, Landmark, AlertCircle, ArrowRightLeft, ArrowRight,
-    GitMerge, Receipt, Plus, ChevronUp, Tag, Layers
+    ChevronDown, ChevronRight, ChevronUp, Link, X, Loader2, ArrowUpRight, ArrowDownLeft,
+    Landmark, AlertCircle, ArrowRightLeft, Layers,
+    GitMerge, Receipt, Plus, Tag, Paperclip, Trash2
 } from 'lucide-react';
 import { useStore } from '@/features/system/context/GlobalStore';
 import { StatementImportModal } from '@/components/ui/StatementImportModal';
 import { ApiService } from '@/services/api';
+import { ColumnFilter } from '@/components/ui/ColumnFilter';
+import { formatDateDMY } from '@/utils/formatDate';
 
 interface BankStatementsProps {
     directionFilter?: 'All' | 'Outgoing' | 'Incoming';
@@ -37,10 +39,41 @@ export const BankStatements: React.FC<BankStatementsProps> = ({ directionFilter 
     const { state, actions } = useStore();
     const { actualPayments, plannedPayments, cashFlowItems, bankAccounts, internalTransactions, clients, suppliers } = state;
 
+    // --- удаление платежа ---
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    const handleDeletePayment = async (ap: ActualPayment) => {
+        const dirLabel = ap.direction === 'Outgoing' ? 'расход' : 'приход';
+        const confirmed = window.confirm(
+            `Удалить платёж?\n\n${ap.counterpartyName}\n${ap.direction === 'Outgoing' ? '−' : '+'}${Number(ap.amount).toLocaleString('ru-RU')} ${ap.currency} · ${ap.date}\n\nБаланс счёта будет скорректирован, аллокации отвязаны.`
+        );
+        if (!confirmed) return;
+        setDeletingId(ap.id);
+        try {
+            await actions.deleteActualPayment(ap.id);
+        } catch (e: any) {
+            alert('Ошибка удаления платежа: ' + e.message);
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
     // --- список ---
     const [expandedId, setExpandedId] = useState<string | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [filters, setFilters] = useState<Record<string, string>>({});
+    const [sortField, setSortField] = useState<'date' | 'counterpartyName' | 'amount'>('date');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+    const setFilter = (key: string, val: string) =>
+        setFilters(f => val ? { ...f, [key]: val } : Object.fromEntries(Object.entries(f).filter(([k]) => k !== key)));
+    const hasFilters = Object.keys(filters).length > 0;
+
+    const toggleSort = (field: string) => {
+        const sf = field as typeof sortField;
+        if (sortField === sf) setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
+        else { setSortField(sf); setSortOrder('asc'); }
+    };
 
     // --- модалка разноски ---
     const [allocatingTarget, setAllocatingTarget] = useState<ActualPayment | null>(null);
@@ -61,14 +94,78 @@ export const BankStatements: React.FC<BankStatementsProps> = ({ directionFilter 
     const unreconciledTxs = useMemo<InternalTransaction[]>(() =>
         internalTransactions.filter(tx => !tx.isFullyReconciled), [internalTransactions]);
 
-    const filteredActuals = useMemo(() =>
-        actualPayments
-            .filter(p => {
-                const matchSearch = !searchQuery || p.counterpartyName?.toLowerCase().includes(searchQuery.toLowerCase());
-                const matchDir = directionFilter === 'All' || p.direction === directionFilter;
-                return matchSearch && matchDir;
-            })
-            .sort((a, b) => {
+    const cfItemSuggestions = useMemo(() =>
+        [...new Set(cashFlowItems.map(i => i.name))].sort(),
+    [cashFlowItems]);
+
+    const counterpartySuggestions = useMemo(() =>
+        [...new Set(actualPayments.filter(p => p.counterpartyName).map(p => p.counterpartyName!))].sort(),
+    [actualPayments]);
+
+    const dateSuggestions = useMemo(() =>
+        [...new Set(actualPayments.map(p => formatDateDMY(p.date)))].sort().reverse(),
+    [actualPayments]);
+
+    const statusSuggestions = ['Распределено', 'Не распределено', 'Внутренний перевод'];
+
+    const filteredActuals = useMemo(() => {
+        let result = actualPayments.filter(p => {
+            const matchDir = directionFilter === 'All' || p.direction === directionFilter;
+            return matchDir;
+        });
+
+        if (filters.date) {
+            const q = filters.date.toLowerCase();
+            result = result.filter(p => formatDateDMY(p.date).toLowerCase().includes(q));
+        }
+        if (filters.counterpartyName) {
+            const q = filters.counterpartyName.toLowerCase();
+            result = result.filter(p => (p.counterpartyName || '').toLowerCase().includes(q));
+        }
+        if (filters.cfItem) {
+            const q = filters.cfItem.toLowerCase();
+            result = result.filter(p =>
+                p.isInternalTransfer
+                    ? 'внутренний перевод'.includes(q)
+                    : (p.allocations || []).some(al => {
+                        const cf = cashFlowItems.find(c => c.id === al.cashFlowItemId);
+                        return (cf?.name || '').toLowerCase().includes(q);
+                    })
+            );
+        }
+        if (filters.status) {
+            const q = filters.status.toLowerCase();
+            result = result.filter(p => {
+                if (p.isInternalTransfer) return 'внутренний перевод'.includes(q);
+                const apAmount = Number(p.amount) || 0;
+                const totalAlloc = (p.allocations || []).reduce((s, a) => s + Number(a.amountCovered), 0);
+                const unalloc = apAmount - totalAlloc;
+                const label = unalloc > 0.01 ? 'не распределено' : 'распределено';
+                return label.includes(q);
+            });
+        }
+
+        // Сортировка: если задана колонка — по ней; иначе дефолт (нераспределённые вверху)
+        if (filters.date || filters.counterpartyName || sortField !== 'date') {
+            result = [...result].sort((a, b) => {
+                let valA: any, valB: any;
+                if (sortField === 'counterpartyName') {
+                    valA = a.counterpartyName || '';
+                    valB = b.counterpartyName || '';
+                } else if (sortField === 'amount') {
+                    valA = Number(a.amount) || 0;
+                    valB = Number(b.amount) || 0;
+                } else {
+                    valA = a.date || '';
+                    valB = b.date || '';
+                }
+                if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+                if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
+        } else {
+            // Дефолтный порядок: нераспределённые вверху, внутренние переводы вниз, затем по дате
+            result = [...result].sort((a, b) => {
                 if (a.isInternalTransfer && !b.isInternalTransfer) return 1;
                 if (!a.isInternalTransfer && b.isInternalTransfer) return -1;
                 const ua = (Number(a.amount) || 0) - (a.allocations || []).reduce((s, al) => s + Number(al.amountCovered), 0);
@@ -76,8 +173,11 @@ export const BankStatements: React.FC<BankStatementsProps> = ({ directionFilter 
                 if (ua > 0.01 && ub <= 0.01) return -1;
                 if (ua <= 0.01 && ub > 0.01) return 1;
                 return b.date.localeCompare(a.date);
-            }),
-    [actualPayments, searchQuery, directionFilter]);
+            });
+        }
+
+        return result;
+    }, [actualPayments, directionFilter, filters, sortField, sortOrder, cashFlowItems]);
 
     // Доступные планы для allocatingTarget (Kaspi-кейс: через посредника тоже)
     const matchingPlans = useMemo(() => {
@@ -343,43 +443,88 @@ export const BankStatements: React.FC<BankStatementsProps> = ({ directionFilter 
     return (
         <div className="space-y-4">
             {/* Toolbar */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                <div className="relative w-full md:w-80">
-                    <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
-                    <input
-                        type="text" placeholder="Поиск по контрагенту..."
-                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-500/10 font-bold text-sm"
-                        value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                    />
-                </div>
-                <div className="flex gap-2 w-full md:w-auto">
-                    <button onClick={() => setIsImportModalOpen(true)} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-md font-black uppercase text-[10px] tracking-widest"><Landmark size={14}/> Импорт выписки</button>
-                    <button onClick={() => onOpenPaymentModal('Outgoing')} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 shadow-md font-black uppercase text-[10px] tracking-widest"><ArrowUpRight size={14}/> Расход</button>
-                    <button onClick={() => onOpenPaymentModal('Incoming')} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 shadow-md font-black uppercase text-[10px] tracking-widest"><ArrowDownLeft size={14}/> Приход</button>
-                </div>
+            <div className="flex flex-wrap gap-2 justify-end bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <button onClick={() => setIsImportModalOpen(true)} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-md font-black uppercase text-[10px] tracking-widest"><Landmark size={14}/> Импорт выписки</button>
+                <button onClick={() => onOpenPaymentModal('Outgoing')} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 shadow-md font-black uppercase text-[10px] tracking-widest"><ArrowUpRight size={14}/> Расход</button>
+                <button onClick={() => onOpenPaymentModal('Incoming')} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 shadow-md font-black uppercase text-[10px] tracking-widest"><ArrowDownLeft size={14}/> Приход</button>
             </div>
 
             {/* Таблица платежей */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
                     <h3 className="font-bold text-gray-700">Журнал фактических платежей</h3>
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><Filter size={12}/> Нераспределённые сначала</div>
+                    {!hasFilters && (
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            Всего: {filteredActuals.length}
+                        </span>
+                    )}
                 </div>
+                {/* Полоса сброса фильтров */}
+                {hasFilters && (
+                    <div className="flex items-center justify-between px-4 py-2 bg-blue-50 border-b border-blue-100">
+                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                            Найдено: {filteredActuals.length}
+                        </span>
+                        <button
+                            onClick={() => setFilters({})}
+                            className="flex items-center gap-1 text-[10px] font-bold text-blue-400 hover:text-red-500 transition-colors"
+                        >
+                            <X size={10} /> Сбросить фильтры
+                        </button>
+                    </div>
+                )}
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        <thead className="bg-gray-50">
                             <tr>
                                 <th className="w-10"/>
-                                <th className="px-6 py-3 text-left">Дата</th>
-                                <th className="px-6 py-3 text-left">Контрагент</th>
-                                <th className="px-6 py-3 text-left">Разноска</th>
-                                <th className="px-6 py-3 text-right">Сумма</th>
-                                <th className="px-6 py-3 text-center">Статус</th>
+                                <th className="px-4 py-3 text-left">
+                                    <ColumnFilter
+                                        label="Дата"
+                                        sortKey="date"
+                                        currentSortKey={sortField} sortOrder={sortOrder} onSort={toggleSort}
+                                        filterValue={filters.date || ''} onFilterChange={v => setFilter('date', v)}
+                                        suggestions={dateSuggestions}
+                                    />
+                                </th>
+                                <th className="px-4 py-3 text-left">
+                                    <ColumnFilter
+                                        label="Контрагент"
+                                        sortKey="counterpartyName"
+                                        currentSortKey={sortField} sortOrder={sortOrder} onSort={toggleSort}
+                                        filterValue={filters.counterpartyName || ''} onFilterChange={v => setFilter('counterpartyName', v)}
+                                        suggestions={counterpartySuggestions}
+                                    />
+                                </th>
+                                <th className="px-4 py-3 text-left">
+                                    <ColumnFilter
+                                        label="Разноска"
+                                        filterValue={filters.cfItem || ''} onFilterChange={v => setFilter('cfItem', v)}
+                                        suggestions={cfItemSuggestions}
+                                    />
+                                </th>
+                                <th className="px-4 py-3 text-right">
+                                    <ColumnFilter
+                                        label="Сумма"
+                                        sortKey="amount"
+                                        currentSortKey={sortField} sortOrder={sortOrder} onSort={toggleSort}
+                                        align="right"
+                                    />
+                                </th>
+                                <th className="px-4 py-3 text-center">
+                                    <ColumnFilter
+                                        label="Статус"
+                                        filterValue={filters.status || ''} onFilterChange={v => setFilter('status', v)}
+                                        suggestions={statusSuggestions}
+                                        align="center"
+                                    />
+                                </th>
+                                <th className="w-8"/>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 bg-white">
                             {filteredActuals.length === 0 ? (
-                                <tr><td colSpan={6} className="p-20 text-center text-slate-300 italic">Платежи не найдены</td></tr>
+                                <tr><td colSpan={7} className="p-20 text-center text-slate-300 italic">Платежи не найдены</td></tr>
                             ) : filteredActuals.map(ap => {
                                 const isExp = expandedId === ap.id;
                                 const totalAlloc = (ap.allocations || []).reduce((s, a) => s + Number(a.amountCovered), 0);
@@ -389,21 +534,28 @@ export const BankStatements: React.FC<BankStatementsProps> = ({ directionFilter 
 
                                 return (
                                     <React.Fragment key={ap.id}>
-                                        <tr className={`hover:bg-gray-50/50 transition-colors ${isInternal ? 'bg-indigo-50/20' : unalloc > 0.01 ? 'bg-amber-50/20' : ''}`}>
+                                        <tr className={`group hover:bg-gray-50/50 transition-colors ${isInternal ? 'bg-indigo-50/20' : unalloc > 0.01 ? 'bg-amber-50/20' : ''}`}>
                                             <td className="pl-4 cursor-pointer" onClick={() => setExpandedId(isExp ? null : ap.id)}>
                                                 {ap.allocations?.length > 0
                                                     ? (isExp ? <ChevronDown size={14} className="text-blue-500"/> : <ChevronRight size={14} className="text-gray-300"/>)
                                                     : null}
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <div className="text-sm font-bold text-slate-600">{ap.date}</div>
-                                                <div className="text-[9px] font-mono text-slate-300">{ap.id.slice(-8)}</div>
+                                            <td className="px-4 py-3">
+                                                <div className="text-sm font-bold text-slate-600">{formatDateDMY(ap.date)}</div>
+                                                <div className="text-[10px] font-mono text-slate-400">{ap.id.slice(-8)}</div>
+                                                {ap.receiptUrl && (
+                                                    <a href={ap.receiptUrl} target="_blank" rel="noopener noreferrer"
+                                                       className="flex items-center gap-0.5 text-[9px] font-bold text-blue-500 hover:text-blue-700 mt-0.5 w-fit"
+                                                       title="Открыть документ" onClick={e => e.stopPropagation()}>
+                                                        <Paperclip size={9}/> чек
+                                                    </a>
+                                                )}
                                             </td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-4 py-3">
                                                 <div className="text-sm font-bold">{ap.counterpartyName}</div>
                                                 <div className="text-[10px] text-gray-400">{ap.fromAccount}</div>
                                             </td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-4 py-3">
                                                 {isInternal ? (
                                                     <span className="text-[9px] font-black px-2 py-0.5 rounded border text-indigo-600 bg-indigo-50 border-indigo-100 flex items-center gap-1 w-fit">
                                                         <ArrowRightLeft size={9}/> Внутренний перевод
@@ -430,12 +582,12 @@ export const BankStatements: React.FC<BankStatementsProps> = ({ directionFilter 
                                                     <span className="text-[10px] text-amber-600 font-bold flex items-center gap-1 italic"><AlertCircle size={10}/> Не распределено</span>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4 text-right font-mono font-black">
+                                            <td className="px-4 py-3 text-right font-mono font-black">
                                                 <div className={ap.direction === 'Outgoing' ? 'text-red-600' : 'text-emerald-600'}>
                                                     {ap.direction === 'Outgoing' ? '-' : '+'}{f(apAmount)} {ap.currency}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-center">
+                                            <td className="px-4 py-3 text-center">
                                                 {isInternal && !ap.pairedInternalTxId ? (
                                                     <button onClick={() => openAllocModal(ap)} className="text-[10px] font-black text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-600 hover:text-white transition-all">
                                                         Закрыть перевод
@@ -451,6 +603,19 @@ export const BankStatements: React.FC<BankStatementsProps> = ({ directionFilter 
                                                 ) : (
                                                     <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100">ОК</span>
                                                 )}
+                                            </td>
+                                            <td className="pr-3 text-center">
+                                                {deletingId === ap.id ? (
+                                                    <Loader2 size={14} className="animate-spin text-slate-300 mx-auto"/>
+                                                ) : !isInternal ? (
+                                                    <button
+                                                        onClick={() => handleDeletePayment(ap)}
+                                                        className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"
+                                                        title="Удалить платёж"
+                                                    >
+                                                        <Trash2 size={14}/>
+                                                    </button>
+                                                ) : null}
                                             </td>
                                         </tr>
                                         {isExp && ap.allocations?.map((al, idx) => {

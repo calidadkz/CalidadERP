@@ -63,6 +63,12 @@ export interface CurrencyLot {
     rate: number;
 }
 
+export interface ConsumedLotEntry {
+    lotId: string;    // ID лота в currency_lots (без суффикса -ACC-)
+    amount: number;   // сколько было потрачено / создано
+    op?: 'consume' | 'create';  // consume (Outgoing) | create (Incoming)
+}
+
 export interface ActualPayment {
     id: string;
     date: string;
@@ -85,6 +91,8 @@ export interface ActualPayment {
     counterpartyBankName?: string;
     isInternalTransfer?: boolean;          // true = исключать из P&L-анализа
     pairedInternalTxId?: string;           // ссылка на InternalTransaction
+    receiptUrl?: string;                   // URL прикреплённого чека/документа (Firebase Storage)
+    consumedLots?: ConsumedLotEntry[];     // FIFO-лоты потреблённые (Outgoing) / созданный лот (Incoming)
 }
 
 export interface PaymentAllocation {
@@ -116,6 +124,25 @@ export interface PlannedPayment {
     isDeleted?: boolean;                    // Пометка на удаление
     paymentCounterpartyId?: string;         // Посредник (Kaspi Bank, маркетплейс) — кто будет в выписке
     paymentCounterpartyName?: string;       // Денормализованное имя посредника
+}
+
+export interface MoneyMovement {
+    id: string;
+    date: string;
+    bankAccountId: string;
+    direction: 'In' | 'Out';
+    amount: number;
+    currency: Currency;
+    amountKzt: number;
+    exchangeRate: number;
+    actualPaymentId?: string;
+    cashFlowItemId?: string;
+    batchId?: string;
+    counterpartyId?: string;
+    counterpartyName?: string;
+    type: 'Payment' | 'Reversal' | 'Transfer';
+    note?: string;
+    createdAt?: string;
 }
 
 export interface InternalTransaction {

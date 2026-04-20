@@ -1,20 +1,39 @@
 
-import React, { useState } from 'react';
+import React, { useState, Suspense, useMemo } from 'react';
 import { useStore } from '../system/context/GlobalStore';
-import { SalesOrder, PlannedPayment } from '@/types';
+import { useAuth } from '../system/context/AuthContext';
+import { SalesOrder, PlannedPayment, AppRole } from '@/types';
 import { ShoppingCart, Plus } from 'lucide-react';
 import { useAccess } from '../auth/hooks/useAccess';
 import { SalesOrdersList } from './components/SalesOrdersList';
 import { SalesOrderForm } from './components/SalesOrderForm';
+import { useIsMobile } from '@/hooks/useIsMobile';
+
+const MobileSalesView = React.lazy(() =>
+    import('./components/MobileSalesView').then(m => ({ default: m.MobileSalesView }))
+);
 
 export const SalesPage: React.FC = () => {
+    const isMobile = useIsMobile();
+    if (isMobile) return <Suspense fallback={null}><MobileSalesView /></Suspense>;
+
     const { state, actions } = useStore();
+    const { user } = useAuth();
     const access = useAccess('sales');
 
     const [view, setView] = useState<'list' | 'form'>('list');
     const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
 
     const canCreate = access.canWrite('actions', 'create');
+    const canSeeResponsible = access.canSee('fields', 'col_responsible');
+
+    // Менеджер видит только свои заказы (если привязан к сотруднику)
+    const visibleOrders = useMemo(() => {
+        if (user?.role === AppRole.MANAGER && user.employeeId) {
+            return state.salesOrders.filter(o => o.responsibleEmployeeId === user.employeeId);
+        }
+        return state.salesOrders;
+    }, [state.salesOrders, user]);
 
     const handleEditOrder = (order: SalesOrder) => {
         setEditingOrder(order);
@@ -59,13 +78,14 @@ export const SalesPage: React.FC = () => {
             </div>
 
             {view === 'list' ? (
-                <SalesOrdersList 
-                    salesOrders={state.salesOrders} 
+                <SalesOrdersList
+                    salesOrders={visibleOrders}
                     plannedPayments={state.plannedPayments}
                     showColClient={access.canSee('fields', 'col_client')}
                     showColAmount={access.canSee('fields', 'col_amount')}
                     showColPayment={access.canSee('fields', 'col_payment')}
                     showColShipment={access.canSee('fields', 'col_shipment')}
+                    showColResponsible={canSeeResponsible}
                     canEdit={access.canSee('actions', 'edit')}
                     canDelete={access.canWrite('actions', 'delete')}
                     onEdit={handleEditOrder}

@@ -30,7 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             const { data: profile, error: pError } = await supabase
                 .from('profiles')
-                .select('id, email, full_name, role')
+                .select('id, email, full_name, role, employee_id')
                 .eq('id', userId)
                 .maybeSingle();
 
@@ -50,7 +50,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 email: profile.email,
                 fullName: profile.full_name,
                 role: profile.role as AppRole,
-                permissions: perms?.matrix || {}
+                permissions: perms?.matrix || {},
+                employeeId: profile.employee_id || undefined,
             };
 
             try {

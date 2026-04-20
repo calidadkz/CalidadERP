@@ -5,10 +5,13 @@ import { ProductType, PricingMethod } from '@/types/enums';
 import { Currency } from '@/types/currency';
 import { Counterparty as Supplier, Manufacturer } from '@/types/counterparty';
 import { OptionType, OptionVariant } from '@/types/options';
-import { X, Save, Search, Check, Loader2, ChevronDown, Box, Settings, CheckSquare, Square, ChevronRight } from 'lucide-react';
+import { X, Save, Search, Check, Loader2, ChevronDown, Box, Settings, CheckSquare, Square, ChevronRight, Image as ImageIcon, Upload, Trash2, LayoutGrid } from 'lucide-react';
 import { ApiService } from '@/services/api';
 import { useAccess } from '@/features/auth/hooks/useAccess';
 import { useStore } from '@/features/system/context/GlobalStore';
+import { storage as firebaseStorage } from '@/services/firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL, listAll } from 'firebase/storage';
+import { MediaLibraryModal } from '@/components/ui/MediaLibraryModal';
 
 interface MobileProductFormProps {
     isOpen: boolean;
@@ -89,6 +92,72 @@ const SupplierOverlay: React.FC<{
                         {selectedId === s.id && <Check size={16} className="flex-none text-blue-600" />}
                     </button>
                 ))}
+                {filtered.length === 0 && (
+                    <div className="text-center py-12 text-slate-400 text-sm">Ничего не найдено</div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ── Выбор типов станков (fixed-overlay, multi-select) ─────────────────────────
+const MachineCategoryOverlay: React.FC<{
+    categories: ProductCategory[];
+    selectedIds: string[];
+    onToggle: (id: string) => void;
+    onClose: () => void;
+}> = ({ categories, selectedIds, onToggle, onClose }) => {
+    const [query, setQuery] = useState('');
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => { setTimeout(() => inputRef.current?.focus(), 50); }, []);
+
+    const filtered = useMemo(() =>
+        categories.filter(c => !query || c.name.toLowerCase().includes(query.toLowerCase())),
+        [categories, query]
+    );
+
+    return (
+        <div className="fixed inset-0 z-[400] flex flex-col bg-white">
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-white flex-none">
+                <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:bg-slate-100">
+                    <X size={20} />
+                </button>
+                <span className="text-base font-bold text-slate-700">Типы станков</span>
+                {selectedIds.length > 0 && (
+                    <span className="ml-auto text-sm font-bold text-blue-600">{selectedIds.length} выбрано</span>
+                )}
+            </div>
+            <div className="px-4 py-3 border-b border-slate-100 flex-none">
+                <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2.5">
+                    <Search size={15} className="text-slate-400 flex-none" />
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        className="flex-1 bg-transparent text-[15px] outline-none text-slate-800 placeholder:text-slate-400"
+                        placeholder="Поиск типа..."
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                    />
+                    {query && <button onClick={() => setQuery('')}><X size={14} className="text-slate-400" /></button>}
+                </div>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+                {filtered.map(c => {
+                    const isSelected = selectedIds.includes(c.id);
+                    return (
+                        <button
+                            key={c.id}
+                            onClick={() => onToggle(c.id)}
+                            className={`w-full flex items-center gap-3 px-5 py-4 text-left border-b border-slate-100 transition-colors ${isSelected ? 'bg-blue-50' : ''}`}
+                        >
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-none transition-all ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}`}>
+                                {isSelected && <Check size={12} className="text-white" />}
+                            </div>
+                            <span className={`text-base font-medium ${isSelected ? 'text-blue-700 font-bold' : 'text-slate-800'}`}>{c.name}</span>
+                        </button>
+                    );
+                })}
                 {filtered.length === 0 && (
                     <div className="text-center py-12 text-slate-400 text-sm">Ничего не найдено</div>
                 )}
@@ -270,8 +339,47 @@ export const MobileProductForm: React.FC<MobileProductFormProps> = ({
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showSupplierOverlay, setShowSupplierOverlay] = useState(false);
+    const [showMachineCatOverlay, setShowMachineCatOverlay] = useState(false);
     const [activeTab, setActiveTab] = useState<'main' | 'options'>('main');
     const [showDescription, setShowDescription] = useState(false);
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
+    const [storageImages, setStorageImages] = useState<{ name: string; url: string }[]>([]);
+    const [isImagesLoading, setIsImagesLoading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const loadStorageImages = async () => {
+        setIsImagesLoading(true);
+        try {
+            const listRef = storageRef(firebaseStorage, 'product-photos');
+            const result = await listAll(listRef);
+            const imgs = await Promise.all(result.items.map(async item => ({
+                name: item.name,
+                url: await getDownloadURL(item)
+            })));
+            setStorageImages(imgs);
+        } catch (e) {
+            console.error('Storage load error:', e);
+        } finally {
+            setIsImagesLoading(false);
+        }
+    };
+
+    const handleImageUpload = async (file: File) => {
+        if (!file) return;
+        setIsUploadingImage(true);
+        try {
+            const id = formData.id || `new_${Date.now()}`;
+            const imgRef = storageRef(firebaseStorage, `products/${id}/${file.name}`);
+            await uploadBytes(imgRef, file);
+            const url = await getDownloadURL(imgRef);
+            set('imageUrl', url);
+        } catch (e) {
+            console.error('Ошибка загрузки фото:', e);
+        } finally {
+            setIsUploadingImage(false);
+        }
+    };
 
     const canWrite = access.canWrite('actions', mode === 'create' ? 'create' : 'edit');
     const canSeePurchase = access.canSee('fields', 'basePrice');
@@ -290,6 +398,8 @@ export const MobileProductForm: React.FC<MobileProductFormProps> = ({
             setActiveTab('main');
             setShowDescription(!!initialData.description);
             setShowSupplierOverlay(false);
+            setShowMachineCatOverlay(false);
+            loadStorageImages();
         }
     }, [isOpen, initialData]);
 
@@ -327,6 +437,24 @@ export const MobileProductForm: React.FC<MobileProductFormProps> = ({
             return { ...prev, compatibleMachineCategoryIds: next };
         });
     };
+
+    const [machineSearch, setMachineSearch] = useState('');
+
+    const toggleCompatibleMachineId = (machineId: string) => {
+        if (!canWrite) return;
+        setFormData(prev => {
+            const ids = prev.compatibleMachineIds || [];
+            const next = ids.includes(machineId) ? ids.filter(id => id !== machineId) : [...ids, machineId];
+            return { ...prev, compatibleMachineIds: next };
+        });
+    };
+
+    const machineProducts = useMemo(() => {
+        const list = products.filter(p => p.type === ProductType.MACHINE && p.id !== formData.id);
+        if (!machineSearch.trim()) return list;
+        const q = machineSearch.toLowerCase();
+        return list.filter(p => p.name.toLowerCase().includes(q) || (p.sku || '').toLowerCase().includes(q));
+    }, [products, formData.id, machineSearch]);
 
     const currentSupplier = useMemo(() =>
         suppliers.find(s => s.id === formData.supplierId),
@@ -388,6 +516,16 @@ export const MobileProductForm: React.FC<MobileProductFormProps> = ({
                     selectedId={formData.supplierId}
                     onSelect={(id) => set('supplierId', id || undefined)}
                     onClose={() => setShowSupplierOverlay(false)}
+                />
+            )}
+
+            {/* Оверлей выбора типов станков */}
+            {showMachineCatOverlay && (
+                <MachineCategoryOverlay
+                    categories={machineCategories}
+                    selectedIds={formData.compatibleMachineCategoryIds || []}
+                    onToggle={toggleMachineCategory}
+                    onClose={() => setShowMachineCatOverlay(false)}
                 />
             )}
 
@@ -479,16 +617,69 @@ export const MobileProductForm: React.FC<MobileProductFormProps> = ({
                                 {/* Наименования */}
                                 <div className={sectionCls}>
                                     <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Наименование</div>
-                                    <div>
-                                        <label className={labelCls}>У поставщика <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text" className={inputCls}
-                                            value={formData.supplierProductName || ''}
-                                            onChange={e => set('supplierProductName', e.target.value)}
-                                            placeholder="Артикул / наименование у поставщика"
-                                            autoComplete="off"
-                                        />
+                                    {/* Фото */}
+                                    <div className="flex gap-3 items-start">
+                                        <div
+                                            onClick={() => canWrite && fileInputRef.current?.click()}
+                                            className={`w-20 h-20 rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden flex-none transition-all ${canWrite ? 'cursor-pointer active:scale-95' : ''} ${formData.imageUrl ? 'border-slate-200' : 'border-slate-200 bg-slate-50'}`}
+                                        >
+                                            {formData.imageUrl ? (
+                                                <img src={formData.imageUrl} alt="Фото" className="w-full h-full object-cover" />
+                                            ) : isUploadingImage ? (
+                                                <Loader2 size={22} className="text-blue-400 animate-spin" />
+                                            ) : (
+                                                <ImageIcon size={22} className="text-slate-300" />
+                                            )}
+                                        </div>
+                                        <div className="flex-1 space-y-2 pt-1">
+                                            <div>
+                                                <label className={labelCls}>У поставщика <span className="text-red-500">*</span></label>
+                                                <input
+                                                    type="text" className={inputCls}
+                                                    value={formData.supplierProductName || ''}
+                                                    onChange={e => set('supplierProductName', e.target.value)}
+                                                    placeholder="Артикул / наименование у поставщика"
+                                                    autoComplete="off"
+                                                />
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {canWrite && (
+                                                    <button
+                                                        onClick={() => fileInputRef.current?.click()}
+                                                        disabled={isUploadingImage}
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold border border-blue-100 active:scale-95 transition-all disabled:opacity-50"
+                                                    >
+                                                        {isUploadingImage ? <Loader2 size={12} className="animate-spin"/> : <Upload size={12}/>}
+                                                        Фото
+                                                    </button>
+                                                )}
+                                                {canWrite && (
+                                                    <button
+                                                        onClick={() => setIsMediaModalOpen(true)}
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold border border-slate-200 active:scale-95 transition-all"
+                                                    >
+                                                        <LayoutGrid size={12}/>
+                                                        Библиотека
+                                                    </button>
+                                                )}
+                                                {formData.imageUrl && canWrite && (
+                                                    <button
+                                                        onClick={() => set('imageUrl', undefined)}
+                                                        className="p-1.5 bg-red-50 text-red-400 rounded-xl border border-red-100 active:scale-95 transition-all"
+                                                    >
+                                                        <Trash2 size={12}/>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); e.target.value = ''; }}
+                                    />
                                     <div>
                                         <label className={labelCls}>Наименование (рус.) <span className="text-red-500">*</span></label>
                                         <input
@@ -549,22 +740,71 @@ export const MobileProductForm: React.FC<MobileProductFormProps> = ({
                                     </div>
 
                                     {/* Совместимые станки (только для запчастей) */}
-                                    {formData.type === ProductType.PART && machineCategories.length > 0 && (
-                                        <div>
-                                            <label className={labelCls}>Совместимые станки</label>
-                                            <div className="flex flex-wrap gap-2">
-                                                {machineCategories.map(mc => {
-                                                    const isSelected = (formData.compatibleMachineCategoryIds || []).includes(mc.id);
-                                                    return (
-                                                        <button
-                                                            key={mc.id}
-                                                            onClick={() => toggleMachineCategory(mc.id)}
-                                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-200'}`}
-                                                        >
-                                                            <Box size={11} />{mc.name}
-                                                        </button>
-                                                    );
-                                                })}
+                                    {formData.type === ProductType.PART && (
+                                        <div className="space-y-3">
+                                            {machineCategories.length > 0 && (
+                                                <div>
+                                                    <label className={labelCls}>Типы станков</label>
+                                                    <button
+                                                        onClick={() => setShowMachineCatOverlay(true)}
+                                                        className={`${inputCls} flex items-center justify-between text-left`}
+                                                    >
+                                                        {(formData.compatibleMachineCategoryIds || []).length === 0 ? (
+                                                            <span className="text-slate-400">Выбрать типы...</span>
+                                                        ) : (
+                                                            <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
+                                                                {machineCategories
+                                                                    .filter(mc => (formData.compatibleMachineCategoryIds || []).includes(mc.id))
+                                                                    .map(mc => (
+                                                                        <span key={mc.id} className="flex items-center gap-1 bg-blue-100 text-blue-700 rounded-lg px-2 py-0.5 text-xs font-bold">
+                                                                            <Box size={10}/>{mc.name}
+                                                                        </span>
+                                                                    ))
+                                                                }
+                                                            </div>
+                                                        )}
+                                                        <ChevronDown size={16} className="text-slate-400 flex-none ml-2" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <div>
+                                                <label className={labelCls}>
+                                                    Конкретные станки
+                                                    {(formData.compatibleMachineIds || []).length > 0 && (
+                                                        <span className="ml-2 text-blue-600 font-black">{(formData.compatibleMachineIds || []).length} выбрано</span>
+                                                    )}
+                                                </label>
+                                                <div className="relative mb-2">
+                                                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300"/>
+                                                    <input
+                                                        value={machineSearch}
+                                                        onChange={e => setMachineSearch(e.target.value)}
+                                                        placeholder="Поиск станка..."
+                                                        className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-[13px] bg-slate-50 focus:outline-none focus:border-blue-400"
+                                                    />
+                                                </div>
+                                                <div className="max-h-48 overflow-y-auto space-y-1 rounded-xl border border-slate-100 p-1">
+                                                    {machineProducts.length === 0 ? (
+                                                        <div className="text-xs text-slate-400 py-3 text-center">Нет станков</div>
+                                                    ) : machineProducts.map(machine => {
+                                                        const isSelected = (formData.compatibleMachineIds || []).includes(machine.id);
+                                                        return (
+                                                            <button
+                                                                key={machine.id}
+                                                                onClick={() => toggleCompatibleMachineId(machine.id)}
+                                                                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all text-left ${isSelected ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-transparent hover:bg-slate-50 text-slate-700'}`}
+                                                            >
+                                                                <div className={`w-4 h-4 rounded flex items-center justify-center border flex-none ${isSelected ? 'bg-blue-500 border-blue-500' : 'bg-white border-slate-300'}`}>
+                                                                    {isSelected && <Check size={10} className="text-white"/>}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="text-[13px] font-bold truncate">{machine.name}</div>
+                                                                    {machine.sku && <div className="text-[10px] text-slate-400">{machine.sku}</div>}
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -660,6 +900,15 @@ export const MobileProductForm: React.FC<MobileProductFormProps> = ({
                     </div>
                 </div>
             </div>
+
+            <MediaLibraryModal
+                isOpen={isMediaModalOpen}
+                onClose={() => setIsMediaModalOpen(false)}
+                images={storageImages}
+                isLoading={isImagesLoading}
+                onSelect={(url) => { set('imageUrl', url); setIsMediaModalOpen(false); }}
+                currentUrl={formData.imageUrl}
+            />
         </>
     );
 };

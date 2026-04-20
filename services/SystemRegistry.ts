@@ -159,6 +159,7 @@ export const SystemRegistry: Record<string, RegistryEntry> = {
       col_amount: { label: 'Колонка: Сумма', group: 'Таблица' },
       col_payment: { label: 'Колонка: Прогресс оплаты', group: 'Таблица' },
       col_shipment: { label: 'Колонка: Статус отгрузки', group: 'Таблица' },
+      col_responsible: { label: 'Колонка: Ответственный менеджер', group: 'Таблица' },
       sales_prices: { label: 'Редактирование цен продажи', group: 'Финансы' },
       economy_details: { label: 'Видеть юнит-экономику (Прибыль)', group: 'Финансы' }
     },

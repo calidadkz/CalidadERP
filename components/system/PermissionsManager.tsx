@@ -1,14 +1,15 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '@/features/system/context/GlobalStore';
 import { useAuth } from '@/features/system/context/AuthContext';
-import { AppRole, RolePermissions, AccessLevel } from '@/types';
-import { Shield, Save, EyeOff, BookOpen, Edit3, ChevronRight, Layout, Database, MousePointer2 as MousePointer, CheckSquare, Square, Lock, Loader2, CheckCircle, AlertCircle, RefreshCw, Download, Upload, X as XIcon } from 'lucide-react';
+import { AppRole, RolePermissions, AccessLevel, CounterpartyType } from '@/types';
+import { Shield, Save, EyeOff, BookOpen, Edit3, ChevronRight, Layout, Database, MousePointer2 as MousePointer, CheckSquare, Square, Lock, Loader2, CheckCircle, AlertCircle, RefreshCw, Download, Upload, X as XIcon, Users } from 'lucide-react';
 import { ApiService } from '@/services/api';
 import { SystemRegistry } from '@/services/SystemRegistry';
+import { supabase } from '@/services/supabaseClient';
 
 export const PermissionsManager: React.FC = () => {
-    const { actions } = useStore();
+    const { state, actions } = useStore();
     const { refreshProfile } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
     
@@ -21,6 +22,12 @@ export const PermissionsManager: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
+
+    // ── Вкладка Пользователи ──
+    const [activeSection, setActiveSection] = useState<'permissions' | 'users'>('permissions');
+    const [userProfiles, setUserProfiles] = useState<any[]>([]);
+    const [usersLoading, setUsersLoading] = useState(false);
+    const [savingUserId, setSavingUserId] = useState<string | null>(null);
 
     // Маппинг ролей для UI
     const roleLabels: Record<AppRole, string> = {
@@ -257,6 +264,36 @@ export const PermissionsManager: React.FC = () => {
     const isModuleEnabled = permissions[selectedModuleId]?.tabs?.main === 'read' || 
                             permissions[selectedModuleId]?.tabs?.main === 'write';
 
+    const loadUserProfiles = useCallback(async () => {
+        setUsersLoading(true);
+        try {
+            const { data } = await supabase
+                .from('profiles')
+                .select('id, email, full_name, role, employee_id')
+                .order('full_name', { ascending: true });
+            setUserProfiles(data || []);
+        } finally {
+            setUsersLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (activeSection === 'users') loadUserProfiles();
+    }, [activeSection, loadUserProfiles]);
+
+    const handleLinkEmployee = async (userId: string, employeeId: string) => {
+        setSavingUserId(userId);
+        try {
+            await supabase
+                .from('profiles')
+                .update({ employee_id: employeeId || null })
+                .eq('id', userId);
+            setUserProfiles(prev => prev.map(p => p.id === userId ? { ...p, employee_id: employeeId || null } : p));
+        } finally {
+            setSavingUserId(null);
+        }
+    };
+
     const renderAccessToggle = (module: string, type: 'tabs' | 'fields' | 'actions', key: string) => {
         const current = permissions[module]?.[type]?.[key] || 'none';
         
@@ -310,11 +347,27 @@ export const PermissionsManager: React.FC = () => {
             )}
 
             <div className="flex justify-between items-center flex-none">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-800 flex items-center">
-                        <Shield className="mr-3 text-indigo-600" size={28} /> Права доступа
-                    </h2>
-                    <p className="text-slate-500 text-sm font-medium mt-1">Гранулярная настройка ролей: {roleLabels[selectedRole]}</p>
+                <div className="flex items-center gap-4">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800 flex items-center">
+                            <Shield className="mr-3 text-indigo-600" size={28} /> Права доступа
+                        </h2>
+                        <p className="text-slate-500 text-sm font-medium mt-1">Гранулярная настройка ролей</p>
+                    </div>
+                    <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner ml-4">
+                        <button
+                            onClick={() => setActiveSection('permissions')}
+                            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeSection === 'permissions' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            <Shield size={13}/> Роли
+                        </button>
+                        <button
+                            onClick={() => setActiveSection('users')}
+                            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeSection === 'users' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            <Users size={13}/> Пользователи
+                        </button>
+                    </div>
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm mr-2">
@@ -343,7 +396,72 @@ export const PermissionsManager: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex-1 flex gap-6 min-h-0">
+            {/* ── Секция: Пользователи ── */}
+            {activeSection === 'users' && (
+                <div className="flex-1 bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0">
+                    <div className="p-5 bg-slate-50 border-b border-slate-100 flex justify-between items-center flex-none">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Привязка пользователей к сотрудникам</span>
+                        <button onClick={loadUserProfiles} className="p-1.5 text-slate-300 hover:text-blue-500 transition-colors">
+                            <RefreshCw size={14} className={usersLoading ? 'animate-spin' : ''}/>
+                        </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        {usersLoading ? (
+                            <div className="flex items-center justify-center h-40 opacity-20"><Loader2 size={32} className="animate-spin"/></div>
+                        ) : (
+                            <table className="min-w-full divide-y divide-slate-100">
+                                <thead className="bg-slate-50/50 sticky top-0">
+                                    <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        <th className="px-6 py-3 text-left">Пользователь</th>
+                                        <th className="px-6 py-3 text-left">Email</th>
+                                        <th className="px-6 py-3 text-left">Роль</th>
+                                        <th className="px-6 py-3 text-left">Ответственный сотрудник</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {userProfiles.map(profile => (
+                                        <tr key={profile.id} className="hover:bg-slate-50/50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="text-sm font-bold text-slate-800">{profile.full_name || '—'}</div>
+                                                <div className="text-[10px] text-slate-400 font-mono">{profile.id.slice(0, 8)}...</div>
+                                            </td>
+                                            <td className="px-6 py-4 text-xs text-slate-500 font-medium">{profile.email}</td>
+                                            <td className="px-6 py-4">
+                                                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-md text-[9px] font-black uppercase">
+                                                    {roleLabels[profile.role as AppRole] || profile.role}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <select
+                                                        className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-blue-500/20 min-w-[200px]"
+                                                        value={profile.employee_id || ''}
+                                                        onChange={e => handleLinkEmployee(profile.id, e.target.value)}
+                                                        disabled={savingUserId === profile.id}
+                                                    >
+                                                        <option value="">— Не привязан —</option>
+                                                        {state.counterparties
+                                                            .filter(e => (e.roles || [e.type]).includes(CounterpartyType.EMPLOYEE))
+                                                            .map(e => (
+                                                                <option key={e.id} value={e.id}>
+                                                                    {e.name}{(e as any).position ? ` — ${(e as any).position}` : ''}
+                                                                </option>
+                                                            ))
+                                                        }
+                                                    </select>
+                                                    {savingUserId === profile.id && <Loader2 size={14} className="animate-spin text-blue-400"/>}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            <div className={`flex-1 flex gap-6 min-h-0 ${activeSection !== 'permissions' ? 'hidden' : ''}`}>
                 <div className="w-80 bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                     <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Разделы системы</span>

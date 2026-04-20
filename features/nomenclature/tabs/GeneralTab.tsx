@@ -27,11 +27,12 @@ interface GeneralTabProps {
     storageImages?: { name: string; url: string }[];
     isImagesLoading?: boolean;
     onUploadImage?: (file: File) => Promise<string>;
+    products?: Product[];
 }
 
-export const GeneralTab: React.FC<GeneralTabProps> = ({ 
+export const GeneralTab: React.FC<GeneralTabProps> = ({
     formData, suppliers = [], categories = [], hscodes = [], pricingProfiles = [], manufacturers = [], modalMode, onChange, exchangeRates = {} as Record<Currency, number>, onPackageChange, onAddPackage, onRemovePackage, economyData, appliedProfile, onShowDetails, showDetails = false,
-    storageImages = [], isImagesLoading = false, onUploadImage
+    storageImages = [], isImagesLoading = false, onUploadImage, products = []
 }) => {
     const access = useAccess('nomenclature');
     const [isCatOpen, setIsCatOpen] = useState(false);
@@ -54,6 +55,10 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
     const [isMethodOpen, setIsMethodOpen] = useState(false);
     const methodRef = useRef<HTMLDivElement>(null);
 
+    const [isMachineCatOpen, setIsMachineCatOpen] = useState(false);
+    const [machineCatSearch, setMachineCatSearch] = useState('');
+    const machineCatRef = useRef<HTMLDivElement>(null);
+
     const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -61,9 +66,10 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
     const { openPicker, isLoaded: isDriveLoaded } = useGoogleDrivePicker();
 
     const canWriteField = (key: string) => access.canWrite('fields', key);
+    const canSeePricingDetails = access.canSee('fields', 'pricingDetails');
 
     const isSidebarActuallyOpen = useMemo(() => {
-        return showDetails && !!appliedProfile && access.canSee('fields', 'pricingDetails');
+        return showDetails && !!appliedProfile && canSeePricingDetails;
     }, [showDetails, appliedProfile, access]);
 
     useEffect(() => {
@@ -73,6 +79,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             if (methodRef.current && !methodRef.current.contains(event.target as Node)) setIsMethodOpen(false);
             if (supplierRef.current && !supplierRef.current.contains(event.target as Node)) setIsSupplierOpen(false);
             if (manufRef.current && !manufRef.current.contains(event.target as Node)) setIsManufOpen(false);
+            if (machineCatRef.current && !machineCatRef.current.contains(event.target as Node)) setIsMachineCatOpen(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -138,6 +145,10 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
     }, [categories]);
 
+    const filteredMachineCategories = useMemo(() => {
+        return machineCategories.filter(c => !machineCatSearch || c.name.toLowerCase().includes(machineCatSearch.toLowerCase()));
+    }, [machineCategories, machineCatSearch]);
+
     const filteredHSCodes = useMemo(() => {
         return hscodes
             .filter(h => !hsSearch || h.code.includes(hsSearch) || h.name.toLowerCase().includes(hsSearch.toLowerCase()))
@@ -183,12 +194,28 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         return formData.pricingMethod === PricingMethod.MARKUP_WITH_VAT ? 'Наценка (с НДС)' : 'Наценка (без НДС)';
     }, [formData.pricingMethod, formData.pricingProfileId, pricingProfiles]);
 
+    const [machineSearch, setMachineSearch] = useState('');
+
     const toggleMachineCompatibility = (catId: string) => {
-        if (!canWriteField('actions')) return; 
+        if (!canWriteField('actions')) return;
         const current = formData.compatibleMachineCategoryIds || [];
         const updated = current.includes(catId) ? current.filter(id => id !== catId) : [...current, catId];
         onChange('compatibleMachineCategoryIds', updated);
     };
+
+    const toggleCompatibleMachineId = (machineId: string) => {
+        if (!canWriteField('actions')) return;
+        const current = formData.compatibleMachineIds || [];
+        const updated = current.includes(machineId) ? current.filter(id => id !== machineId) : [...current, machineId];
+        onChange('compatibleMachineIds', updated);
+    };
+
+    const machineProducts = useMemo(() => {
+        const list = products.filter(p => p.type === ProductType.MACHINE && p.id !== formData.id);
+        if (!machineSearch.trim()) return list;
+        const q = machineSearch.toLowerCase();
+        return list.filter(p => p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q));
+    }, [products, formData.id, machineSearch]);
 
     const calculatedProfit = useMemo(() => {
         if (!economyData) return 0;
@@ -519,15 +546,15 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                                 <Zap size={14} className={`${isSidebarActuallyOpen ? 'mr-0' : 'mr-2'} text-green-500`}/> 
                                 {!isSidebarActuallyOpen && <span>Цены</span>}
                             </h4>
-                            <div 
+                            {canSeePricingDetails && <div
                                 onClick={() => setIsMethodOpen(!isMethodOpen)}
                                 className="flex items-center gap-2 border border-slate-200 rounded-lg py-0.5 px-2 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-all"
                             >
                                 <span className="text-[9px] font-black uppercase text-blue-600 truncate max-w-[120px]">{currentMethodLabel}</span>
                                 <ChevronDown size={12} className={`text-slate-400 transition-transform ${isMethodOpen ? 'rotate-180' : ''}`}/>
-                            </div>
+                            </div>}
 
-                            {isMethodOpen && (
+                            {canSeePricingDetails && isMethodOpen && (
                                 <div className="absolute top-full right-0 mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-[120] w-[200px] animate-in fade-in slide-in-from-top-1 overflow-hidden">
                                     <div className="p-1">
                                         <div 
@@ -565,36 +592,38 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                             )}
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-3 mb-3">
-                            <div className="flex flex-col">
-                                <label className="block text-[8px] font-black text-slate-400 uppercase mb-1.5 ml-1">Закуп (ВЦП)</label>
-                                <div className="flex h-[34px]">
-                                    <input type="number" className="w-full border border-slate-200 rounded-l-lg px-2 text-sm font-black font-mono outline-none focus:ring-4 focus:ring-green-500/10" value={formData.basePrice || ''} onChange={e => handleNumChange('basePrice', e.target.value)}/>
-                                    <select className="w-14 border border-l-0 border-slate-200 rounded-r-lg bg-slate-100 font-black text-[9px] outline-none" value={formData.currency} onChange={e => onChange('currency', e.target.value as Currency)}>
-                                        {Object.values(Currency).map(c => <option key={c} value={c}>{c}</option>)}
-                                    </select>
+                        {canSeePricingDetails && (
+                            <div className="grid grid-cols-2 gap-3 mb-3">
+                                <div className="flex flex-col">
+                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1.5 ml-1">Закуп (ВЦП)</label>
+                                    <div className="flex h-[34px]">
+                                        <input type="number" className="w-full border border-slate-200 rounded-l-lg px-2 text-sm font-black font-mono outline-none focus:ring-4 focus:ring-green-500/10" value={formData.basePrice || ''} onChange={e => handleNumChange('basePrice', e.target.value)}/>
+                                        <select className="w-14 border border-l-0 border-slate-200 rounded-r-lg bg-slate-100 font-black text-[9px] outline-none" value={formData.currency} onChange={e => onChange('currency', e.target.value as Currency)}>
+                                            {Object.values(Currency).map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col">
+                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1.5 ml-1">Наценка %</label>
+                                    <div className="relative h-[34px]">
+                                        <input
+                                            type="number"
+                                            className={`w-full h-full border rounded-lg px-2 text-sm font-black font-mono outline-none transition-all ${formData.pricingMethod === PricingMethod.PROFILE ? 'bg-slate-50 border-slate-100 text-slate-400' : 'border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-500/10'}`}
+                                            value={formData.markupPercentage !== undefined ? parseFloat(formData.markupPercentage.toFixed(2)) : ''}
+                                            onChange={e => formData.pricingMethod !== PricingMethod.PROFILE && handleNumChange('markupPercentage', e.target.value)}
+                                            readOnly={formData.pricingMethod === PricingMethod.PROFILE}
+                                        />
+                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300">%</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex flex-col">
-                                <label className="block text-[8px] font-black text-slate-400 uppercase mb-1.5 ml-1">Наценка %</label>
-                                <div className="relative h-[34px]">
-                                    <input 
-                                        type="number" 
-                                        className={`w-full h-full border rounded-lg px-2 text-sm font-black font-mono outline-none transition-all ${formData.pricingMethod === PricingMethod.PROFILE ? 'bg-slate-50 border-slate-100 text-slate-400' : 'border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-500/10'}`} 
-                                        value={formData.markupPercentage !== undefined ? parseFloat(formData.markupPercentage.toFixed(2)) : ''} 
-                                        onChange={e => formData.pricingMethod !== PricingMethod.PROFILE && handleNumChange('markupPercentage', e.target.value)}
-                                        readOnly={formData.pricingMethod === PricingMethod.PROFILE}
-                                    />
-                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300">%</span>
-                                </div>
-                            </div>
-                        </div>
+                        )}
 
-                        <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div className={`grid gap-3 mb-3 ${canSeePricingDetails ? 'grid-cols-2' : 'grid-cols-1'}`}>
                             <div className="flex flex-col">
                                 <label className="block text-[8px] font-black text-slate-400 uppercase mb-1.5 ml-1">Цена продажи</label>
                                 <div className={`relative h-[34px] border rounded-lg shadow-inner transition-all ${formData.pricingMethod === PricingMethod.PROFILE ? 'bg-blue-50 border-blue-100' : 'bg-white border-slate-200 focus-within:ring-2 focus-within:ring-blue-500/10'}`}>
-                                    <input 
+                                    <input
                                         type="number"
                                         className={`w-full h-full bg-transparent px-2 text-sm font-black font-mono outline-none ${formData.pricingMethod === PricingMethod.PROFILE ? 'text-blue-700' : 'text-slate-700'}`}
                                         value={formData.salesPrice || ''}
@@ -604,18 +633,20 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                                     <span className={`absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-black uppercase pointer-events-none ${formData.pricingMethod === PricingMethod.PROFILE ? 'text-blue-400' : 'text-slate-400'}`}>₸</span>
                                 </div>
                             </div>
-                            <div className="flex flex-col">
-                                <label className="block text-[8px] font-black text-slate-400 uppercase mb-1.5 ml-1">Прибыль</label>
-                                <div className="flex items-center justify-between h-[34px] border border-slate-100 rounded-lg px-2 bg-emerald-50/30">
-                                    <span className="text-sm font-black font-mono text-emerald-600 truncate">
-                                        {(Math.round(calculatedProfit)).toLocaleString()}
-                                    </span>
-                                    <span className="text-[9px] font-black uppercase text-emerald-400 ml-1 flex-shrink-0">₸</span>
+                            {canSeePricingDetails && (
+                                <div className="flex flex-col">
+                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1.5 ml-1">Прибыль</label>
+                                    <div className="flex items-center justify-between h-[34px] border border-slate-100 rounded-lg px-2 bg-emerald-50/30">
+                                        <span className="text-sm font-black font-mono text-emerald-600 truncate">
+                                            {(Math.round(calculatedProfit)).toLocaleString()}
+                                        </span>
+                                        <span className="text-[9px] font-black uppercase text-emerald-400 ml-1 flex-shrink-0">₸</span>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
 
-                        {formData.pricingMethod === PricingMethod.PROFILE && (
+                        {canSeePricingDetails && formData.pricingMethod === PricingMethod.PROFILE && (
                             <button onClick={onShowDetails} className="w-full py-1.5 bg-slate-900 text-white rounded-lg font-black uppercase text-[8px] tracking-widest flex items-center justify-center gap-1.5 hover:bg-slate-800 transition-all">
                                 <Calculator size={10}/> Детализация
                             </button>
@@ -702,28 +733,123 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                         <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center pb-1.5 border-b">
                             <Cpu size={14} className="mr-2 text-indigo-500"/> Совместимость со станками
                         </h4>
-                        <div className="grid grid-cols-4 gap-2 max-h-32 overflow-y-auto p-1 custom-scrollbar">
-                            {machineCategories.map(cat => {
-                                const isSelected = formData.compatibleMachineCategoryIds?.includes(cat.id);
-                                return (
-                                    <div 
-                                        key={cat.id}
-                                        onClick={() => toggleMachineCompatibility(cat.id)}
-                                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
-                                            isSelected 
-                                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700' 
-                                                : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
-                                        }`}
-                                    >
-                                        <div className={`w-3 h-3 rounded flex items-center justify-center border ${
-                                            isSelected ? 'bg-indigo-500 border-indigo-500' : 'bg-white border-slate-300'
-                                        }`}>
-                                            {isSelected && <CheckCircle size={8} className="text-white"/>}
-                                        </div>
-                                        <span className="text-[10px] font-bold leading-none">{cat.name}</span>
+                        {/* Типы станков */}
+                        <div className="mb-3" ref={machineCatRef}>
+                            <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">Типы</div>
+                            <div className="relative">
+                                <div
+                                    onClick={() => setIsMachineCatOpen(!isMachineCatOpen)}
+                                    className={`w-full flex items-center justify-between border rounded-lg py-1.5 px-3 min-h-[34px] transition-all cursor-pointer ${
+                                        isMachineCatOpen ? 'border-indigo-500 ring-4 ring-indigo-500/10 bg-white' : 'border-slate-200 bg-white'
+                                    } ${!canWriteField('actions') ? 'opacity-70 pointer-events-none' : ''}`}
+                                >
+                                    <div className="flex flex-wrap gap-1 flex-1 min-w-0">
+                                        {(formData.compatibleMachineCategoryIds || []).length === 0 ? (
+                                            <span className="text-slate-400 italic text-[11px] font-normal">Выбрать типы...</span>
+                                        ) : (
+                                            machineCategories
+                                                .filter(c => formData.compatibleMachineCategoryIds?.includes(c.id))
+                                                .map(c => (
+                                                    <span key={c.id} className="flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded px-1.5 py-0.5 text-[10px] font-bold">
+                                                        {c.name}
+                                                        <button
+                                                            onClick={e => { e.stopPropagation(); toggleMachineCompatibility(c.id); }}
+                                                            className="text-indigo-400 hover:text-indigo-600 leading-none ml-0.5"
+                                                        >×</button>
+                                                    </span>
+                                                ))
+                                        )}
                                     </div>
-                                );
-                            })}
+                                    <ChevronDown size={14} className={`text-slate-300 transition-transform flex-none ml-2 ${isMachineCatOpen ? 'rotate-180' : ''}`}/>
+                                </div>
+
+                                {isMachineCatOpen && (
+                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-[100] animate-in fade-in slide-in-from-top-1 overflow-hidden">
+                                        <div className="p-2 border-b bg-slate-50">
+                                            <div className="relative">
+                                                <Search size={12} className="absolute left-2.5 top-2 text-slate-400" />
+                                                <input
+                                                    autoFocus
+                                                    className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold outline-none focus:border-indigo-400"
+                                                    placeholder="Начните ввод..."
+                                                    value={machineCatSearch}
+                                                    onChange={e => setMachineCatSearch(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="max-h-56 overflow-y-auto p-1 custom-scrollbar">
+                                            {filteredMachineCategories.map(c => {
+                                                const isSelected = formData.compatibleMachineCategoryIds?.includes(c.id);
+                                                return (
+                                                    <div
+                                                        key={c.id}
+                                                        onClick={() => toggleMachineCompatibility(c.id)}
+                                                        className={`px-3 py-2 rounded-lg cursor-pointer text-[11px] flex items-center gap-2.5 transition-all ${
+                                                            isSelected ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'
+                                                        }`}
+                                                    >
+                                                        <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border flex-none ${
+                                                            isSelected ? 'bg-indigo-500 border-indigo-500' : 'bg-white border-slate-300'
+                                                        }`}>
+                                                            {isSelected && <CheckCircle size={8} className="text-white"/>}
+                                                        </div>
+                                                        <span className="font-bold">{c.name}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                            {filteredMachineCategories.length === 0 && (
+                                                <div className="py-3 text-center text-[11px] text-slate-400">Ничего не найдено</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        {/* Конкретные станки */}
+                        <div>
+                            <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center justify-between">
+                                <span>Конкретные станки</span>
+                                {(formData.compatibleMachineIds || []).length > 0 && (
+                                    <span className="text-indigo-600 font-black">{(formData.compatibleMachineIds || []).length} выбрано</span>
+                                )}
+                            </div>
+                            <div className="relative mb-2">
+                                <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300"/>
+                                <input
+                                    value={machineSearch}
+                                    onChange={e => setMachineSearch(e.target.value)}
+                                    placeholder="Поиск по названию или SKU..."
+                                    className="w-full pl-7 pr-3 py-1.5 border border-slate-200 rounded-lg text-[10px] focus:outline-none focus:border-indigo-300"
+                                />
+                            </div>
+                            <div className="max-h-36 overflow-y-auto space-y-0.5 custom-scrollbar">
+                                {machineProducts.length === 0 ? (
+                                    <div className="text-[10px] text-slate-400 py-2 text-center">Нет станков</div>
+                                ) : machineProducts.map(machine => {
+                                    const isSelected = (formData.compatibleMachineIds || []).includes(machine.id);
+                                    return (
+                                        <div
+                                            key={machine.id}
+                                            onClick={() => toggleCompatibleMachineId(machine.id)}
+                                            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border cursor-pointer transition-all ${
+                                                isSelected
+                                                    ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                                                    : 'bg-white border-transparent hover:bg-slate-50 text-slate-600'
+                                            }`}
+                                        >
+                                            <div className={`w-3 h-3 rounded flex items-center justify-center border flex-none ${
+                                                isSelected ? 'bg-indigo-500 border-indigo-500' : 'bg-white border-slate-300'
+                                            }`}>
+                                                {isSelected && <CheckCircle size={8} className="text-white"/>}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-[10px] font-bold truncate">{machine.name}</div>
+                                                {machine.sku && <div className="text-[8px] text-slate-400">{machine.sku}</div>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 )}

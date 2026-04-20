@@ -268,7 +268,7 @@ const BundleCard: React.FC<{
                 {canEdit && (
                     <button onClick={onEdit}
                         className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm active:scale-95 transition-all">
-                        <Pencil size={14} /> Изменить
+                        <Pencil size={14} />
                     </button>
                 )}
             </div>

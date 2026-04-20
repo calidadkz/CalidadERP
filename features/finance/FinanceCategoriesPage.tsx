@@ -130,7 +130,7 @@ export const FinanceCategoriesPage: React.FC = () => {
                 />
             )}
 
-            <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in duration-500">
+            <div className="space-y-6 w-full max-w-[1210px] mx-auto animate-in fade-in duration-500">
 
                 {/* ── Заголовок ── */}
                 <div className="flex justify-between items-start">
@@ -247,19 +247,19 @@ export const FinanceCategoriesPage: React.FC = () => {
                 )}
 
                 {/* ── Таблица ── */}
-                <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200">
                     <table className="w-full">
                         <thead className="bg-slate-50/50 border-b border-slate-100">
                             <tr>
-                                <th className="text-left px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Название / Бейджи</th>
-                                <th className="text-right px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-40">Группа</th>
-                                <th className="w-44" />
+                                <th className="text-left px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Название / Теги</th>
+                                <th className="text-left px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[340px]">Тип / Группа</th>
+                                <th className="w-36" />
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                             {typeItems.length === 0 ? (
                                 <tr>
-                                    <td colSpan={3} className="p-20 text-center text-slate-300 italic font-medium">
+                                    <td colSpan={3} className="p-20 text-center text-slate-400 italic font-medium">
                                         В этом разделе пока нет статей
                                     </td>
                                 </tr>
@@ -283,7 +283,7 @@ export const FinanceCategoriesPage: React.FC = () => {
                                         <>
                                             {groups.length > 0 && (
                                                 <tr className="bg-slate-50/40 border-t border-slate-100">
-                                                    <td colSpan={3} className="px-6 py-2.5 text-[9px] font-black text-slate-300 uppercase tracking-widest">Без группы</td>
+                                                    <td colSpan={3} className="px-6 py-2.5 text-[11px] font-black text-slate-400 uppercase tracking-widest">Без группы</td>
                                                 </tr>
                                             )}
                                             {ungroupedItems.map(item => (

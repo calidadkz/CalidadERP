@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { GeneralSettings, PreCalculationItem, PackingListItem, PreCalculationDocument } from '@/types/pre-calculations';
+import { GeneralSettings, PreCalculationItem, PreCalculationDocument } from '@/types/pre-calculations';
 import { api } from '@/services';
 
 const DEFAULT_SETTINGS: GeneralSettings = {
@@ -19,13 +19,12 @@ const DEFAULT_SETTINGS: GeneralSettings = {
     chinaDomesticRateMethod: 'volume',
     chinaDomesticRatePerM3Usd: 0,
     chinaDomesticRatePerTonUsd: 0,
-    chinaDomesticFixedKztPerUnit: 0,
+    chinaDomesticFixedKztTotal: 0,
 };
 
 export const usePreCalculations = (id?: string) => {
   const [generalSettings, setGeneralSettings] = useState<GeneralSettings>(DEFAULT_SETTINGS);
   const [items, setItems] = useState<PreCalculationItem[]>([]);
-  const [packingList, setPackingList] = useState<PackingListItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [preCalculation, setPreCalculation] = useState<PreCalculationDocument | null>(null);
 
@@ -64,7 +63,7 @@ export const usePreCalculations = (id?: string) => {
           chinaDomesticRateMethod: (docData.chinaDomesticRateMethod as any) || 'volume',
           chinaDomesticRatePerM3Usd: Number(docData.chinaDomesticRatePerM3Usd) || 0,
           chinaDomesticRatePerTonUsd: Number(docData.chinaDomesticRatePerTonUsd) || 0,
-          chinaDomesticFixedKztPerUnit: Number(docData.chinaDomesticFixedKztPerUnit) || 0,
+          chinaDomesticFixedKztTotal: Number(docData.chinaDomesticFixedKztTotal ?? docData.chinaDomesticFixedKztPerUnit) || 0,
       };
 
       const mappedItems: PreCalculationItem[] = itemsData.map((item: any) => ({
@@ -106,9 +105,9 @@ export const usePreCalculations = (id?: string) => {
           deliveryUrumqiAlmatyKzt: Number(item.deliveryUrumqiAlmatyKzt) || 0,
           deliveryChinaDomesticKzt: Number(item.deliveryChinaDomesticKzt) || 0,
           deliveryAlmatyKaragandaPerItemKzt: Number(item.logisticsAlmatyKaragandaKzt) || 0,
-          svhPerItemKzt: 0,
-          brokerPerItemKzt: 0,
-          customsFeesPerItemKzt: 0,
+          svhPerItemKzt: Number(item.svhPerItemKzt) || 0,
+          brokerPerItemKzt: Number(item.brokerPerItemKzt) || 0,
+          customsFeesPerItemKzt: Number(item.customsFeesPerItemKzt) || 0,
           customsNdsKzt: Number(item.customsNdsKzt) || 0,
           totalNdsKzt: Number(item.totalNdsKzt) || 0,
           ndsDifferenceKzt: Number(item.ndsDifferenceKzt) || 0,
@@ -119,18 +118,6 @@ export const usePreCalculations = (id?: string) => {
           profitKzt: Number(item.profitKzt) || 0
       }));
 
-      const mappedPacking: PackingListItem[] = packagesData.map((pkg: any) => ({
-          id: pkg.id,
-          description: pkg.description || '',
-          placeNumber: pkg.packageNumber,
-          lengthMm: Number(pkg.lengthMm) || 0,
-          widthMm: Number(pkg.widthMm) || 0,
-          heightMm: Number(pkg.heightMm) || 0,
-          weightKg: Number(pkg.weightKg) || 0,
-          volumeM3: Number(pkg.volumeM3) || 0,
-          items: pkg.items || []
-      }));
-
       const fullDoc: PreCalculationDocument = {
           id: docData.id,
           name: docData.name,
@@ -138,14 +125,13 @@ export const usePreCalculations = (id?: string) => {
           status: docData.status === 'Draft' ? 'draft' : 'finalized',
           settings,
           items: mappedItems,
-          packingList: mappedPacking,
+          packingList: [],
           timeline: docData.timeline ?? undefined,
       };
 
       setPreCalculation(fullDoc);
       setGeneralSettings(settings);
       setItems(mappedItems);
-      setPackingList(mappedPacking);
 
     } catch (error) {
       console.error("Failed to load pre-calculation:", error);
@@ -176,11 +162,10 @@ export const usePreCalculations = (id?: string) => {
             items: [],
             packingList: [],
         };
-        
+
         setPreCalculation(newDoc);
         setGeneralSettings(newDoc.settings);
         setItems([]);
-        setPackingList([]);
         return newDoc;
     } catch (error) {
         console.error("Failed to init new pre-calculation:", error);
@@ -241,7 +226,14 @@ export const usePreCalculations = (id?: string) => {
           const weightTons = (Number(newItem.weightKg) || 0) / 1000;
           newItem.deliveryChinaDomesticKzt = weightTons * (Number(generalSettings.chinaDomesticRatePerTonUsd) || 0) * shippingRate;
         } else {
-          newItem.deliveryChinaDomesticKzt = Number(generalSettings.chinaDomesticFixedKztPerUnit) || 0;
+          // Фикс. сумма на всю партию: распределяем пропорционально объёму позиции.
+          // Позиции с useDimensions=false (effectiveVolumePerItem=0) получают 0.
+          const fixedTotal = Number(generalSettings.chinaDomesticFixedKztTotal) || 0;
+          if (totalEffectiveVolumeM3 > 0 && effectiveVolumePerItem > 0) {
+            newItem.deliveryChinaDomesticKzt = fixedTotal * effectiveVolumePerItem / totalEffectiveVolumeM3;
+          } else {
+            newItem.deliveryChinaDomesticKzt = 0;
+          }
         }
       }
 
@@ -342,30 +334,7 @@ export const usePreCalculations = (id?: string) => {
     setItems(prev => prev.filter(i => i.id !== itemId));
   };
 
-  const addPackingItem = useCallback(() => {
-    const newItem: PackingListItem = {
-      id: api.generateId('PLI'),
-      description: '',
-      placeNumber: packingList.length + 1,
-      lengthMm: 0,
-      widthMm: 0,
-      heightMm: 0,
-      weightKg: 0,
-      volumeM3: 0,
-      items: []
-    };
-    setPackingList(prev => [...prev, newItem]);
-  }, [packingList.length]);
-
-  const updatePackingItem = useCallback((id: string, key: keyof PackingListItem, value: any) => {
-    setPackingList(prev => prev.map(item => item.id === id ? { ...item, [key]: value } : item));
-  }, []);
-
-  const deletePackingItem = useCallback((id: string) => {
-    setPackingList(prev => prev.filter(item => item.id !== id));
-  }, []);
-
-  const savePreCalculation = useCallback(async () => {
+const savePreCalculation = useCallback(async () => {
     if (!preCalculation) return;
     
     setIsLoading(true);
@@ -393,7 +362,7 @@ export const usePreCalculations = (id?: string) => {
           chinaDomesticRateMethod: generalSettings.chinaDomesticRateMethod || 'volume',
           chinaDomesticRatePerM3Usd: Number(generalSettings.chinaDomesticRatePerM3Usd) || 0,
           chinaDomesticRatePerTonUsd: Number(generalSettings.chinaDomesticRatePerTonUsd) || 0,
-          chinaDomesticFixedKztPerUnit: Number(generalSettings.chinaDomesticFixedKztPerUnit) || 0,
+          chinaDomesticFixedKztTotal: Number(generalSettings.chinaDomesticFixedKztTotal) || 0,
           timeline: preCalculation.timeline ?? null,
       };
       await api.upsert('pre_calculations', dbDoc, 'id');
@@ -433,6 +402,9 @@ export const usePreCalculations = (id?: string) => {
             deliveryUrumqiAlmatyKzt: Number(item.deliveryUrumqiAlmatyKzt) || 0,
             deliveryChinaDomesticKzt: Number(item.deliveryChinaDomesticKzt) || 0,
             logisticsAlmatyKaragandaKzt: Number(item.deliveryAlmatyKaragandaPerItemKzt) || 0,
+            svhPerItemKzt: Number(item.svhPerItemKzt) || 0,
+            brokerPerItemKzt: Number(item.brokerPerItemKzt) || 0,
+            customsFeesPerItemKzt: Number(item.customsFeesPerItemKzt) || 0,
             customsNdsKzt: Number(item.customsNdsKzt) || 0,
             totalNdsKzt: Number(item.totalNdsKzt) || 0,
             ndsDifferenceKzt: Number(item.ndsDifferenceKzt) || 0,
@@ -444,23 +416,6 @@ export const usePreCalculations = (id?: string) => {
         await api.createMany('pre_calculation_items', itemsToSave);
       }
 
-      await api.deleteByField('pre_calculation_packages', 'preCalculationId', realId);
-      if (packingList.length > 0) {
-        const packagesToSave = packingList.map(pkg => ({
-            id: pkg.id,
-            preCalculationId: realId,
-            packageNumber: pkg.placeNumber,
-            description: pkg.description,
-            lengthMm: Number(pkg.lengthMm) || 0,
-            widthMm: Number(pkg.widthMm) || 0,
-            heightMm: Number(pkg.heightMm) || 0,
-            weightKg: Number(pkg.weightKg) || 0,
-            volumeM3: Number(pkg.volumeM3) || 0,
-            items: pkg.items
-        }));
-        await api.createMany('pre_calculation_packages', packagesToSave);
-      }
-
       setPreCalculation(prev => prev ? { ...prev, id: realId } : null);
       return realId;
 
@@ -470,13 +425,12 @@ export const usePreCalculations = (id?: string) => {
     } finally {
       setIsLoading(false);
     }
-  }, [preCalculation, generalSettings, calculatedItemsResult, packingList]);
+  }, [preCalculation, generalSettings, calculatedItemsResult]);
 
   return {
     preCalculation,
     generalSettings,
     items: calculatedItemsResult,
-    packingList,
     isLoading,
     savePreCalculation,
     updateGeneralSetting,
@@ -485,11 +439,7 @@ export const usePreCalculations = (id?: string) => {
     updateItem,
     updateItemsBatch,
     deleteItem,
-    addPackingItem,
-    updatePackingItem,
-    deletePackingItem,
     createNew,
     setDetailedListItems: setItems,
-    setPackingListItems: setPackingList
   };
 };

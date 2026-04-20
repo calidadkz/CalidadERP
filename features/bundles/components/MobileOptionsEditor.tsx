@@ -459,7 +459,7 @@ const VariantCard: React.FC<{
             {canWrite && !isDeleted && (
                 <div className="flex border-t border-slate-100">
                     <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors">
-                        <Pencil size={13} /> Изменить
+                        <Pencil size={13} />
                     </button>
                     <div className="w-px bg-slate-100" />
                     <button onClick={onClone} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-slate-500 hover:bg-slate-50 transition-colors">

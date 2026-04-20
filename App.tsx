@@ -141,6 +141,7 @@ const AppContent = () => {
                         <Route path="/finance_calendar" element={<FinancePage view="plan" />} />
                         <Route path="/finance_statements" element={<FinancePage view="fact" />} />
                         <Route path="/finance_accounts" element={<FinancePage view="treasury" />} />
+                        <Route path="/finance_movements" element={<FinancePage view="movements" />} />
                         <Route path="/finance_categories" element={<FinanceCategoriesPage />} />
                         <Route path="/rates" element={<CurrencyRatesPage />} />
                         <Route path="/counterparties" element={<CounterpartyManagerPage />} />

@@ -1,4 +1,20 @@
-export type BatchStatus = 'active' | 'completed' | 'closed';
+export type BatchStatus =
+  | 'open'
+  | 'manufacturing'
+  | 'transit_china'
+  | 'transit_almaty'
+  | 'customs'
+  | 'transit_karaganda'
+  | 'receiving'
+  | 'setup_shipping'
+  | 'completed';
+
+export interface BatchStatusRecord {
+  id: BatchStatus;
+  label: string;
+  sortOrder: number;
+  color: string;
+}
 
 export interface BatchTimeline {
   startDate?: string;             // Дата старта (от которой считаются все этапы)
@@ -24,6 +40,7 @@ export type ExpenseCategory =
   | 'customs'                      // Таможенные сборы
   | 'pnr'                          // Пусконаладка
   | 'delivery_local'               // Доставка до клиента
+  | 'sales_bonus'                  // Бонус отдела продаж
   | 'other'                        // Прочее
   | 'revenue';                     // Выручка
 
@@ -60,6 +77,9 @@ export interface Batch {
 
   // Планирование сроков
   timeline?: BatchTimeline;
+
+  // Позиции, помеченные на удаление (в статусе manufacturing)
+  deletedItemIds?: string[];
 }
 
 export interface BatchItemActuals {
@@ -70,6 +90,13 @@ export interface BatchItemActuals {
   actualPurchaseKzt: number;
 }
 
+// Правила распределения суммы доставки по Китаю между позициями партии
+export interface ChinaDeliveryDistribution {
+  method: 'volume' | 'weight' | 'manual';
+  targetItemIds: string[];              // [] = все позиции партии
+  manualAmounts?: Record<string, number>; // preCalcItemId → сумма KZT
+}
+
 export interface BatchExpense {
   id: string;
   batchId: string;
@@ -77,10 +104,12 @@ export interface BatchExpense {
   description: string;
   amountKzt: number;
   date: string;
-  paymentId?: string;        // Связь с actual_payments (Выписка) — подтверждает расход
-  plannedPaymentId?: string; // Связь с planned_payments (Календарь) — прогноз оплаты
+  paymentId?: string;        // Связь с actual_payments (Выписка)
+  plannedPaymentId?: string; // Связь с planned_payments (Календарь)
+  allocationId?: string;     // Связь с payment_allocations.id (Аллокации)
   documentIds?: string[];
-  receptionId?: string;      // Авто-создан из приёмки (Receiving) — источник данных
+  receptionId?: string;      // Авто-создан из приёмки (Receiving)
+  chinaDistribution?: ChinaDeliveryDistribution; // Только для logistics_china_domestic
 }
 
 export interface BatchDocument {

@@ -1,5 +1,436 @@
 # Session Log
 
+## 2026-04-19 — Мобильный UI: форма ЗК + Конфигуратор
+
+**Что сделано:**
+
+**1. MobileSalesOrderForm.tsx** (новый компонент)
+- Полноэкранная мобильная форма создания/редактирования Заказа Клиента
+- Самодостаточная (берёт state из useStore сама, без пропсов)
+- Хедер: ArrowLeft + переключатель вкладок (Состав / Транши) + кнопка Провести/Обновить
+- Поля: название заказа + клиент (trigger → ClientSearchOverlay) + итого
+- **ClientSearchOverlay** (z-[400]) — полноэкранный поиск клиента с кнопкой "Новый клиент"
+- **ItemsTab** — список позиций с карточками: название + SKU + configuration chips + qty picker (−/+) + цена + итого + удалить; кнопка "Добавить товар"
+- **ProductSearchOverlay** (z-[400]) — выбор товара: переключатель типов, фильтры (совместимость / категория), поиск, список товаров с балансом; для станков → открывает конфигуратор; для остальных → qty picker + добавить
+- **MobileConfiguratorOverlay** (z-[400]) — мобильный конфигуратор комплектаций:
+  - 3 вкладки: Вручную / Шаблоны / Со склада
+  - Вручную: группы опций, карточки вариантов с чекбоксами
+  - Шаблоны: сохранённые бандлы с ценой и описанием
+  - Со склада: конфигурации из stock_movements с показателями наличия
+  - Футер с итоговой ценой IPP + кнопка "Добавить"
+- **PaymentsTab** — транши: баннер баланса + карточки траншей с датой/суммой/статьёй ДДС/посредником; индикатор несбалансированности на вкладке
+
+**2. MobileSalesView.tsx** — обновлён
+- Форма `view === 'form'` теперь использует `MobileSalesOrderForm` вместо `SalesOrderForm(isMobile=true)`
+
+**3. Номенклатура (попутно в той же сессии)**
+- Desktop `GeneralTab`: бейджи типов станков → custom multi-select dropdown (с поиском, чекбоксами, dismiss-chips)
+- Mobile `MobileProductForm`: бейджи → `MachineCategoryOverlay` (полноэкранный multi-select); добавлена кнопка "Библиотека" (MediaLibraryModal + loadStorageImages)
+
+**Файлы изменены:**
+- `features/sales/components/MobileSalesOrderForm.tsx` (новый)
+- `features/sales/components/MobileSalesView.tsx`
+- `features/nomenclature/tabs/GeneralTab.tsx`
+- `features/nomenclature/components/MobileProductForm.tsx`
+
+**Открытые задачи / следующий шаг:**
+- Настроить права для роли MANAGER: `col_responsible = none`
+- Потенциально: мобильная форма для ЗП (Заказы Поставщику) по аналогии
+
+**Ссылки:** [[Modules/UI-Mobile]] [[Modules/Procurement-Sales]]
+
+---
+
+## 2026-04-17 — Ответственный менеджер + Должности сотрудников
+
+**Что сделано:**
+
+**1. DB миграция**
+- `counterparties.position` — должность сотрудника (text)
+- `sales_orders.responsible_employee_id / responsible_employee_name` — ответственный за заказ
+- `profiles.employee_id` — привязка user → employee
+
+**2. Типы**
+- `Counterparty.position?: string`
+- `SalesOrder.responsibleEmployeeId/Name?: string`
+- `UserProfile.employeeId?: string`
+
+**3. Контрагенты (Сотрудники)**
+- `CounterpartyCreateModal`: поле "Должность" (select) — показывается только для роли Сотрудник
+- Список должностей: Исп. директор / РОП / Менеджер по продажам / Техспец / Контент / Аналитик / Снабженец / IT / Кладовщик
+- `CounterpartyManagerPage`: должность отображается под именем сотрудника в списке
+
+**4. Продажи**
+- `SalesOrderForm`: поле "Ответственный" (select сотрудников) — показывается при `canSee('fields', 'col_responsible')`
+- `SalesPage`: менеджер (role=MANAGER + employeeId) видит только свои заказы
+- `SalesOrdersList`: новая колонка "Ответственный" (управляется через `showColResponsible`)
+- `SystemRegistry.sales.fields.col_responsible` — новый ключ прав доступа
+
+**5. PermissionsManager**
+- Новая вкладка "Пользователи": список всех юзеров + привязка user → employee (dropdown)
+- При смене — прямое обновление `profiles.employee_id` через supabase
+
+**Файлы изменены:**
+- `types/counterparty.ts`, `types/order.ts`, `types/permissions.ts`
+- `features/counterparties/components/CounterpartyCreateModal.tsx`
+- `features/counterparties/pages/CounterpartyManagerPage.tsx`
+- `features/system/context/AuthContext.tsx`
+- `features/sales/SalesPage.tsx`, `SalesOrdersList.tsx`, `SalesOrderForm.tsx`
+- `features/sales/hooks/useSalesOrderFormState.ts`
+- `components/system/PermissionsManager.tsx`
+- `services/SystemRegistry.ts`
+
+**Открытые задачи / следующий шаг:**
+- Настроить права для роли MANAGER в PermissionsManager: `col_responsible = none`
+- Для ADMIN/ROP: `col_responsible = read`
+
+**Ссылки:** [[Modules/UI-Mobile]]
+
+## 2026-04-17 — Стилистика Дэшборда Партии (BatchMainListTab)
+
+**Что сделано:**
+Стилистическое приведение вкладки "Позиции" в окне Партии (= **Дэшборд Партии**, `BatchMainListTab`) к стилю Предрасчёта:
+
+1. **Цвета заголовков колонок** — убраны яркие насыщенные `bg-blue-700`, `bg-amber-700`, `bg-violet-700` и т.д. Заменены на тёмные прозрачные фоны (`bg-blue-800/60`, `bg-amber-900/60`, `bg-violet-900/60`) + цветной текст секции (`text-blue-200`, `text-amber-200`). Единый тёмный регистр как в Предрасчёте.
+2. **Шрифт заголовков** — `text-[10px] font-black` → `text-[9px] font-bold tracking-wider` (совпадает с Предрасчётом).
+3. **Убраны `↑` / вторые строки в кнопках** — кнопки-заголовки теперь однострочные, компактные. Hover: `hover:brightness-125` + `active:scale-[0.97]`.
+4. **Строка итогов в thead** — добавлены цветные фоны по секциям через `inlineBgClass` в `ExpenseColDef` и проп `bgClass` в `FooterCell` (emerald/sky/amber/violet/rose/emerald/slate).
+5. **Убрано зачёркивание** плановой суммы в `FactPlanCell` — шрифт (маленький, `text-slate-300`) оставлен прежним.
+6. **Удалён tfoot "ИТОГО"** — дублировал sticky-строку итогов в шапке; оставлена только одна строка итогов прямо под заголовками.
+
+**Файлы изменены:**
+- `features/batches/components/BatchMainListTab.tsx` — все изменения выше
+
+**Открытые задачи / следующий шаг:**
+- П.3.3: Мобильный конфигуратор комплектаций в Заказах
+
+**Ссылки:** [[Modules/Batches-PreCalc]]
+
+---
+
+## 2026-04-19 — Мобильный UI: Категории продуктов
+
+**Что сделано:**
+- Создан `features/products/pages/MobileCategoriesView.tsx` — полноэкранная мобильная версия
+  - Шапка: иконка + «Категории» + счётчик активного типа
+  - Переключатель типов: Станки / Запчасти / Услуги (3 кнопки, цветные)
+  - Поиск по названию
+  - Строка добавления новой категории (только если canCreate)
+  - Список карточек с inline-редактированием (autoFocus input + ✓/✗)
+  - Удаление через bottom sheet подтверждения
+- Обновлён `features/products/pages/CategoriesPage.tsx`:
+  - Добавлен `useIsMobile`, lazy-load `MobileCategoriesView`
+  - На мобильном рендерится Suspense + MobileCategoriesView вместо десктопной таблицы
+
+**Файлы изменены:**
+- `features/products/pages/MobileCategoriesView.tsx` (новый)
+- `features/products/pages/CategoriesPage.tsx`
+
+**Открытые задачи / следующий шаг:**
+- П.3.3: Мобильный конфигуратор комплектаций в Заказах
+
+**Ссылки:** [[Modules/UI-Mobile]]
+
+## 2026-04-17 — Мобильный UI: шапки форм + детальный просмотр заказов (Продажи/Снабжение)
+
+**Что сделано:**
+
+**П.3.2 — Продажи / Снабжение (мобильная)**
+- `SalesOrderForm` и `OrderForm`: добавлен `isMobile?: boolean` проп
+  - На мобильном: контейнер `flex flex-col flex-1` вместо `h-[calc(100vh-120px)] rounded-[2rem]`
+  - Мобильная шапка: `[← Назад] [Состав | Транши] [Провести]` — вместо десктопной
+  - Мобильные поля: вертикальный стек (название + клиент/поставщик + итого) без договоров и доп.файлов
+  - Десктопные шапка/поля сохранены без изменений
+- `MobileSalesView`: добавлен `view === 'detail'` — полноэкранный просмотр заказа
+  - Шапка: назад + название заказа + статус + кнопка "Изменить"
+  - Итоги: сумма / оплачено / отгружено (3 колонки)
+  - Состав заказа: список позиций (название, SKU, конфигурация, кол-во × цена = итого)
+  - Транши оплат: список с датой, суммой к оплате, оплачено, статус
+  - Карточки списка теперь кликабельны → открывают detail; edit/delete кнопки `stopPropagation`
+- `MobileProcurementView`: аналогично Sales — `view === 'detail'` с составом инвойса и траншами
+
+**Файлы изменены:**
+- `features/sales/components/SalesOrderForm.tsx`
+- `features/sales/components/MobileSalesView.tsx`
+- `features/procurement/components/OrderForm.tsx`
+- `features/procurement/components/MobileProcurementView.tsx`
+
+**Открытые задачи / следующий шаг:**
+- П.3.3: Мобильный конфигуратор комплектаций в Заказах
+
+**Ссылки:** [[Modules/Finance]]
+
+## 2026-04-16 — Каскадное удаление заказов + удаление платежей + Реестр ДДС
+
+**Что сделано:**
+
+**1. ApiService — новый метод `updateByField`**
+- Массовое обновление строк по полю: `supabase.from(table).update(data).eq(field, value)`
+- Аналог `deleteByField` для UPDATE
+
+**2. Удаление заказов (Снабжение + Продажи) — `useOrderState.ts`**
+
+`deleteOrder` (заказ поставщику):
+- Блокировка если есть Posted-приёмки: "Сначала отмените приёмки"
+- Блокировка если `paidAmountForeign > 0`
+- Удаляет Incoming stock_movements по `documentId = orderId`
+- Удаляет черновики приёмок (+ их items/expenses)
+- Очищает `pre_calculation_items.orderId = null` где orderId = удалённый
+- Обновляет `setStockMovements`, `setReceptions` в state
+
+`deleteSalesOrder` (заказ покупателю):
+- Блокировка если есть Posted-отгрузки: "Сначала отмените отгрузки"
+- Блокировка если `paidAmount > 0`
+- Удаляет Reserved stock_movements по `documentId = salesOrderId`
+- Удаляет черновики отгрузок (+ их items)
+- Очищает `pre_calculation_items` — orderId/clientName/sellingPriceKzt/isRevenueConfirmed
+- Обновляет `setStockMovements`, `setShipments` в state
+
+**3. Удаление фактического платежа — `useFinanceState.ts`**
+
+Новая функция `deleteActualPayment(id)`:
+- Блокировка для `isInternalTransfer = true` (ручная обработка)
+- Откат аллокаций: `PlannedPayment.amountPaid -= amountCovered`, снять `isPaid`
+- Удаление `payment_allocations` по `actualPaymentId`
+- Откат баланса счёта: Outgoing → +amount, Incoming → -amount
+- Попытка удалить валютный лот (Incoming non-KZT): поиск по amountOriginal+currency, только если нетронутый
+- Запись компенсирующего движения в `money_movements` (type='Reversal')
+- Кнопка Trash2 в `BankStatements.tsx` (появляется на hover, скрыта для переводов)
+
+**4. Реестр движений денег (Money Movement Registry)**
+
+DB-миграция: таблица `money_movements` (id, date, bank_account_id, direction, amount, currency, amount_kzt, exchange_rate, actual_payment_id, cash_flow_item_id, batch_id, counterparty_id, counterparty_name, type, note)
+- Бэкфил из `actual_payments` (исторические данные с категориями из первой аллокации)
+- Тип `MoneyMovement` в `types/finance.ts`
+- `TableNames.MONEY_MOVEMENTS` в `constants.ts`
+- `useFinanceState`: state `moneyMovements` + запись при `executePayment` (type='Payment') и `deleteActualPayment` (type='Reversal')
+- `GlobalStore`: загрузка в `loadOperational`, экспорт в state
+- Новый компонент `features/finance/tabs/MoneyMovementsRegistry.tsx`
+  - Сводные карточки по счетам (итого In/Out/Net в KZT)
+  - Таблица движений с фильтрами (дата, контрагент, счёт, тип) и сортировкой
+  - Итоги по отфильтрованным строкам
+  - Сторно-записи показываются с `opacity-60` + бейдж "Сторно"
+- Новая вкладка "Реестр ДДС" в `FinancePage.tsx`, маршрут `/finance_movements` в `App.tsx`
+
+**Файлы изменены:**
+- `services/api.ts` — `updateByField`
+- `features/procurement/hooks/useOrderState.ts` — `deleteOrder`, `deleteSalesOrder`
+- `types/finance.ts` — интерфейс `MoneyMovement`
+- `constants.ts` — `MONEY_MOVEMENTS`
+- `features/finance/hooks/useFinanceState.ts` — `deleteActualPayment`, `moneyMovements` state, запись движений
+- `features/system/context/GlobalStore.tsx` — загрузка money_movements, экспорт
+- `features/finance/tabs/BankStatements.tsx` — кнопка удаления платежа
+- `features/finance/tabs/MoneyMovementsRegistry.tsx` — **новый файл**
+- `features/finance/FinancePage.tsx` — вкладка "Реестр ДДС"
+- `App.tsx` — маршрут `/finance_movements`
+
+**Открытые задачи / следующий шаг:**
+- Валютные лоты при удалении Outgoing non-KZT платежей не откатываются (FIFO слишком сложно). Нужна DB-колонка `currency_lot_id` на `actual_payments` для точного отката — требует миграции
+- При добавлении аллокаций (`allocatePayment`) money_movements не обновляется — cashFlowItemId берётся только при создании платежа. Можно добавить UPDATE при разноске если нужно
+- Реестр движений пока без "бегущего баланса" по счёту — можно добавить накопительную сумму
+
+**Ссылки:** [[Modules/Finance]] | [[Modules/Procurement-Sales]]
+
+---
+
+## 2026-04-16 — Переработка логики Выручки в Партии: вычисляемый факт из ПП
+
+**Что сделано:**
+
+**1. Логика выручки: теперь вычисляемая, не ручная**
+- Колонка "Выручка" в `BatchMainListTab` больше не читает `BatchItemActuals.actualRevenueKzt`
+- Для каждой позиции: `factRevenue = (% оплаты заказа) × (выручка позиции в предрасчёте)`
+- `% оплаты = сумма amountPaid по всем ПП заказа / totalAmount заказа`
+- Мемоизировано через `itemPaidAmounts: Record<itemId, {paid, percent}>`
+- `factTotals.revenue` тоже теперь из этого словаря, а не из itemActuals
+
+**2. Колонка "Заказ/Контрагент" упрощена**
+- Убрана сумма в KZT из прогресс-бара — теперь только % оплаты
+- Сумма перенесена в колонку "Выручка"
+
+**3. Ячейка "Выручка" кликабельна**
+- Клик на ячейку строки → `setSidebarCtx({ type: 'revenueItem', itemId })`
+- Подсветка hover emerald-50 + cursor-pointer
+- `FactPlanCell` получил опциональный prop `onClick`
+
+**4. RevenueSidebarPanel — полная переработка**
+- Два режима: `mode='overview'` (клик на заголовок) и `mode='item'` (клик на ячейку)
+- **Overview**: показывает все заказы партии с группировкой по позициям, суммой оплат и долей; итоговое "разнесено на партию" с прогресс-баром
+- **Per-item**: карточка позиции + детали заказа (доля позиции %) + список ПП с указанием суммы, разнесённой на эту позицию (`pp.amountPaid × ratio`); итоговая сумма на позицию
+- Кнопка "Все позиции" (onBack) → закрывает per-item панель
+
+**5. BatchSidebar**
+- Добавлен prop `salesOrders: SalesOrder[]`
+- Шапка для `revenueItem` → "Выручка — позиция"
+- Передаёт `salesOrders` в `RevenueSidebarPanel`
+
+**6. SidebarContext (types.ts)**
+- Добавлен тип `'revenueItem'` + поле `itemId?: string`
+
+**7. BatchDetailPage**
+- `onRevenueItemClick` → `setSidebarCtx({ type: 'revenueItem', itemId })`
+- `salesOrders` передаётся в `BatchSidebar`
+
+**Файлы изменены:**
+- `features/batches/components/sidebar/types.ts`
+- `features/batches/components/BatchMainListTab.tsx`
+- `features/batches/components/sidebar/RevenueSidebarPanel.tsx`
+- `features/batches/components/BatchSidebar.tsx`
+- `features/batches/BatchDetailPage.tsx`
+
+**Открытые задачи / следующий шаг:**
+- KPI-карточка "Выручка (факт)" и `BatchCalculator.calculateBatchStats()` всё ещё читает `actualRevenueKzt` из BatchItemActuals — при желании можно синхронизировать с новой логикой
+- Проверить поведение open-фазы: deletedItemIds фильтрация (из прошлой сессии)
+- Массовое редактирование в Номенклатуре не пересчитывает salesPrice (из старой сессии)
+
+**Ссылки:** [[Modules/Batches-PreCalc]] | [[Modules/Finance]]
+
+---
+
+## 2026-04-16 — Связь Предрасчёт ↔ Партия: статусная модель, readOnly, добавление/мягкое удаление позиций
+
+**Что сделано:**
+
+**1. DB миграция**
+- Добавлена колонка `deleted_item_ids jsonb default '[]'` в таблицу `batches` (Supabase migration)
+
+**2. Фазовая модель партии (`batchPhase.ts`)**
+- Новый helper `getBatchPhase(status) → 'open' | 'manufacturing' | 'locked'`
+- `open` — Предрасчёт редактируемый, Партия отражает изменения
+- `manufacturing` — Партия центральный объект (добавление/мягкое удаление), Предрасчёт read-only
+- `locked` — оба заблокированы, только привязка заказов к позициям без заказа
+
+**3. Предрасчёт: read-only режим**
+- `PreCalculationEditorPage` загружает связанную партию по `preCalculationId`
+- Если партия в `manufacturing`+ → баннер блокировки с кнопкой "Открыть партию"
+- Скрыты кнопки Сохранить / Создать партию, заблокировано редактирование названия
+- Передан `readOnly` prop в `DetailedList` и `GeneralSettings`
+
+**4. DetailedList: readOnly prop**
+- Скрыты кнопки "+ Станок / + Запчасть / + Из заказа / Создать заказ"
+- Скрыта кнопка Trash в строке и в контекстном меню (MoreVertical)
+- Кнопка "Инвойс .xlsx" остаётся доступной
+
+**5. GeneralSettings: readOnly prop**
+- `pointer-events-none opacity-70` на всём блоке настроек
+
+**6. useBatches: новые функции**
+- `addItemToBatch(item)` — создаёт `pre_calculation_item` напрямую в DB, обновляет локальный state
+- `markItemForDeletion(itemId)` — добавляет в `batch.deletedItemIds`, сохраняет в DB
+- `unmarkItemForDeletion(itemId)` — убирает из `deletedItemIds`
+- `permanentDeleteItem(itemId)` — удаляет `pre_calculation_item` из DB + убирает из deletedItemIds
+- `attachOrderToItem(itemId, orderId, clientName?)` — обновляет `orderId` у позиции напрямую
+
+**7. BatchMainListTab: manufacturing UI**
+- Тулбар "Добавить позицию" (фиолетовая кнопка, только manufacturing)
+- Иконка Trash на hover по строке (только manufacturing) → `onMarkDelete`
+- Ячейка "Привязать заказ" (indigo-кнопка) для позиций без orderId в manufacturing/locked
+- Секция **Корзина** внизу — позиции из `deletedItemIds`, кнопки "Восстановить" / "Удалить навсегда"
+- `colSpan` в сепараторных строках динамический (`ACTUAL_TOTAL_COLS`)
+- Принимает `batch` prop для определения фазы
+
+**8. BatchDetailPage: интеграция**
+- Подключён `AddItemModal` (тот же что в Предрасчёте)
+- Новые обработчики: `handleAddItemToBatch`, `handleCreateOrderForItem`
+- `handleOrderSubmit` расширен: если `attachOrderItemId` и новый заказ — создаёт через `api.create` напрямую (чтобы получить ID), затем вызывает `attachOrderToItem`
+
+**Файлы изменены:**
+- `types/batch.ts` — добавлено `deletedItemIds?: string[]`
+- `features/batches/utils/batchPhase.ts` — **новый файл**, helper фазовой модели
+- `features/batches/hooks/useBatches.ts` — 5 новых функций, маппинг `deletedItemIds`
+- `features/pre-calculations/pages/PreCalculationEditorPage.tsx` — загрузка batch, readOnly баннер, блокировка кнопок
+- `features/pre-calculations/components/detailed-list/DetailedList.tsx` — `readOnly` prop
+- `features/pre-calculations/components/general-settings/GeneralSettings.tsx` — `readOnly` prop
+- `features/batches/components/BatchMainListTab.tsx` — фазовый UI, корзина, привязка заказа
+- `features/batches/BatchDetailPage.tsx` — AddItemModal, новые обработчики, `attachOrderToItem`
+
+**Открытые задачи / следующий шаг:**
+- Проверить поведение `open`-фазы: при сохранении Предрасчёта позиции перезаписываются (`deleteByField` + `createMany`) — нужно убедиться что `deletedItemIds` корректно фильтруется при показе в Партии после сохранения PreCalc (сейчас фильтр по `deletedIds` только в `BatchMainListTab.activeItems`)
+- Массовое редактирование в Номенклатуре не пересчитывает salesPrice (`handleMassUpdate`) — из прошлой сессии
+
+**Ссылки:** [[Modules/Batches-PreCalc]]
+
+---
+
+## 2026-04-16 — Сращивание импорта выписки с ручными платежами (StatementImportModal)
+
+**Что сделано:**
+
+**1. Детекция дублей при импорте банковской выписки**
+- В `MatchResult` добавлены поля `duplicatePayment: ActualPayment | null` и `mergeDecision: 'merge' | 'create'`
+- В `processParsedResult` — поиск дубля среди `actualPayments` по критериям: дата (YYYY-MM-DD) + сумма (±0.01) + направление
+- Если дубль найден → `mergeDecision` = `'merge'` по умолчанию
+- Если в дубле найден `counterpartyId` → подтягивается в `matchedId`
+
+**2. Логика handleImport**
+- Ветка `mergeDecision === 'merge'`: не создаёт новый `ActualPayment`, а дополняет существующий через `ApiService.update`
+- Обогащение только пустых полей: `counterpartyBinIin`, `counterpartyIik`, `counterpartyBik`, `counterpartyBankName`, `documentNumber`, `knp`, `purpose`, `counterpartyName` (если был "физлицо")
+- Ветка `mergeDecision === 'create'`: стандартный `executePayment`
+- Кнопка "Завершить импорт" разблокирована для merge-строк даже без сопоставления контрагента
+
+**3. UI**
+- Amber-тонировка строк с дублями (`bg-amber-50/40`)
+- Миниатюрный badge в ячейке даты: "Объединить" (amber) или "Создать новую" (red)
+- Sub-row под каждой duplicate-строкой: данные существующего платежа + индикаторы что будет обогащено + toggle "Объединить / Создать отдельно"
+- Статья ДДС и план dim'ятся (`opacity-40 pointer-events-none`) для merge-строк — не нужны
+- Banner-счётчик дублей в шапке review-шага
+- Суммы в итогах (поступления/списания) исключают merge-строки
+
+**Файлы изменены:**
+- `components/ui/StatementImportModal.tsx`
+
+**Открытые задачи / следующий шаг:**
+- Массовое редактирование в Номенклатуре не пересчитывает salesPrice (`handleMassUpdate`)
+- После merge обновления не отражаются сразу в GlobalStore (только в БД) — данные видны после перезагрузки страницы; можно добавить явный reload если потребуется
+
+**Ссылки:** [[Modules/Finance]]
+
+---
+
+## 2026-04-16 — Кликабельные заказы в Предрасчёте и Партиях, стиль таблицы Партий, пересчёт цены в Номенклатуре
+
+**Что сделано:**
+
+**1. Предрасчёт — кликабельные заказы клиента (DetailedList)**
+- Колонка "Заказ / Контрагент" теперь кликабельна: иконка Tag + название + контрагент открывают `SalesOrderForm` в модале
+- При сохранении вызывает `actions.updateSalesOrder` (не создаёт новый)
+- Модал различает режим создания и редактирования (`isNew: boolean` в `orderFormConfig`)
+
+**2. Предрасчёт — визуальное разделение станков и запчастей (DetailedList)**
+- Станки (`MACHINE`) сортируются выше запчастей
+- Сепараторные строки: "СТАНКИ И ОБОРУДОВАНИЕ" (янтарный) и "ЗАПЧАСТИ И КОМПЛЕКТУЮЩИЕ" (синий)
+- Показываются только если в списке есть оба типа одновременно
+
+**3. Партии — колонка "Заказ / Контрагент" (BatchMainListTab)**
+- Добавлена третья колонка между "Позиция" и "Выручка"
+- Кликабельный заказ открывает `SalesOrderForm` через модал в `BatchDetailPage`
+- Если заказ не найден — статичный FileText; если нет orderId — "Под склад" с пульсом
+
+**4. Партии — стиль таблицы сближен с DetailedList**
+- Тёмный хедер, строка итогов (sticky, белый фон, inline-значения), `hover:bg-blue-50/20`
+- Иконка `Cpu`/`Package` в ячейке позиции, теги комплектации
+- Визуальные сепараторы станки/запчасти (те же что в Предрасчёте)
+
+**5. Номенклатура — пересчёт salesPrice в быстром редактировании**
+- Передан `exchangeRates` проп в `NomenclatureTable`
+- `calcSalesPrice` + `applyPriceRecalc` — при `saveInline` автоматически пересчитывает `salesPrice = basePrice × rate × (1 + markup/100)`
+- "Расч. цена" в Quick Edit строке обновляется в реальном времени при наборе наценки
+- Изменение метода ценообразования (select) сохраняется немедленно с пересчётом цены
+
+**Файлы изменены:**
+- `features/pre-calculations/components/detailed-list/DetailedList.tsx` — кликабельные заказы, сепараторы, сортировка по типу
+- `features/batches/components/BatchMainListTab.tsx` — полная переработка: новые пропсы, колонка заказа, сепараторы, стилистика
+- `features/batches/BatchDetailPage.tsx` — импорты SalesOrderForm, модал заказа, хендлеры открытия/сохранения
+- `features/nomenclature/components/NomenclatureTable.tsx` — проп exchangeRates, calcSalesPrice, applyPriceRecalc, saveInline с пересчётом
+- `features/nomenclature/NomenclaturePage.tsx` — передача exchangeRates в NomenclatureTable
+
+**Открытые задачи / следующий шаг:**
+- Массовое редактирование в Номенклатуре тоже не пересчитывает salesPrice — аналогичная правка в `handleMassUpdate`
+
+**Ссылки:** [[Modules/PreCalculations]], [[Modules/Batches]], [[Modules/Nomenclature]], [[Decisions/007-sales-order-form-external-modules]]
+
+---
+
 ## 2026-04-16 — Мобильный UI: Комплектации (полностью) + Остатки и Движения
 
 **Что сделано:**

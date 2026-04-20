@@ -1,17 +1,18 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { 
-    SalesOrder, 
-    SalesOrderItem, 
-    PlannedPayment, 
-    Client, 
-    Product, 
-    OrderStatus, 
+import {
+    SalesOrder,
+    SalesOrderItem,
+    PlannedPayment,
+    Client,
+    Product,
+    OrderStatus,
     Currency,
     OrderDocument,
     CashFlowItem
 } from '@/types';
 import { ApiService } from '@/services/api';
+import { addWorkingDays } from '@/utils/kazakhstanWorkingDays';
 
 export const useSalesOrderFormState = (
     initialOrder: SalesOrder | null,
@@ -32,8 +33,18 @@ export const useSalesOrderFormState = (
 
     const [contractUrl, setContractUrl] = useState(initialOrder?.contractUrl || '');
     const [contractName, setContractName] = useState(initialOrder?.contractName || '');
-    const [contractDeliveryDate, setContractDeliveryDate] = useState(initialOrder?.contractDeliveryDate || '');
+    const [contractStartDate, setContractStartDate] = useState(initialOrder?.contractStartDate || '');
+    const [contractWorkingDays, setContractWorkingDays] = useState<number | ''>(initialOrder?.contractWorkingDays ?? '');
     const [additionalDocuments, setAdditionalDocuments] = useState<OrderDocument[]>(initialOrder?.additionalDocuments || []);
+    const [responsibleEmployeeId, setResponsibleEmployeeId] = useState(initialOrder?.responsibleEmployeeId || '');
+
+    // Крайняя дата поставки — рассчитывается из начала договора + рабочих дней
+    const contractDeliveryDate = useMemo(() => {
+        if (contractStartDate && contractWorkingDays && Number(contractWorkingDays) > 0) {
+            return addWorkingDays(contractStartDate, Number(contractWorkingDays));
+        }
+        return '';
+    }, [contractStartDate, contractWorkingDays]);
 
     const totalOrderAmount = useMemo(() => items.reduce((sum, i) => sum + (Number(i.totalKzt) || 0), 0), [items]);
     const allocatedPaymentSum = useMemo(() => formPayments.reduce((sum, p) => sum + (Number(p.amountDue) || 0), 0), [formPayments]);
@@ -67,21 +78,24 @@ export const useSalesOrderFormState = (
         if (items.length === 0) return "Добавьте товары в заказ";
         if (Math.abs(unallocatedAmount) > 0.1) return "Сумма в графике оплат должна соответствовать сумме заказа.";
         if (formPayments.some(p => !p.cashFlowItemId)) return "Для всех траншей должна быть выбрана статья ДДС";
-        if (contractUrl && !contractDeliveryDate) return "Укажите крайнюю дату поставки по договору";
+        if (contractUrl && !contractDeliveryDate) return "Заполните начало договора и срок в рабочих днях";
         return null;
     }, [selectedClientId, items, unallocatedAmount, formPayments, contractUrl, contractDeliveryDate]);
 
     return {
         orderId,
-        orderName, setOrderName, // Возвращаем состояние названия заказа
+        orderName, setOrderName,
         selectedClientId, setSelectedClientId,
         items, setItems,
         formPayments, setFormPayments,
         activeFormTab, setActiveFormTab,
         contractUrl, setContractUrl,
         contractName, setContractName,
-        contractDeliveryDate, setContractDeliveryDate,
+        contractStartDate, setContractStartDate,
+        contractWorkingDays, setContractWorkingDays,
+        contractDeliveryDate, // readonly — вычисляется
         additionalDocuments, setAdditionalDocuments,
+        responsibleEmployeeId, setResponsibleEmployeeId,
         totalOrderAmount,
         unallocatedAmount,
         handleAddPaymentStep,

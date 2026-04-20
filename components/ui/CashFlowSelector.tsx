@@ -1,6 +1,7 @@
 /**
  * CashFlowSelector — компонент выбора статьи ДДС.
  * Поддерживает: группировку, теги, поиск.
+ * Дропдаун рендерится через Portal (document.body) — не обрезается overflow-hidden родителей.
  * Использование:
  *   <CashFlowSelector
  *     value={cashFlowItemId}
@@ -10,6 +11,7 @@
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '@/features/system/context/GlobalStore';
 import { CashFlowItem, CashFlowTag } from '@/types';
 import { Tag, Search, ChevronDown, X, Check } from 'lucide-react';
@@ -44,13 +46,37 @@ export const CashFlowSelector: React.FC<Props> = ({
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
     const [filterTagId, setFilterTagId] = useState<string>('');
-    const containerRef = useRef<HTMLDivElement>(null);
+    const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Вычисляем позицию дропдауна при открытии
+    const recalcPosition = () => {
+        if (!buttonRef.current) return;
+        const rect = buttonRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        const dropH = 340; // approx max height (search + tags + list max-h-64)
+
+        const showAbove = spaceBelow < dropH && spaceAbove > spaceBelow;
+        setDropdownStyle({
+            position: 'fixed',
+            left: rect.left,
+            top: showAbove ? undefined : rect.bottom + 4,
+            bottom: showAbove ? window.innerHeight - rect.top + 4 : undefined,
+            minWidth: Math.max(dropdownMinWidth, rect.width),
+            zIndex: 99999,
+        });
+    };
 
     // Закрываем по клику вне
     useEffect(() => {
         if (!open) return;
         const handler = (e: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+            const target = e.target as Node;
+            const inButton = buttonRef.current?.contains(target);
+            const inDropdown = dropdownRef.current?.contains(target);
+            if (!inButton && !inDropdown) {
                 setOpen(false);
                 setSearch('');
                 setFilterTagId('');
@@ -59,6 +85,28 @@ export const CashFlowSelector: React.FC<Props> = ({
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, [open]);
+
+    // Закрываем при скролле/ресайзе (но НЕ при скролле внутри самого дропдауна)
+    useEffect(() => {
+        if (!open) return;
+        const closeOnOutsideScroll = (e: Event) => {
+            if (dropdownRef.current?.contains(e.target as Node)) return;
+            setOpen(false); setSearch(''); setFilterTagId('');
+        };
+        const closeOnResize = () => { setOpen(false); setSearch(''); setFilterTagId(''); };
+        window.addEventListener('scroll', closeOnOutsideScroll, true);
+        window.addEventListener('resize', closeOnResize);
+        return () => {
+            window.removeEventListener('scroll', closeOnOutsideScroll, true);
+            window.removeEventListener('resize', closeOnResize);
+        };
+    }, [open]);
+
+    const handleToggle = () => {
+        if (disabled) return;
+        if (!open) recalcPosition();
+        setOpen(p => !p);
+    };
 
     // Тип для фильтрации
     const itemType: 'Income' | 'Expense' | undefined =
@@ -119,7 +167,6 @@ export const CashFlowSelector: React.FC<Props> = ({
     }, [priorityItemIds, cashFlowItems, itemType]);
 
     const selectedItem = cashFlowItems.find(x => x.id === value);
-    const selectedTags = cashFlowTags.filter(t => selectedItem?.tagIds?.includes(t.id));
 
     const handleSelect = (id: string) => {
         onChange(id);
@@ -133,13 +180,132 @@ export const CashFlowSelector: React.FC<Props> = ({
         onChange('');
     };
 
+    const dropdown = open ? (
+        <div
+            ref={dropdownRef}
+            className="bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden"
+            style={dropdownStyle}
+        >
+            {/* Поиск */}
+            <div className="p-2 border-b border-slate-100">
+                <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
+                    <Search size={12} className="text-slate-400 shrink-0" />
+                    <input
+                        autoFocus
+                        className="flex-1 bg-transparent text-[11px] font-bold outline-none text-slate-700 placeholder:text-slate-300"
+                        placeholder="Поиск статьи..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                    />
+                    {search && (
+                        <button onClick={() => setSearch('')} className="text-slate-300 hover:text-slate-500 transition-colors">
+                            <X size={10} />
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Фильтр по тегам */}
+            {usedTags.length > 0 && (
+                <div className="px-2.5 py-1.5 border-b border-slate-50 flex flex-wrap gap-1">
+                    {usedTags.map(tag => (
+                        <button
+                            key={tag.id}
+                            onClick={() => setFilterTagId(p => p === tag.id ? '' : tag.id)}
+                            className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide border transition-all"
+                            style={{
+                                borderColor: tag.color,
+                                backgroundColor: filterTagId === tag.id ? tag.color : 'transparent',
+                                color: filterTagId === tag.id ? '#fff' : tag.color,
+                            }}
+                        >
+                            {tag.name}
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {/* Список */}
+            <div className="max-h-64 overflow-y-auto py-1">
+                {/* Приоритетные статьи контрагента */}
+                {priorityItems.length > 0 && !search && !filterTagId && (
+                    <div>
+                        <div className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-50/80 flex items-center gap-1.5">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                            Приоритет
+                        </div>
+                        {priorityItems.map((item, idx) => (
+                            <OptionRow
+                                key={item.id}
+                                item={item}
+                                tags={cashFlowTags}
+                                isSelected={value === item.id}
+                                onSelect={handleSelect}
+                                priorityIndex={idx}
+                            />
+                        ))}
+                        <div className="mx-3 my-1 border-t border-slate-100" />
+                    </div>
+                )}
+                {filteredItems.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-[11px] text-slate-300 font-bold italic">Ничего не найдено</div>
+                ) : (
+                    <>
+                        {/* Сначала группы с детьми */}
+                        {groups.map(group => {
+                            const children = grouped.get(group.id) ?? [];
+                            if (children.length === 0) return null;
+                            return (
+                                <div key={group.id}>
+                                    <div className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50/80">
+                                        {group.name}
+                                    </div>
+                                    {children.map(item => (
+                                        <OptionRow
+                                            key={item.id}
+                                            item={item}
+                                            tags={cashFlowTags}
+                                            isSelected={value === item.id}
+                                            onSelect={handleSelect}
+                                            indent
+                                        />
+                                    ))}
+                                </div>
+                            );
+                        })}
+                        {/* Затем без группы */}
+                        {(grouped.get(null)?.length ?? 0) > 0 && (
+                            <div>
+                                {groups.some(g => (grouped.get(g.id)?.length ?? 0) > 0) && (
+                                    <div className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-300 bg-slate-50/40">
+                                        Без группы
+                                    </div>
+                                )}
+                                {grouped.get(null)!.map(item => (
+                                    <OptionRow
+                                        key={item.id}
+                                        item={item}
+                                        tags={cashFlowTags}
+                                        isSelected={value === item.id}
+                                        onSelect={handleSelect}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        </div>
+    ) : null;
+
     return (
-        <div ref={containerRef} className={`relative ${className}`}>
+        <div className={`relative ${className}`}>
             {/* Trigger */}
             <button
+                ref={buttonRef}
                 type="button"
                 disabled={disabled}
-                onClick={() => !disabled && setOpen(p => !p)}
+                onClick={handleToggle}
                 className={`
                     w-full flex items-center gap-2 px-3 py-2 rounded-xl border text-left transition-all
                     ${disabled
@@ -162,123 +328,8 @@ export const CashFlowSelector: React.FC<Props> = ({
                 <ChevronDown size={12} className={`shrink-0 text-slate-300 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* Dropdown */}
-            {open && (
-                <div
-                    className="absolute top-full mt-1 z-[200] bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden"
-                    style={{ minWidth: dropdownMinWidth }}
-                >
-                    {/* Поиск */}
-                    <div className="p-2 border-b border-slate-100">
-                        <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
-                            <Search size={12} className="text-slate-400 shrink-0" />
-                            <input
-                                autoFocus
-                                className="flex-1 bg-transparent text-[11px] font-bold outline-none text-slate-700 placeholder:text-slate-300"
-                                placeholder="Поиск статьи..."
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                            />
-                            {search && (
-                                <button onClick={() => setSearch('')} className="text-slate-300 hover:text-slate-500 transition-colors">
-                                    <X size={10} />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Фильтр по тегам */}
-                    {usedTags.length > 0 && (
-                        <div className="px-2.5 py-1.5 border-b border-slate-50 flex flex-wrap gap-1">
-                            {usedTags.map(tag => (
-                                <button
-                                    key={tag.id}
-                                    onClick={() => setFilterTagId(p => p === tag.id ? '' : tag.id)}
-                                    className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide border transition-all"
-                                    style={{
-                                        borderColor: tag.color,
-                                        backgroundColor: filterTagId === tag.id ? tag.color : 'transparent',
-                                        color: filterTagId === tag.id ? '#fff' : tag.color,
-                                    }}
-                                >
-                                    {tag.name}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Список */}
-                    <div className="max-h-64 overflow-y-auto py-1">
-                        {/* Приоритетные статьи контрагента */}
-                        {priorityItems.length > 0 && !search && !filterTagId && (
-                            <div>
-                                <div className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-50/80 flex items-center gap-1.5">
-                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                                    Приоритет
-                                </div>
-                                {priorityItems.map((item, idx) => (
-                                    <OptionRow
-                                        key={item.id}
-                                        item={item}
-                                        tags={cashFlowTags}
-                                        isSelected={value === item.id}
-                                        onSelect={handleSelect}
-                                        priorityIndex={idx}
-                                    />
-                                ))}
-                                <div className="mx-3 my-1 border-t border-slate-100" />
-                            </div>
-                        )}
-                        {filteredItems.length === 0 ? (
-                            <div className="px-4 py-6 text-center text-[11px] text-slate-300 font-bold italic">Ничего не найдено</div>
-                        ) : (
-                            <>
-                                {/* Сначала группы с детьми */}
-                                {groups.map(group => {
-                                    const children = grouped.get(group.id) ?? [];
-                                    if (children.length === 0) return null;
-                                    return (
-                                        <div key={group.id}>
-                                            <div className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50/80">
-                                                {group.name}
-                                            </div>
-                                            {children.map(item => (
-                                                <OptionRow
-                                                    key={item.id}
-                                                    item={item}
-                                                    tags={cashFlowTags}
-                                                    isSelected={value === item.id}
-                                                    onSelect={handleSelect}
-                                                    indent
-                                                />
-                                            ))}
-                                        </div>
-                                    );
-                                })}
-                                {/* Затем без группы */}
-                                {(grouped.get(null)?.length ?? 0) > 0 && (
-                                    <div>
-                                        {groups.some(g => (grouped.get(g.id)?.length ?? 0) > 0) && (
-                                            <div className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-300 bg-slate-50/40">
-                                                Без группы
-                                            </div>
-                                        )}
-                                        {grouped.get(null)!.map(item => (
-                                            <OptionRow
-                                                key={item.id}
-                                                item={item}
-                                                tags={cashFlowTags}
-                                                isSelected={value === item.id}
-                                                onSelect={handleSelect}
-                                            />
-                                        ))}
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
-                </div>
-            )}
+            {/* Dropdown через Portal — не обрезается overflow-hidden родителей */}
+            {typeof document !== 'undefined' && createPortal(dropdown, document.body)}
         </div>
     );
 };

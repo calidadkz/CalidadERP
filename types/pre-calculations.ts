@@ -22,7 +22,7 @@ export interface GeneralSettings {
   chinaDomesticRateMethod: ChinaDomesticRateMethod; // 'volume' | 'weight' | 'fixed'
   chinaDomesticRatePerM3Usd: number;   // рейт за м³ (метод volume)
   chinaDomesticRatePerTonUsd: number;  // рейт за тонну (метод weight)
-  chinaDomesticFixedKztPerUnit: number; // фиксированная цена за ед. (метод fixed)
+  chinaDomesticFixedKztTotal: number;   // фикс. сумма на всю партию (метод fixed), делится пропорционально объёму
 }
 
 export interface PreCalculationItem {

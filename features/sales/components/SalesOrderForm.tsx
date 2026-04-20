@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { SalesOrder, PlannedPayment, Client, Currency, OrderStatus, CounterpartyType, OrderDocument } from '@/types';
-import { Save, UserPlus, FileText, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import { Save, UserPlus, FileText, ChevronDown, ChevronUp, AlertCircle, CalendarDays, Clock, ArrowLeft } from 'lucide-react';
+import { formatDateRu } from '@/utils/kazakhstanWorkingDays';
 import { SalesItemsTab } from './SalesItemsTab';
 import { SalesPaymentsTab } from './SalesPaymentsTab';
 import { CounterpartyCreateModal } from '../../counterparties/components/CounterpartyCreateModal';
@@ -18,10 +19,11 @@ interface SalesOrderFormProps {
     access: any;
     onCancel: () => void;
     onSubmit: (order: SalesOrder, plans: PlannedPayment[]) => void;
+    isMobile?: boolean;
 }
 
 export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
-    initialOrder, initialPayments, state, actions, access, onCancel, onSubmit
+    initialOrder, initialPayments, state, actions, access, onCancel, onSubmit, isMobile = false
 }) => {
     const {
         orderId,
@@ -32,8 +34,11 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
         activeFormTab, setActiveFormTab,
         contractUrl, setContractUrl,
         contractName, setContractName,
-        contractDeliveryDate, setContractDeliveryDate,
+        contractStartDate, setContractStartDate,
+        contractWorkingDays, setContractWorkingDays,
+        contractDeliveryDate,
         additionalDocuments, setAdditionalDocuments,
+        responsibleEmployeeId, setResponsibleEmployeeId,
         totalOrderAmount,
         unallocatedAmount,
         handleAddPaymentStep,
@@ -47,6 +52,7 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
     const canSeePayments = access.canSee('tabs', 'payments_tab');
     const canEditPrices = access.canWrite('fields', 'sales_prices');
     const canAddClient = access.canWrite('actions', 'add_client');
+    const canSeeResponsible = access.canSee('fields', 'col_responsible');
     const isFormWriteable = initialOrder ? access.canWrite('actions', 'edit') : access.canWrite('actions', 'create');
 
     const f = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -71,8 +77,12 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
             totalItemCount: items.reduce((sum, i) => sum + (i.quantity || 0), 0),
             contractUrl,
             contractName,
+            contractStartDate: contractStartDate || undefined,
+            contractWorkingDays: contractWorkingDays ? Number(contractWorkingDays) : undefined,
             contractDeliveryDate: contractDeliveryDate || undefined,
-            additionalDocuments
+            additionalDocuments,
+            responsibleEmployeeId: responsibleEmployeeId || undefined,
+            responsibleEmployeeName: state.counterparties?.find((e: any) => e.id === responsibleEmployeeId)?.name || undefined,
         };
 
         const plans: PlannedPayment[] = formPayments.map(p => {
@@ -111,26 +121,102 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
     };
 
     return (
-        <div className="h-[calc(100vh-120px)] flex flex-col bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden relative">
-            <div className="flex-none bg-white border-b px-8 py-3 flex justify-between items-center z-30">
-                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
-                    {canSeeItems && (<button onClick={() => setActiveFormTab('items')} className={`px-6 py-1.5 rounded-lg text-[10px] font-black transition-all uppercase tracking-widest ${activeFormTab === 'items' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>1. Состав заказа</button>)}
-                    {canSeePayments && (<button onClick={() => setActiveFormTab('payments')} className={`px-6 py-1.5 rounded-lg text-[10px] font-black transition-all uppercase tracking-widest ${activeFormTab === 'payments' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>2. График оплат (IPP)</button>)}
-                </div>
-                <div className="flex items-center gap-3">
-                    <button onClick={onCancel} className="px-4 py-2 font-bold text-slate-400 hover:text-slate-600 transition-colors text-xs uppercase tracking-widest">Отмена</button>
-                    {isFormWriteable && (<button onClick={handleFormSubmit} className={`bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-2.5 rounded-xl font-black shadow-lg flex items-center text-xs uppercase tracking-[0.1em] transition-all ${Math.abs(unallocatedAmount) > 0.1 ? 'opacity-50 grayscale' : ''}`}><Save size={16} className="mr-2"/> {initialOrder ? 'Обновить' : 'Провести'}</button>)}
-                </div>
-            </div>
+        <div className={isMobile ? "flex flex-col flex-1 bg-white overflow-hidden" : "h-[calc(100vh-120px)] flex flex-col bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden relative"}>
 
-            <div className="flex-none px-8 py-4 border-b flex flex-col gap-4 bg-slate-50/20">
-                <div className="flex gap-6 items-center">
-                    <div className="flex flex-col">
-                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Название заказа</label>
-                        <input 
+            {/* ── Мобильная шапка ── */}
+            {isMobile && (
+                <div className="sticky top-0 z-30 bg-white border-b border-slate-100 px-3 py-2.5 flex items-center gap-2 shrink-0">
+                    <button onClick={onCancel} className="p-2 text-slate-400 active:text-slate-600 rounded-xl active:bg-slate-50">
+                        <ArrowLeft size={18}/>
+                    </button>
+                    <div className="flex-1 flex justify-center">
+                        <div className="flex bg-slate-100 p-0.5 rounded-xl">
+                            {canSeeItems && (
+                                <button onClick={() => setActiveFormTab('items')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeFormTab === 'items' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>
+                                    Состав
+                                </button>
+                            )}
+                            {canSeePayments && (
+                                <button onClick={() => setActiveFormTab('payments')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeFormTab === 'payments' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>
+                                    Транши
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    {isFormWriteable && (
+                        <button onClick={handleFormSubmit} className={`flex items-center gap-1 bg-emerald-500 text-white px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-lg ${Math.abs(unallocatedAmount) > 0.1 ? 'opacity-50' : ''}`}>
+                            <Save size={13}/> {initialOrder ? 'Обновить' : 'Провести'}
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* ── Десктоп шапка ── */}
+            {!isMobile && (
+                <div className="flex-none bg-white border-b px-8 py-3 flex justify-between items-center z-30">
+                    <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
+                        {canSeeItems && (<button onClick={() => setActiveFormTab('items')} className={`px-6 py-1.5 rounded-lg text-[10px] font-black transition-all uppercase tracking-widest ${activeFormTab === 'items' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>1. Состав заказа</button>)}
+                        {canSeePayments && (<button onClick={() => setActiveFormTab('payments')} className={`px-6 py-1.5 rounded-lg text-[10px] font-black transition-all uppercase tracking-widest ${activeFormTab === 'payments' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>2. График оплат (IPP)</button>)}
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button onClick={onCancel} className="px-4 py-2 font-bold text-slate-400 hover:text-slate-600 transition-colors text-xs uppercase tracking-widest">Отмена</button>
+                        {isFormWriteable && (<button onClick={handleFormSubmit} className={`bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-2.5 rounded-xl font-black shadow-lg flex items-center text-xs uppercase tracking-[0.1em] transition-all ${Math.abs(unallocatedAmount) > 0.1 ? 'opacity-50 grayscale' : ''}`}><Save size={16} className="mr-2"/> {initialOrder ? 'Обновить' : 'Провести'}</button>)}
+                    </div>
+                </div>
+            )}
+
+            {/* ── Мобильные поля ── */}
+            {isMobile && (
+                <div className="flex-none px-4 py-3 border-b bg-slate-50/20 space-y-2.5">
+                    <div>
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Название заказа</label>
+                        <input
                             type="text"
                             placeholder="Напр: Поставка станков для цеха №1"
-                            className="w-64 border border-slate-200 p-2 rounded-xl bg-white font-bold text-slate-700 text-xs outline-none focus:ring-4 focus:ring-blue-500/10"
+                            className="w-full border border-slate-200 p-2.5 rounded-xl bg-white font-bold text-slate-700 text-xs outline-none focus:ring-4 focus:ring-blue-500/10"
+                            value={orderName}
+                            onChange={e => setOrderName(e.target.value)}
+                            disabled={!isFormWriteable}
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Клиент</label>
+                        <div className="flex gap-2">
+                            <SearchableDropdown
+                                options={state.clients}
+                                value={selectedClientId}
+                                onChange={setSelectedClientId}
+                                displayKey="name"
+                                valueKey="id"
+                                placeholder="-- Выберите клиента --"
+                                disabled={!isFormWriteable}
+                                className="flex-1"
+                            />
+                            {canAddClient && (
+                                <button onClick={() => setIsClientModalOpen(true)} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 active:bg-blue-600 active:text-white transition-all">
+                                    <UserPlus size={16}/>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between px-1">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Итого заказ</span>
+                        <span className="text-base font-black text-blue-600 font-mono">{f(totalOrderAmount)} <span className="text-xs font-normal opacity-40">₸</span></span>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Десктоп поля ── */}
+            {!isMobile && (
+            <div className="flex-none px-6 py-3 border-b flex flex-col gap-2 bg-slate-50/20">
+                {/* Строка 1: основные поля */}
+                <div className="flex gap-4 items-end flex-wrap">
+                    <div className="flex flex-col">
+                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Название заказа</label>
+                        <input
+                            type="text"
+                            placeholder="Напр: Поставка станков для цеха №1"
+                            className="w-56 border border-slate-200 p-2 rounded-xl bg-white font-bold text-slate-700 text-xs outline-none focus:ring-4 focus:ring-blue-500/10"
                             value={orderName}
                             onChange={e => setOrderName(e.target.value)}
                             disabled={!isFormWriteable}
@@ -148,54 +234,106 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
                                 valueKey="id"
                                 placeholder="-- Выберите клиента --"
                                 disabled={!isFormWriteable}
-                                className="w-56" 
+                                className="w-48"
                             />
                             {canAddClient && <button onClick={() => setIsClientModalOpen(true)} className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 hover:bg-blue-600 hover:text-white transition-all shadow-sm"><UserPlus size={16}/></button>}
                         </div>
                     </div>
-                    <div className="flex flex-col"><label className="text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Валюта</label><div className="w-20 p-2 border border-slate-200 rounded-xl bg-slate-50 font-black text-slate-400 text-xs text-center">KZT</div></div>
-                    
-                    <div className="h-10 w-px bg-slate-200 mx-1"/>
-                    
-                    <div className="flex items-end gap-3">
-                        <div className="max-w-xs">
-                            <FileUpload
-                                label="Договор клиента"
-                                value={contractUrl}
-                                fileName={contractName}
-                                onUpload={(url, name) => { setContractUrl(url); setContractName(name); }}
-                                onRemove={() => { setContractUrl(''); setContractName(''); setContractDeliveryDate(''); }}
-                                folder={`contracts/sales-orders/${orderId}`}
-                                isContract
-                            />
-                        </div>
-                        {contractUrl && (
-                            <div className="flex flex-col">
-                                <label className={`text-[9px] font-black uppercase mb-1.5 ml-1 tracking-widest flex items-center gap-1 ${!contractDeliveryDate ? 'text-red-500' : 'text-slate-400'}`}>
-                                    {!contractDeliveryDate && <AlertCircle size={10}/>}
-                                    Крайняя дата по договору
-                                    <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="date"
-                                    value={contractDeliveryDate}
-                                    onChange={e => setContractDeliveryDate(e.target.value)}
-                                    disabled={!isFormWriteable}
-                                    className={`w-44 border p-2 rounded-xl bg-white font-bold text-slate-700 text-xs outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
-                                        !contractDeliveryDate
-                                            ? 'border-red-300 bg-red-50 focus:ring-red-500/10'
-                                            : 'border-slate-200'
-                                    }`}
-                                />
-                            </div>
-                        )}
+
+                    <div className="flex flex-col">
+                        <label className="text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Валюта</label>
+                        <div className="w-16 p-2 border border-slate-200 rounded-xl bg-slate-50 font-black text-slate-400 text-xs text-center">KZT</div>
                     </div>
 
-                    <div className="flex flex-col justify-center min-w-[120px] items-end">
+                    {canSeeResponsible && (
+                        <div className="flex flex-col">
+                            <label className="text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Ответственный</label>
+                            <select
+                                className="w-44 border border-slate-200 p-2 rounded-xl bg-white font-bold text-slate-700 text-xs outline-none focus:ring-4 focus:ring-blue-500/10"
+                                value={responsibleEmployeeId}
+                                onChange={e => setResponsibleEmployeeId(e.target.value)}
+                                disabled={!isFormWriteable}
+                            >
+                                <option value="">— Не назначен —</option>
+                                {(state.counterparties || [])
+                                    .filter((e: any) => (e.roles || [e.type]).includes('Employee'))
+                                    .map((e: any) => (
+                                        <option key={e.id} value={e.id}>{e.name}{e.position ? ` (${e.position})` : ''}</option>
+                                    ))
+                                }
+                            </select>
+                        </div>
+                    )}
+
+                    <div className="h-8 w-px bg-slate-200"/>
+
+                    <div className="max-w-xs">
+                        <FileUpload
+                            label="Договор клиента"
+                            value={contractUrl}
+                            fileName={contractName}
+                            onUpload={(url, name) => { setContractUrl(url); setContractName(name); }}
+                            onRemove={() => { setContractUrl(''); setContractName(''); setContractStartDate(''); setContractWorkingDays(''); }}
+                            folder={`contracts/sales-orders/${orderId}`}
+                            isContract
+                        />
+                    </div>
+
+                    <div className="flex-1"/>
+
+                    <div className="flex flex-col justify-center items-end">
                         <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Итого заказ</div>
-                        <div className="text-2xl font-black text-blue-600 leading-none tracking-tighter">{f(totalOrderAmount)} <span className="text-sm font-light opacity-40">₸</span></div>
+                        <div className="text-xl font-black text-blue-600 leading-none tracking-tighter">{f(totalOrderAmount)} <span className="text-sm font-light opacity-40">₸</span></div>
                     </div>
                 </div>
+
+                {/* Строка 2: поля договора (показываем только если договор загружен) */}
+                {contractUrl && (
+                    <div className="flex items-end gap-3 pt-1 border-t border-slate-100">
+                        {/* Дата первого платежа */}
+                        <div className="flex flex-col">
+                            <label className="text-[9px] font-black uppercase mb-1.5 ml-1 tracking-widest text-slate-400 flex items-center gap-1">
+                                <CalendarDays size={9}/> Дата первого платежа <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="date"
+                                value={contractStartDate}
+                                onChange={e => setContractStartDate(e.target.value)}
+                                disabled={!isFormWriteable}
+                                className="w-36 border border-slate-200 p-2 rounded-xl bg-white font-bold text-slate-700 text-xs outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                            />
+                        </div>
+                        {/* Срок в рабочих днях */}
+                        <div className="flex flex-col">
+                            <label className="text-[9px] font-black uppercase mb-1.5 ml-1 tracking-widest text-slate-400 flex items-center gap-1">
+                                <Clock size={9}/> Срок по договору (раб. дней) <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="number"
+                                min={1}
+                                value={contractWorkingDays}
+                                onChange={e => setContractWorkingDays(e.target.value === '' ? '' : Number(e.target.value))}
+                                disabled={!isFormWriteable}
+                                placeholder="30"
+                                className="w-20 border border-slate-200 p-2 rounded-xl bg-white font-bold text-slate-700 text-xs outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                            />
+                        </div>
+                        {/* Рассчитанный дедлайн */}
+                        <div className="flex flex-col">
+                            <label className={`text-[9px] font-black uppercase mb-1.5 ml-1 tracking-widest flex items-center gap-1 ${!contractDeliveryDate ? 'text-red-400' : 'text-emerald-600'}`}>
+                                {!contractDeliveryDate && <AlertCircle size={9}/>}
+                                Крайний срок отгрузки
+                            </label>
+                            <div className={`px-3 py-2 rounded-xl border text-xs font-black min-w-[150px] ${
+                                contractDeliveryDate
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : 'border-red-200 bg-red-50 text-red-400'
+                            }`}>
+                                {contractDeliveryDate ? formatDateRu(contractDeliveryDate) : '— заполните поля'}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="border-t pt-3">
                     <button 
@@ -236,8 +374,9 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
                     )}
                 </div>
             </div>
+            )}
 
-            <div className="flex-1 overflow-y-auto p-6 bg-white custom-scrollbar">
+            <div className={`flex-1 overflow-y-auto bg-white custom-scrollbar ${isMobile ? 'p-3' : 'p-6'}`}>
                 {activeFormTab === 'items' ? (
                     <SalesItemsTab 
                         products={state.products} 

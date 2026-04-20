@@ -23,6 +23,7 @@ export enum ExpenseAllocationMethod {
     BY_VOLUME = 'По объему',
     BY_VALUE = 'По стоимости',
     BY_QUANTITY = 'По количеству',
+    BY_EQUAL = 'Поровну',
     SPECIFIC_ITEM = 'На позицию'
 }
 

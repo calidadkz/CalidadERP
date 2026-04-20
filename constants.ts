@@ -47,7 +47,10 @@ export enum TableNames {
     BATCH_ITEM_ACTUALS = 'batch_item_actuals',
     INVENTORY_SUMMARY = 'v_inventory_summary',
     STOCK_WRITEOFFS = 'stock_writeoffs',
-    WRITEOFF_REASON_TYPES = 'writeoff_reason_types'
+    WRITEOFF_REASON_TYPES = 'writeoff_reason_types',
+    BATCH_STATUSES = 'batch_statuses',
+    BATCH_CATEGORY_DEFAULTS = 'batch_category_defaults',
+    MONEY_MOVEMENTS = 'money_movements'
 }
 
 export const KZT_RATES: Record<Currency, number> = {

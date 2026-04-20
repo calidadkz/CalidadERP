@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ActualPayment, Currency, PlannedPayment, BankAccount, Client, Supplier, PaymentAllocation, Batch, Counterparty, CounterpartyAccount, CounterpartyType } from '@/types';
-import { X, AlertCircle, Landmark, Wallet, Plus, Trash2, UserPlus, Tag, Receipt } from 'lucide-react';
+import { X, AlertCircle, Landmark, Plus, Trash2, UserPlus, Tag, Receipt, Paperclip, Upload, Loader2, CheckCircle } from 'lucide-react';
+import { CalidadSelect, CalidadSelectOption } from '@/components/ui/CalidadSelect';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '@/services/firebase';
 import { CashFlowSelector } from '@/components/ui/CashFlowSelector';
 import { ApiService } from '@/services/api';
 import { TableNames } from '@/constants';
@@ -50,6 +53,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     // --- Строки распределения ---
     const [lines, setLines] = useState<AllocLine[]>([]);
 
+    // ID платежа генерируется заранее, чтобы использовать в пути загрузки файла
+    const [paymentId] = useState(() => ApiService.generateId('TX'));
+
+    // --- Прикреплённый документ (чек, скан) ---
+    const [receiptFile, setReceiptFile] = useState<File | null>(null);
+    const [receiptUrl, setReceiptUrl] = useState<string>('');
+    const [isUploading, setIsUploading] = useState(false);
+
     const [batches, setBatches] = useState<Batch[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [localClients, setLocalClients] = useState<Client[]>(initialClients);
@@ -83,7 +94,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
     // Инициализация строк
     useEffect(() => {
-        ApiService.fetchAll<Batch>(TableNames.BATCHES, { status: 'active' }).then(setBatches);
+        ApiService.fetchAll<Batch>(TableNames.BATCHES).then(bs => setBatches(bs.filter(b => b.status !== 'completed')));
 
         if (plan) {
             setLines([{
@@ -126,6 +137,25 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         }));
     };
 
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setReceiptFile(file);
+        setIsUploading(true);
+        try {
+            const storageRef = ref(storage, `payment-receipts/${paymentId}/${file.name}`);
+            const snapshot = await uploadBytes(storageRef, file);
+            const url = await getDownloadURL(snapshot.ref);
+            setReceiptUrl(url);
+        } catch {
+            setError('Ошибка загрузки файла. Попробуйте ещё раз.');
+            setReceiptFile(null);
+        } finally {
+            setIsUploading(false);
+            e.target.value = '';
+        }
+    };
+
     const handleSave = () => {
         setError(null);
         if (!counterpartyId) { setError('Укажите контрагента'); return; }
@@ -139,7 +169,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         const cp = [...localClients, ...localSuppliers].find(c => c.id === counterpartyId);
 
         onSubmit({
-            id: ApiService.generateId('TX'),
+            id: paymentId,
             direction,
             date,
             counterpartyId,
@@ -162,6 +192,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             purpose: purpose || undefined,
             counterpartyBinIin: cpBin || undefined,
             counterpartyIik: cpIik || undefined,
+            receiptUrl: receiptUrl || undefined,
         });
     };
 
@@ -180,8 +211,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
     return (
         <>
-            <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-[2px] flex items-center justify-center z-[110] p-4">
-                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-[2px] flex items-center justify-center z-[110] p-3 xl:p-4">
+                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl xl:max-w-2xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
 
                     {/* Шапка */}
                     <div className="px-6 py-4 border-b bg-slate-50 flex justify-between items-center flex-none">
@@ -208,7 +239,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                             <div className="grid grid-cols-12 gap-3">
                                 {/* Контрагент */}
                                 <div className="col-span-5">
-                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 tracking-widest">Контрагент</label>
+                                    <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 tracking-widest">Контрагент</label>
                                     <div className="flex gap-1.5">
                                         <select
                                             className="flex-1 border border-slate-200 p-2 rounded-xl text-xs font-bold bg-white outline-none disabled:bg-slate-50"
@@ -230,13 +261,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
                                 {/* Дата */}
                                 <div className="col-span-3">
-                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 tracking-widest">Дата</label>
+                                    <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 tracking-widest">Дата</label>
                                     <input type="date" className="w-full border border-slate-200 p-2 rounded-xl text-xs font-bold bg-white outline-none" value={date} onChange={e => setDate(e.target.value)}/>
                                 </div>
 
                                 {/* Валюта */}
                                 <div className="col-span-2">
-                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 tracking-widest">Валюта</label>
+                                    <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 tracking-widest">Валюта</label>
                                     <select className="w-full border border-slate-200 p-2 rounded-xl text-xs font-black bg-white outline-none" value={currency} onChange={e => setCurrency(e.target.value as Currency)} disabled={!!plan}>
                                         {Object.values(Currency).map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
@@ -244,7 +275,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
                                 {/* Сумма */}
                                 <div className="col-span-2">
-                                    <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 tracking-widest">Сумма</label>
+                                    <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 tracking-widest">Сумма</label>
                                     <input
                                         type="number"
                                         className="w-full border border-slate-200 p-2 rounded-xl text-sm font-black text-slate-900 outline-none"
@@ -254,24 +285,23 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                 </div>
                             </div>
 
-                            {/* Счёт — горизонтальный ряд карточек */}
+                            {/* Счёт — выпадающий список */}
                             <div>
-                                <label className="block text-[8px] font-black text-slate-400 uppercase mb-1.5 tracking-widest flex items-center gap-1"><Landmark size={10}/> Счёт</label>
-                                <div className="flex gap-2 flex-wrap">
-                                    {bankAccounts.filter(a => a.currency === currency).map(a => (
-                                        <div key={a.id} onClick={() => setAccountId(a.id)}
-                                             className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 cursor-pointer transition-all ${accountId === a.id ? 'border-blue-500 bg-blue-50' : 'border-slate-100 hover:border-slate-200'}`}>
-                                            <Wallet size={13} className={accountId === a.id ? 'text-blue-600' : 'text-slate-300'}/>
-                                            <div>
-                                                <div className="text-[10px] font-black text-slate-700">{a.bank}</div>
-                                                <div className="text-[9px] font-mono text-slate-400">{f(a.balance)} {a.currency}</div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {bankAccounts.filter(a => a.currency === currency).length === 0 && (
-                                        <div className="px-3 py-2 text-[10px] text-slate-400 italic border border-dashed border-slate-200 rounded-xl">Нет счетов в {currency}</div>
-                                    )}
-                                </div>
+                                <label className="block text-[11px] font-black text-slate-500 uppercase mb-1.5 tracking-widest flex items-center gap-1"><Landmark size={10}/> Счёт</label>
+                                <CalidadSelect
+                                    options={bankAccounts
+                                        .filter(a => a.currency === currency)
+                                        .map(a => ({
+                                            id: a.id,
+                                            label: `${a.name} · ${a.bank}`,
+                                            sub: `№${a.number} · ${f(a.balance)} ${a.currency}`,
+                                        } as CalidadSelectOption))}
+                                    value={accountId}
+                                    onChange={setAccountId}
+                                    placeholder="Выберите счёт"
+                                    nullLabel={null}
+                                    zIndex="z-[200]"
+                                />
                             </div>
                         </div>
 
@@ -281,8 +311,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         {/* Строки распределения */}
                         <div className="px-6 py-4 space-y-2">
                             <div className="flex justify-between items-center mb-2">
-                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><Tag size={10}/> Распределение</label>
-                                <button onClick={addLine} className="flex items-center gap-1 text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg hover:bg-indigo-100 transition-all">
+                                <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Tag size={10}/> Распределение</label>
+                                <button onClick={addLine} className="flex items-center gap-1 text-[11px] font-black uppercase text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg hover:bg-indigo-100 transition-all">
                                     <Plus size={11}/> Добавить строку
                                 </button>
                             </div>
@@ -307,7 +337,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                                     ))}
                                                 </select>
                                                 {line.plannedPaymentId && (
-                                                    <span className="text-[8px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">↔ план</span>
+                                                    <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">↔ план</span>
                                                 )}
                                             </div>
                                         )}
@@ -341,15 +371,50 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
                             {/* Баланс */}
                             <div className={`flex items-center justify-between px-4 py-2.5 rounded-2xl border-2 transition-all ${isBalanced ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'}`}>
-                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Итого</span>
+                                <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">Итого</span>
                                 <div className="text-right">
                                     <span className={`text-sm font-black font-mono ${isBalanced ? 'text-emerald-700' : 'text-amber-700'}`}>{f(totalAllocated)}</span>
                                     <span className="text-xs text-slate-400 ml-1">/ {f(amount)} {currency}</span>
                                 </div>
                                 {!isBalanced && (
-                                    <span className="text-[9px] font-black text-amber-600 flex items-center gap-1 ml-2">
+                                    <span className="text-[11px] font-black text-amber-600 flex items-center gap-1 ml-2">
                                         <AlertCircle size={12}/> Δ {f(amount - totalAllocated)}
                                     </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Прикреплённый документ */}
+                        <div className="px-6 pb-3">
+                            <div className="flex items-center gap-3">
+                                <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1 shrink-0">
+                                    <Paperclip size={10}/> Документ
+                                </span>
+                                {receiptUrl ? (
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
+                                           className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-800 truncate max-w-[220px]">
+                                            <CheckCircle size={11} className="shrink-0"/>{receiptFile?.name || 'Документ загружен'}
+                                        </a>
+                                        <button onClick={() => { setReceiptUrl(''); setReceiptFile(null); }}
+                                                className="text-slate-300 hover:text-red-500 transition-colors shrink-0" title="Удалить">
+                                            <X size={12}/>
+                                        </button>
+                                    </div>
+                                ) : isUploading ? (
+                                    <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                                        <Loader2 size={11} className="animate-spin"/> Загрузка...
+                                    </span>
+                                ) : (
+                                    <label className="flex items-center gap-1.5 text-[11px] font-black text-blue-600 cursor-pointer hover:text-blue-800 transition-colors">
+                                        <Upload size={11}/> Прикрепить файл
+                                        <input
+                                            type="file"
+                                            className="hidden"
+                                            accept="image/*,.pdf,.txt,.doc,.docx,.csv,.xlsx,.xls"
+                                            onChange={handleFileSelect}
+                                        />
+                                    </label>
                                 )}
                             </div>
                         </div>
@@ -358,7 +423,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         <div className="px-6 pb-4">
                             <button
                                 onClick={() => setShowDetails(v => !v)}
-                                className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 hover:text-slate-600 transition-colors"
+                                className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 hover:text-slate-600 transition-colors"
                             >
                                 <span className={`transition-transform ${showDetails ? 'rotate-90' : ''}`}>▶</span>
                                 Реквизиты выписки (№ документа, КНП, БИН...)
@@ -372,7 +437,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                         { label: 'ИИК', val: cpIik, set: setCpIik },
                                     ].map(({ label, val, set }) => (
                                         <div key={label}>
-                                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">{label}</label>
+                                            <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">{label}</label>
                                             <input className="w-full border border-slate-100 bg-slate-50 p-2 rounded-xl text-xs font-mono outline-none" value={val} onChange={e => set(e.target.value)}/>
                                         </div>
                                     ))}

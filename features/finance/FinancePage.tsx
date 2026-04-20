@@ -9,13 +9,14 @@ import { useFinanceModals } from './hooks/useFinanceModals';
 const PaymentsCalendar = lazy(() => import('./tabs/PaymentsCalendar').then(m => ({ default: m.PaymentsCalendar })));
 const BankStatements = lazy(() => import('./tabs/BankStatements').then(m => ({ default: m.BankStatements })));
 const TreasuryAccounts = lazy(() => import('./tabs/TreasuryAccounts').then(m => ({ default: m.TreasuryAccounts })));
+const MoneyMovementsRegistry = lazy(() => import('./tabs/MoneyMovementsRegistry').then(m => ({ default: m.MoneyMovementsRegistry })));
 
 // Lazy-loaded Modals
 const PaymentModal = lazy(() => import('./components/PaymentModal').then(m => ({ default: m.PaymentModal })));
 const ManualPlanModal = lazy(() => import('./components/ManualPlanModal').then(m => ({ default: m.ManualPlanModal })));
 
 interface FinancePageProps {
-    view: 'plan' | 'fact' | 'treasury';
+    view: 'plan' | 'fact' | 'treasury' | 'movements';
 }
 
 const TabLoader = () => (
@@ -40,11 +41,12 @@ export const FinancePage: React.FC<FinancePageProps> = ({ view }) => {
         closeManualPlanModal
     } = useFinanceModals();
 
-    const handleViewChange = (newView: 'plan' | 'fact' | 'treasury') => {
+    const handleViewChange = (newView: 'plan' | 'fact' | 'treasury' | 'movements') => {
         const routes = {
             plan: '/finance_calendar',
             fact: '/finance_statements',
-            treasury: '/finance_accounts'
+            treasury: '/finance_accounts',
+            movements: '/finance_movements',
         };
         navigate(routes[newView]);
     };
@@ -66,15 +68,21 @@ export const FinancePage: React.FC<FinancePageProps> = ({ view }) => {
                     >
                         Выписки (IP)
                     </button>
-                    <button 
-                        onClick={() => handleViewChange('treasury')} 
+                    <button
+                        onClick={() => handleViewChange('treasury')}
                         className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${view === 'treasury' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300/50'}`}
                     >
                         Наши счета
                     </button>
+                    <button
+                        onClick={() => handleViewChange('movements')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${view === 'movements' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300/50'}`}
+                    >
+                        Реестр ДДС
+                    </button>
                 </div>
                 
-                {view !== 'treasury' && (
+                {view !== 'treasury' && view !== 'movements' && (
                     <div className="flex bg-gray-100 p-1 rounded-lg">
                         <button onClick={() => setDirectionFilter('All')} className={`px-3 py-1 text-xs rounded transition-all ${directionFilter === 'All' ? 'bg-white shadow font-bold' : 'text-gray-500'}`}>Все</button>
                         <button onClick={() => setDirectionFilter('Outgoing')} className={`flex items-center px-3 py-1 text-xs rounded transition-all ${directionFilter === 'Outgoing' ? 'bg-white shadow text-red-600 font-bold' : 'text-gray-500'}`}><ArrowUpRight size={14} className="mr-1"/> Исходящие</button>
@@ -103,6 +111,10 @@ export const FinancePage: React.FC<FinancePageProps> = ({ view }) => {
 
                     {view === 'treasury' && (
                         <TreasuryAccounts />
+                    )}
+
+                    {view === 'movements' && (
+                        <MoneyMovementsRegistry />
                     )}
                 </Suspense>
             </div>

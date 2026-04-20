@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback, Suspense } from 'react';
 import { useStore } from '../system/context/GlobalStore';
-import { ProductType, ProductCategory as Category, StockMovement } from '@/types';
+import { ProductType, ProductCategory as Category, StockMovement, Currency } from '@/types';
 import { LayoutList, FileText, Wallet, PackageSearch, TrendingUp, Download, Upload, Loader2, CheckCircle, AlertCircle, PlusCircle, Box, Zap, Search, Printer, FileDown, RefreshCw, ChevronDown } from 'lucide-react';
 import { useAccess } from '../auth/hooks/useAccess';
 import { ApiService } from '@/services/api';
@@ -15,8 +15,11 @@ import { AdjustmentForm } from './components/AdjustmentForm';
 import { StockTable } from './components/StockTable';
 import { MovementsTable } from './components/MovementsTable';
 import InventoryVerificationReport from './components/InventoryVerificationReport';
-import { MobileInventoryView } from './components/MobileInventoryView';
 import { useIsMobile } from '@/hooks/useIsMobile';
+
+const MobileInventoryView = React.lazy(() =>
+    import('./components/MobileInventoryView').then(m => ({ default: m.MobileInventoryView }))
+);
 
 const INITIAL_PAGE_SIZE = 50;
 const MOVEMENTS_PAGE_SIZE = 50;
@@ -277,7 +280,9 @@ export const InventoryPage: React.FC = () => {
   if (isMobile) {
     return (
       <div className="h-full relative">
-        <MobileInventoryView state={state} actions={actions} access={access} />
+        <Suspense fallback={null}>
+          <MobileInventoryView state={state} actions={actions} access={access} />
+        </Suspense>
       </div>
     );
   }
@@ -362,7 +367,7 @@ export const InventoryPage: React.FC = () => {
                     onClose={() => setIsAdjusting(false)}
                     products={products}
                     stockMovements={localMovements}
-                    exchangeRates={exchangeRates || {}}
+                    exchangeRates={exchangeRates || {} as Record<Currency, number>}
                     optionVariants={optionVariants || []}
                     pricingProfiles={pricingProfiles || []}
                     categories={categories || []}

@@ -54,12 +54,18 @@ export const useInventoryState = (
         const p = products.find(x => x.id === id);
         if(!p) return;
         try {
-            await moveToTrash(id, 'Product', p.name, p);
             await ApiService.delete(TableNames.PRODUCTS, id);
-            setProducts(prev => prev.filter(x => x.id !== id));
-        } catch(e) { 
-            console.error("Failed to delete product", e);
+        } catch(e: any) {
+            if (e?.code === '23503') {
+                const detail: string = e?.details || '';
+                const tableMatch = detail.match(/table "([^"]+)"/);
+                const tableName = tableMatch ? tableMatch[1] : 'другой таблице';
+                throw new Error(`Невозможно удалить: товар используется в "${tableName}". Удалите или архивируйте связанные записи.`);
+            }
+            throw e;
         }
+        await moveToTrash(id, 'Product', p.name, p);
+        setProducts(prev => prev.filter(x => x.id !== id));
     };
 
     const adjustStock = async (
@@ -145,57 +151,76 @@ export const useInventoryState = (
 
     // ───── Списания ─────
 
-    const createWriteOff = async (
-        writeoff: WriteOff,
-        optionVariants: OptionVariant[] = [],
-        pricingProfiles: PricingProfile[] = [],
-        exchangeRates: Record<Currency, number> = {} as Record<Currency, number>
-    ): Promise<WriteOff> => {
+    // Этап 1: создаёт черновик заявки — без движения по складу
+    const createWriteOff = async (writeoff: WriteOff): Promise<WriteOff> => {
         const p = products.find(x => x.id === writeoff.productId);
         if (!p) throw new Error('Товар не найден');
 
-        // 1. Создаём движение Out через InventoryMediator
-        const docData = {
-            id: writeoff.id,
-            productId: writeoff.productId,
-            quantity: -writeoff.quantity,
-            unitCostKzt: writeoff.unitCostKzt,
-            configuration: undefined,
-            description: `Списание: ${writeoff.reasonNote || 'без причины'}`
+        const toSave: WriteOff = {
+            ...writeoff,
+            status: 'Draft',
+            movementId: undefined,
+            unitCostKzt: 0,
         };
-
-        let movementId = '';
-        let actualUnitCostKzt = writeoff.unitCostKzt;
-        await InventoryMediator.processEvent(
-            'WriteOff',
-            'Adjustment',
-            docData,
-            products,
-            optionVariants,
-            pricingProfiles,
-            exchangeRates,
-            stockMovements,
-            (newMvs) => {
-                movementId = newMvs[0]?.id || '';
-                // Берём реальную себестоимость из движения (InventoryMediator считает FIFO)
-                if (newMvs[0]?.unitCostKzt) {
-                    actualUnitCostKzt = newMvs[0].unitCostKzt;
-                }
-                setStockMovements(prev => [...newMvs, ...prev]);
-            }
-        );
-
-        // 2. Сохраняем запись списания
-        const toSave: WriteOff = { ...writeoff, movementId, unitCostKzt: actualUnitCostKzt };
         const created = await ApiService.create<WriteOff>(TableNames.STOCK_WRITEOFFS, toSave);
         setWriteoffs(prev => [created, ...prev]);
-        addLog('Create', 'Списание', writeoff.productId, `Списание ${writeoff.quantity} шт. ${writeoff.productName}`);
+        addLog('Create', 'Списание (черновик)', writeoff.productId, `Черновик ${writeoff.quantity} шт. ${writeoff.productName}`);
         return created;
     };
 
+    // Этап 2: проводит движение Out по складу, переводит статус в Posted
+    const postWriteOff = async (wo: WriteOff, inventorySummary: any[]): Promise<void> => {
+        const p = products.find(x => x.id === wo.productId);
+        if (!p) throw new Error('Товар не найден');
+
+        // Находим остаток из view (без конфигурации — простой товар)
+        const summaryEntry = inventorySummary.find(e =>
+            e.productId === wo.productId &&
+            (!e.configuration || e.configuration.length === 0)
+        );
+        const physicalQty = Number(summaryEntry?.stock) || 0;
+        if (physicalQty < wo.quantity) {
+            throw new Error(
+                `Недостаточно товара на складе: есть ${physicalQty} шт., требуется ${wo.quantity} шт.`
+            );
+        }
+
+        // Средняя себестоимость из view
+        const totalValue = Number(summaryEntry?.totalValueKzt) || 0;
+        const avgUnitCost = physicalQty > 0 ? totalValue / physicalQty : 0;
+
+        // Создаём движение Out / Physical с documentType = 'WriteOff'
+        const movement: StockMovement = {
+            id: ApiService.generateUUID(),
+            date: new Date().toISOString(),
+            productId: wo.productId,
+            sku: wo.sku,
+            productName: wo.productName,
+            type: 'Out',
+            quantity: wo.quantity,
+            unitCostKzt: avgUnitCost,
+            totalCostKzt: avgUnitCost * wo.quantity,
+            statusType: 'Physical',
+            documentType: 'WriteOff',
+            documentId: wo.id,
+            description: `Списание: ${wo.reasonNote || 'без причины'}`,
+        };
+        const createdMv = await ApiService.create<StockMovement>(TableNames.STOCK_MOVEMENTS, movement);
+        setStockMovements(prev => [createdMv, ...prev]);
+
+        // Обновляем запись списания
+        const updated = await ApiService.update<WriteOff>(TableNames.STOCK_WRITEOFFS, wo.id, {
+            status: 'Posted',
+            movementId: createdMv.id,
+            unitCostKzt: avgUnitCost,
+        });
+        setWriteoffs(prev => prev.map(x => x.id === wo.id ? { ...x, ...updated } : x));
+        addLog('Update', 'Списание', wo.productId, `Проведено ${wo.quantity} шт. ${wo.productName}, сумма потерь: ${Math.round(avgUnitCost * wo.quantity).toLocaleString()} ₸`);
+    };
+
     const deleteWriteOff = async (wo: WriteOff) => {
-        // Удаляем движение-сторно
-        if (wo.movementId) {
+        // Для проведённых — создаём сторно-движение
+        if (wo.status === 'Posted' && wo.movementId) {
             const mv = stockMovements.find(m => m.id === wo.movementId);
             if (mv) {
                 const reversalMovement: StockMovement = {
@@ -223,6 +248,6 @@ export const useInventoryState = (
         writeoffs, setWriteoffs,
         addProduct, updateProduct, updateProductsBulk, deleteProduct, adjustStock, revertInitialStockEntry,
         updateDiscrepancy, writeOffDiscrepancy,
-        createWriteOff, deleteWriteOff,
+        createWriteOff, postWriteOff, deleteWriteOff,
     };
 };

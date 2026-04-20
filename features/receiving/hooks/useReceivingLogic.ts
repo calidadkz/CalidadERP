@@ -99,6 +99,10 @@ export const useReceivingLogic = (
                 } else if (exp.allocationMethod === ExpenseAllocationMethod.BY_QUANTITY) {
                     const totalQty = items.reduce((s, i) => s + Number(i.qtyFact), 0);
                     if (totalQty > 0) allocated += (expInKzt * (qtyFact / totalQty)) / qtyFact;
+                } else if (exp.allocationMethod === ExpenseAllocationMethod.BY_EQUAL) {
+                    // Поровну: каждая позиция (строка) получает равную долю независимо от кол-ва
+                    const nItems = items.filter(i => Number(i.qtyFact) > 0).length || 1;
+                    allocated += (expInKzt / nItems) / qtyFact;
                 }
             });
             

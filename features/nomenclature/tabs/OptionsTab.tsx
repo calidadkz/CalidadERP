@@ -119,15 +119,25 @@ export const OptionsTab: React.FC<OptionsTabProps> = ({ formData, optionTypes = 
         const currentConfig = formData.machineConfig || [];
         const config = currentConfig.find(c => c.typeId === typeId) || { typeId, allowedVariantIds: [], priceOverrides: {} };
         const currentAllowed = config.allowedVariantIds || [];
-        const newAllowed = currentAllowed.includes(variantId) 
-            ? currentAllowed.filter(id => id !== variantId) 
+        const newAllowed = currentAllowed.includes(variantId)
+            ? currentAllowed.filter(id => id !== variantId)
             : [...currentAllowed, variantId];
-        
+
         const updatedConfig = currentConfig.map(c => c.typeId === typeId ? { ...c, allowedVariantIds: newAllowed } : c);
         if (!currentConfig.find(c => c.typeId === typeId)) {
             updatedConfig.push({ typeId, allowedVariantIds: newAllowed, priceOverrides: {} });
         }
         setFormData({ ...formData, machineConfig: updatedConfig });
+    };
+
+    const toggleBaseVariant = (typeId: string, variantId: string) => {
+        if (!canWrite) return;
+        const currentConfig = formData.machineConfig || [];
+        const config = currentConfig.find(c => c.typeId === typeId);
+        if (!config) return;
+        const current = config.baseVariantIds || [];
+        const updated = current.includes(variantId) ? current.filter(id => id !== variantId) : [...current, variantId];
+        setFormData({ ...formData, machineConfig: currentConfig.map(c => c.typeId === typeId ? { ...c, baseVariantIds: updated } : c) });
     };
 
     const updatePriceOverride = (typeId: string, variantId: string, price: number | undefined) => {
@@ -373,7 +383,8 @@ export const OptionsTab: React.FC<OptionsTabProps> = ({ formData, optionTypes = 
                                     <thead className="bg-slate-50 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-widest">
                                         <tr>
                                             <th className="p-3 text-center w-14">Вкл</th>
-                                            <th className="p-3 text-center w-16">База</th>
+                                            <th className="p-3 text-center w-16">В базе</th>
+                                            <th className="p-3 text-center w-16">По умолч.</th>
                                             <th className="p-3 text-left">Вариант / Характеристики</th>
                                             {canSeePurchase && <th className="p-3 text-right w-32">Цена (закуп)</th>}
                                             <th className="p-3 text-right w-36">Спец. цена (KZT)</th>
@@ -395,20 +406,30 @@ export const OptionsTab: React.FC<OptionsTabProps> = ({ formData, optionTypes = 
 
                                             return variantsOfType.map(v => {
                                                 const isAllowed = currentAllowed.includes(v.id);
+                                                const isInBase = (config?.baseVariantIds || []).includes(v.id);
                                                 const isDefault = isSingle ? config?.defaultVariantId === v.id : !!config?.defaultVariantIds?.includes(v.id);
                                                 const override = config?.priceOverrides?.[v.id];
-                                                
+
                                                 return (
                                                     <tr key={v.id} className={`group transition-all ${isAllowed ? 'bg-white hover:bg-blue-50/20' : 'bg-slate-50/50 opacity-60'}`}>
                                                         <td className="p-3 text-center">
-                                                            <button onClick={() => toggleAllowedVariant(selectedOptionTypeId!, v.id)} 
+                                                            <button onClick={() => toggleAllowedVariant(selectedOptionTypeId!, v.id)}
                                                                     className={`p-1.5 rounded-lg border-2 transition-all ${isAllowed ? 'border-blue-500 bg-blue-600 text-white shadow-sm' : 'border-slate-200 text-transparent bg-white hover:border-slate-300'}`}>
                                                                 <Check size={12}/>
                                                             </button>
                                                         </td>
                                                         <td className="p-3 text-center">
                                                             {isAllowed && (
-                                                                <button onClick={() => toggleDefaultVariant(selectedOptionTypeId!, v.id, isSingle)} 
+                                                                <button onClick={() => toggleBaseVariant(selectedOptionTypeId!, v.id)}
+                                                                        title="В базе — входит в базовую комплектацию"
+                                                                        className={`p-1.5 rounded-lg border-2 transition-all ${isInBase ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm' : 'border-slate-200 text-transparent bg-white hover:border-emerald-300 hover:text-emerald-300'}`}>
+                                                                    <Check size={12}/>
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            {isAllowed && (
+                                                                <button onClick={() => toggleDefaultVariant(selectedOptionTypeId!, v.id, isSingle)}
                                                                         className={`p-1.5 rounded-full transition-all ${isDefault ? 'bg-amber-100 text-amber-600 border border-amber-200 shadow-sm' : 'text-slate-200 hover:text-amber-400 hover:bg-amber-50'}`}>
                                                                     <CheckCircle size={18}/>
                                                                 </button>

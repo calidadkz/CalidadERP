@@ -1,7 +1,9 @@
 
 import React, { useState, useMemo } from 'react';
 import { SalesOrder, PlannedPayment } from '@/types';
-import { Pencil, Trash2, ArrowUpDown, Search, Filter } from 'lucide-react';
+import { Pencil, Trash2, X } from 'lucide-react';
+import { ColumnFilter } from '@/components/ui/ColumnFilter';
+import { formatDateDMY } from '@/utils/formatDate';
 
 interface SalesOrdersListProps {
     salesOrders: SalesOrder[];
@@ -10,6 +12,7 @@ interface SalesOrdersListProps {
     showColAmount: boolean;
     showColPayment: boolean;
     showColShipment: boolean;
+    showColResponsible: boolean;
     canEdit: boolean;
     canDelete: boolean;
     onEdit: (order: SalesOrder) => void;
@@ -20,206 +23,259 @@ type SortField = 'date' | 'id' | 'clientName' | 'totalAmount' | 'status' | 'name
 type SortOrder = 'asc' | 'desc';
 
 export const SalesOrdersList: React.FC<SalesOrdersListProps> = ({
-    salesOrders, plannedPayments, showColClient, showColAmount, showColPayment, showColShipment, canEdit, canDelete, onEdit, onDelete
+    salesOrders, plannedPayments, showColClient, showColAmount, showColPayment, showColShipment, showColResponsible, canEdit, canDelete, onEdit, onDelete
 }) => {
-    const [searchTerm, setSearchTerm] = useState('');
+    const [filters, setFilters] = useState<Record<string, string>>({});
     const [sortField, setSortField] = useState<SortField>('date');
     const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-    const [statusFilter, setStatusFilter] = useState<string>('all');
+
+    const setFilter = (key: string, val: string) =>
+        setFilters(f => val ? { ...f, [key]: val } : Object.fromEntries(Object.entries(f).filter(([k]) => k !== key)));
+
+    const hasFilters = Object.keys(filters).length > 0;
 
     const f = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
-    const filteredAndSortedOrders = useMemo(() => {
-        // Исключаем помеченные на удаление из основного списка
-        let result = salesOrders.filter(o => !o.isDeleted);
+    const active = useMemo(() => salesOrders.filter(o => !o.isDeleted), [salesOrders]);
 
-        // Поиск
-        if (searchTerm) {
-            const lowSearch = searchTerm.toLowerCase();
-            result = result.filter(o => 
-                o.id.toLowerCase().includes(lowSearch) || 
-                o.clientName.toLowerCase().includes(lowSearch) ||
-                (o.name && o.name.toLowerCase().includes(lowSearch))
+    const getStatusLabel = (o: SalesOrder) => {
+        const rel = plannedPayments.filter(p => p.sourceDocId === o.id);
+        const paid = rel.reduce((s, p) => s + (p.amountPaid || 0), 0);
+        const fullyShipped = o.shippedItemCount >= o.totalItemCount && o.totalItemCount > 0;
+        const fullyPaid = paid >= (o.totalAmount - 0.1);
+        return (fullyShipped && fullyPaid) ? 'Реализован' : o.status;
+    };
+
+    // ── Подсказки для колонок ──
+    const dateSuggestions = useMemo(() =>
+        [...new Set(active.map(o => formatDateDMY(o.date)))].sort().reverse(),
+    [active]);
+    const nameSuggestions = useMemo(() =>
+        [...new Set(active.filter(o => o.name).map(o => o.name!))].sort(),
+    [active]);
+    const clientSuggestions = useMemo(() =>
+        [...new Set(active.filter(o => o.clientName).map(o => o.clientName))].sort(),
+    [active]);
+    const statusSuggestions = useMemo(() =>
+        [...new Set(active.map(o => getStatusLabel(o)))].sort(),
+    [active, plannedPayments]);
+
+    const filteredAndSortedOrders = useMemo(() => {
+        let result = active;
+
+        if (filters.date) {
+            const q = filters.date.toLowerCase();
+            result = result.filter(o =>
+                formatDateDMY(o.date).toLowerCase().includes(q) ||
+                o.id.toLowerCase().includes(q)
             );
         }
-
-        // Фильтр по статусу
-        if (statusFilter !== 'all') {
-            result = result.filter(o => {
-                const relatedPayments = plannedPayments.filter(p => p.sourceDocId === o.id);
-                const paidAmount = relatedPayments.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
-                const isFullyShipped = o.shippedItemCount >= o.totalItemCount && o.totalItemCount > 0;
-                const isFullyPaid = paidAmount >= (o.totalAmount - 0.1);
-                const currentStatus = (isFullyShipped && isFullyPaid) ? 'Реализован' : o.status;
-                return currentStatus === statusFilter;
-            });
+        if (filters.name) {
+            const q = filters.name.toLowerCase();
+            result = result.filter(o =>
+                (o.name || '').toLowerCase().includes(q) ||
+                o.id.toLowerCase().includes(q)
+            );
+        }
+        if (filters.clientName) {
+            const q = filters.clientName.toLowerCase();
+            result = result.filter(o => o.clientName.toLowerCase().includes(q));
+        }
+        if (filters.status) {
+            const q = filters.status.toLowerCase();
+            result = result.filter(o => getStatusLabel(o).toLowerCase().includes(q));
         }
 
-        // Сортировка
-        result.sort((a, b) => {
-            let valA: any = a[sortField as keyof SalesOrder] || '';
-            let valB: any = b[sortField as keyof SalesOrder] || '';
-
+        result = [...result].sort((a, b) => {
+            let valA: any, valB: any;
             if (sortField === 'status') {
-                const getStatus = (o: SalesOrder) => {
-                    const relatedPayments = plannedPayments.filter(p => p.sourceDocId === o.id);
-                    const paidAmount = relatedPayments.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
-                    const isFullyShipped = o.shippedItemCount >= o.totalItemCount && o.totalItemCount > 0;
-                    const isFullyPaid = paidAmount >= (o.totalAmount - 0.1);
-                    return (isFullyShipped && isFullyPaid) ? 'Реализован' : o.status;
-                };
-                valA = getStatus(a);
-                valB = getStatus(b);
+                valA = getStatusLabel(a);
+                valB = getStatusLabel(b);
+            } else {
+                valA = a[sortField as keyof SalesOrder] || '';
+                valB = b[sortField as keyof SalesOrder] || '';
             }
-
             if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
             if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
             return 0;
         });
 
         return result;
-    }, [salesOrders, searchTerm, sortField, sortOrder, statusFilter, plannedPayments]);
+    }, [active, filters, sortField, sortOrder, plannedPayments]);
 
-    const toggleSort = (field: SortField) => {
-        if (sortField === field) {
-            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortField(field);
-            setSortOrder('asc');
-        }
+    const toggleSort = (field: string) => {
+        const f = field as SortField;
+        if (sortField === f) setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
+        else { setSortField(f); setSortOrder('asc'); }
     };
 
-    const SortIcon = ({ field }: { field: SortField }) => (
-        <ArrowUpDown size={12} className={`inline ml-1 transition-colors ${sortField === field ? 'text-blue-600' : 'text-slate-300'}`} />
-    );
+    const colSpan = 4 + (showColClient ? 1 : 0) + (showColAmount ? 1 : 0) + (showColPayment ? 1 : 0) + (showColShipment ? 1 : 0) + (showColResponsible ? 1 : 0);
 
     return (
-        <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex items-center gap-4 flex-1 min-w-[300px]">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                        <input 
-                            type="text" 
-                            placeholder="Поиск по ID, клиенту или названию..." 
-                            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Filter size={16} className="text-slate-400" />
-                        <select 
-                            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10"
-                            value={statusFilter}
-                            onChange={e => setStatusFilter(e.target.value)}
-                        >
-                            <option value="all">Все статусы</option>
-                            <option value="CONFIRMED">Подтвержден</option>
-                            <option value="Реализован">Реализован</option>
-                        </select>
-                    </div>
+        <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-200 overflow-hidden">
+            {/* Полоса сброса фильтров */}
+            {hasFilters && (
+                <div className="flex items-center justify-between px-4 py-2 bg-blue-50 border-b border-blue-100">
+                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                        Найдено: {filteredAndSortedOrders.length}
+                    </span>
+                    <button
+                        onClick={() => setFilters({})}
+                        className="flex items-center gap-1 text-[10px] font-bold text-blue-400 hover:text-red-500 transition-colors"
+                    >
+                        <X size={10} /> Сбросить фильтры
+                    </button>
                 </div>
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    Найдено: {filteredAndSortedOrders.length}
-                </div>
-            </div>
+            )}
 
-            <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-200 overflow-hidden">
-                <table className="min-w-full divide-y divide-slate-100">
-                    <thead className="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        <tr>
-                            <th className="px-6 py-4 text-left cursor-pointer hover:bg-slate-100/50 transition-colors" onClick={() => toggleSort('date')}>
-                                Дата / ID <SortIcon field="date" />
+            <table className="min-w-full divide-y divide-slate-100">
+                <thead className="bg-slate-50/50">
+                    <tr>
+                        <th className="px-3 py-3 text-left">
+                            <ColumnFilter
+                                label="Дата / ID"
+                                sortKey="date"
+                                currentSortKey={sortField} sortOrder={sortOrder} onSort={toggleSort}
+                                filterValue={filters.date || ''} onFilterChange={v => setFilter('date', v)}
+                                suggestions={dateSuggestions}
+                            />
+                        </th>
+                        <th className="px-3 py-3 text-left">
+                            <ColumnFilter
+                                label="Название"
+                                sortKey="name"
+                                currentSortKey={sortField} sortOrder={sortOrder} onSort={toggleSort}
+                                filterValue={filters.name || ''} onFilterChange={v => setFilter('name', v)}
+                                suggestions={nameSuggestions}
+                            />
+                        </th>
+                        {showColClient && (
+                            <th className="px-3 py-3 text-left">
+                                <ColumnFilter
+                                    label="Клиент"
+                                    sortKey="clientName"
+                                    currentSortKey={sortField} sortOrder={sortOrder} onSort={toggleSort}
+                                    filterValue={filters.clientName || ''} onFilterChange={v => setFilter('clientName', v)}
+                                    suggestions={clientSuggestions}
+                                />
                             </th>
-                            <th className="px-6 py-4 text-left cursor-pointer hover:bg-slate-100/50 transition-colors" onClick={() => toggleSort('name')}>
-                                Название <SortIcon field="name" />
+                        )}
+                        {showColAmount && (
+                            <th className="px-3 py-3 text-right">
+                                <ColumnFilter
+                                    label="Сумма"
+                                    sortKey="totalAmount"
+                                    currentSortKey={sortField} sortOrder={sortOrder} onSort={toggleSort}
+                                    align="right"
+                                />
                             </th>
-                            {showColClient && (
-                                <th className="px-6 py-4 text-left cursor-pointer hover:bg-slate-100/50 transition-colors" onClick={() => toggleSort('clientName')}>
-                                    Клиент <SortIcon field="clientName" />
-                                </th>
-                            )}
-                            {showColAmount && (
-                                <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100/50 transition-colors" onClick={() => toggleSort('totalAmount')}>
-                                    Сумма <SortIcon field="totalAmount" />
-                                </th>
-                            )}
-                            <th className="px-6 py-4 text-center">Отгр.</th>
-                            {showColPayment && <th className="px-6 py-4 text-center w-24">Оплата</th>}
-                            {showColShipment && (
-                                <th className="px-6 py-4 text-center cursor-pointer hover:bg-slate-100/50 transition-colors" onClick={() => toggleSort('status')}>
-                                    Статус <SortIcon field="status" />
-                                </th>
-                            )}
-                            <th className="px-6 py-4 w-16"></th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-slate-50">
-                        {filteredAndSortedOrders.length === 0 ? (
-                            <tr><td colSpan={showColClient ? 8 : 7} className="p-12 text-center text-gray-400 italic text-sm">Заказы не найдены</td></tr>
-                        ) : filteredAndSortedOrders.map(o => {
-                            const relatedPayments = plannedPayments.filter(p => p.sourceDocId === o.id);
-                            const paidAmount = relatedPayments.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
-                            const paymentPercent = o.totalAmount > 0 ? Math.round((paidAmount / o.totalAmount) * 100) : 0;
-                            const isFullyShipped = o.shippedItemCount >= o.totalItemCount && o.totalItemCount > 0;
-                            const isFullyPaid = paidAmount >= (o.totalAmount - 0.1);
-                            const statusLabel = (isFullyShipped && isFullyPaid) ? 'Реализован' : o.status;
+                        )}
+                        <th className="px-3 py-3 text-center">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Отгр.</span>
+                        </th>
+                        {showColPayment && (
+                            <th className="px-3 py-3 text-center w-20">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Оплата</span>
+                            </th>
+                        )}
+                        {showColShipment && (
+                            <th className="px-3 py-3 text-center">
+                                <ColumnFilter
+                                    label="Статус"
+                                    sortKey="status"
+                                    currentSortKey={sortField} sortOrder={sortOrder} onSort={toggleSort}
+                                    filterValue={filters.status || ''} onFilterChange={v => setFilter('status', v)}
+                                    suggestions={statusSuggestions}
+                                    align="center"
+                                />
+                            </th>
+                        )}
+                        {showColResponsible && (
+                            <th className="px-3 py-3 text-left">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ответственный</span>
+                            </th>
+                        )}
+                        <th className="px-3 py-3 w-14" />
+                    </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-slate-50">
+                    {filteredAndSortedOrders.length === 0 ? (
+                        <tr><td colSpan={colSpan} className="p-12 text-center text-gray-400 italic text-sm">Заказы не найдены</td></tr>
+                    ) : filteredAndSortedOrders.map(o => {
+                        const relatedPayments = plannedPayments.filter(p => p.sourceDocId === o.id);
+                        const paidAmount = relatedPayments.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
+                        const paymentPercent = o.totalAmount > 0 ? Math.round((paidAmount / o.totalAmount) * 100) : 0;
+                        const isFullyShipped = o.shippedItemCount >= o.totalItemCount && o.totalItemCount > 0;
+                        const isFullyPaid = paidAmount >= (o.totalAmount - 0.1);
+                        const statusLabel = (isFullyShipped && isFullyPaid) ? 'Реализован' : o.status;
 
-                            return (
-                                <tr key={o.id} className="hover:bg-slate-50/50 transition-colors group">
-                                    <td className="px-6 py-4">
-                                        <div className="text-sm font-bold text-slate-700">{o.date}</div>
-                                        <div className="text-[10px] text-slate-300 font-mono">#{o.id.slice(-6).toUpperCase()}</div>
+                        return (
+                            <tr key={o.id} className="hover:bg-slate-50/50 transition-colors group">
+                                <td className="px-3 py-3">
+                                    <div className="text-xs font-bold text-slate-700 whitespace-nowrap">{formatDateDMY(o.date)}</div>
+                                    <div className="text-[10px] text-slate-300 font-mono">#{o.id.slice(-6).toUpperCase()}</div>
+                                </td>
+                                <td className="px-3 py-3">
+                                    <div className="text-xs font-medium text-slate-700 truncate max-w-[180px]" title={o.name || 'Без названия'}>
+                                        {o.name || <span className="text-slate-300 italic">Без названия</span>}
+                                    </div>
+                                </td>
+                                {showColClient && (
+                                    <td className="px-3 py-3">
+                                        <div className="text-xs font-bold text-slate-700 truncate max-w-[140px]" title={o.clientName}>{o.clientName}</div>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <div className="text-sm font-medium text-slate-700 truncate max-w-[200px]" title={o.name || 'Без названия'}>
-                                            {o.name || <span className="text-slate-300 italic">Без названия</span>}
-                                        </div>
+                                )}
+                                {showColAmount && (
+                                    <td className="px-3 py-3 text-xs text-right font-mono font-black text-slate-900 whitespace-nowrap">
+                                        {f(o.totalAmount)} ₸
                                     </td>
-                                    {showColClient && (
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm font-bold text-slate-700">{o.clientName}</div>
-                                        </td>
-                                    )}
-                                    {showColAmount && (
-                                        <td className="px-6 py-4 text-sm text-right font-mono font-black text-slate-900 whitespace-nowrap">
-                                            {f(o.totalAmount)} ₸
-                                        </td>
-                                    )}
-                                    <td className="px-6 py-4 text-center">
+                                )}
+                                <td className="px-3 py-3 text-center">
+                                    <span className={`text-[11px] font-black ${isFullyShipped ? 'text-emerald-600' : 'text-slate-700'}`}>{o.shippedItemCount}/{o.totalItemCount}</span>
+                                </td>
+                                {showColPayment && (
+                                    <td className="px-3 py-3">
                                         <div className="flex flex-col items-center">
-                                            <span className={`text-[11px] font-black ${isFullyShipped ? 'text-emerald-600' : 'text-slate-700'}`}>{o.shippedItemCount}/{o.totalItemCount}</span>
-                                        </div>
-                                    </td>
-                                    {showColPayment && (
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col items-center">
-                                                <div className="text-[10px] font-black text-slate-500 mb-1">{paymentPercent}%</div>
-                                                <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-200">
-                                                    <div className={`h-full transition-all duration-700 ${paymentPercent >= 100 ? 'bg-emerald-500' : 'bg-blue-600'}`} style={{ width: `${Math.min(100, paymentPercent)}%` }} />
-                                                </div>
-                                                <div className="text-[9px] text-slate-400 font-mono mt-0.5 whitespace-nowrap">{paidAmount.toLocaleString('ru-RU', {maximumFractionDigits: 0})} / {o.totalAmount.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₸</div>
+                                            <div className="text-[10px] font-black text-slate-500 mb-1">{paymentPercent}%</div>
+                                            <div className="w-14 bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-200">
+                                                <div className={`h-full transition-all duration-700 ${paymentPercent >= 100 ? 'bg-emerald-500' : 'bg-blue-600'}`} style={{ width: `${Math.min(100, paymentPercent)}%` }} />
                                             </div>
-                                        </td>
-                                    )}
-                                    {showColShipment && (
-                                        <td className="px-6 py-4 text-center">
-                                            <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded-md border ${statusLabel === 'Реализован' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>{statusLabel}</span>
-                                        </td>
-                                    )}
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            {canEdit && (<button onClick={() => onEdit(o)} className="p-1.5 text-slate-400 hover:text-blue-500 transition-all"><Pencil size={14}/></button>)}
-                                            {canDelete && (<button onClick={() => onDelete(o)} className="p-1.5 text-slate-400 hover:text-red-500 transition-all"><Trash2 size={14}/></button>)}
+                                            <div className="text-[9px] text-slate-400 font-mono mt-0.5 whitespace-nowrap">{paidAmount.toLocaleString('ru-RU', {maximumFractionDigits: 0})} / {o.totalAmount.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₸</div>
                                         </div>
                                     </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
+                                )}
+                                {showColShipment && (
+                                    <td className="px-3 py-3 text-center">
+                                        <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded-md border ${statusLabel === 'Реализован' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>{statusLabel}</span>
+                                    </td>
+                                )}
+                                {showColResponsible && (
+                                    <td className="px-3 py-3">
+                                        <div className="text-[11px] font-bold text-slate-600 truncate max-w-[120px]">
+                                            {o.responsibleEmployeeName || <span className="text-slate-300 italic">—</span>}
+                                        </div>
+                                    </td>
+                                )}
+                                <td className="px-3 py-3 text-right">
+                                    <div className="flex justify-end gap-0.5">
+                                        {canEdit && (<button onClick={() => onEdit(o)} className="p-1.5 text-slate-300 hover:text-blue-500 transition-all rounded-lg hover:bg-blue-50"><Pencil size={13}/></button>)}
+                                        {canDelete && (<button onClick={() => onDelete(o)} className="p-1.5 text-slate-300 hover:text-red-500 transition-all rounded-lg hover:bg-red-50"><Trash2 size={13}/></button>)}
+                                    </div>
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+                {!hasFilters && (
+                    <tfoot>
+                        <tr>
+                            <td colSpan={colSpan} className="px-4 py-2 text-right text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                                Всего: {active.length}
+                            </td>
+                        </tr>
+                    </tfoot>
+                )}
+            </table>
         </div>
     );
 };

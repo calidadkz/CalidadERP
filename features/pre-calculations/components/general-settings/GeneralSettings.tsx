@@ -21,9 +21,10 @@ import {
 interface GeneralSettingsProps {
   settings: GeneralSettingsType;
   onSettingChange: (key: keyof GeneralSettingsType, value: number) => void;
+  readOnly?: boolean;
 }
 
-const SettingRow = ({ label, icon: Icon, value, onChange, unit = "" }: any) => (
+const SettingRow = ({ label, icon: Icon, value, onChange, unit = "", readOnly = false }: any) => (
   <div className="flex items-center justify-between gap-3 py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50/80 transition-colors px-2 rounded-lg group">
     <div className="flex items-center gap-2.5 min-w-0 flex-1">
       <div className="p-1.5 bg-slate-100 rounded-md group-hover:bg-white transition-colors flex-shrink-0">
@@ -34,11 +35,12 @@ const SettingRow = ({ label, icon: Icon, value, onChange, unit = "" }: any) => (
       </label>
     </div>
     <div className="relative flex-shrink-0">
-      <input 
-        type="number" 
+      <input
+        type="number"
         value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-        className="w-24 sm:w-28 bg-slate-100 border border-slate-200 rounded-lg pl-8 pr-2 py-1.5 text-xs font-black text-slate-800 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none text-right shadow-inner"
+        readOnly={readOnly}
+        onChange={(e) => !readOnly && onChange(parseFloat(e.target.value) || 0)}
+        className={`w-24 sm:w-28 bg-slate-100 border border-slate-200 rounded-lg pl-8 pr-2 py-1.5 text-xs font-black text-slate-800 transition-all outline-none text-right shadow-inner ${readOnly ? 'cursor-default opacity-70' : 'focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'}`}
       />
       {unit && (
         <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 pointer-events-none group-focus-within:text-blue-600 transition-colors uppercase">
@@ -63,9 +65,9 @@ const SettingsCard = ({ title, icon: Icon, children, colorClass = "text-blue-500
   </div>
 );
 
-export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, onSettingChange }) => {
+export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, onSettingChange, readOnly = false }) => {
   return (
-    <div className="max-w-full mx-auto px-4 py-2 animate-in fade-in duration-500 overflow-y-auto max-h-[calc(100vh-140px)] custom-scrollbar">
+    <div className={`max-w-full mx-auto px-4 py-2 animate-in fade-in duration-500 overflow-y-auto max-h-[calc(100vh-140px)] custom-scrollbar ${readOnly ? 'pointer-events-none opacity-70 select-none' : ''}`}>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
 
         {/* Logistics & Customs */}
@@ -158,16 +160,19 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, onSe
           )}
           {settings.chinaDomesticRateMethod === 'fixed' && (
             <SettingRow
-              label="Цена за ед."
+              label="Фикс. сумма (партия)"
               icon={Package}
-              value={settings.chinaDomesticFixedKztPerUnit}
-              onChange={(v: number) => onSettingChange('chinaDomesticFixedKztPerUnit', v)}
+              value={settings.chinaDomesticFixedKztTotal}
+              onChange={(v: number) => onSettingChange('chinaDomesticFixedKztTotal', v)}
               unit="₸"
             />
           )}
           <div className="px-2 pt-1 pb-1">
             <p className="text-[9px] text-slate-400 leading-relaxed">
-              Курс пересчёта — тот же что у Урумчи–Алматы.<br/>
+              {settings.chinaDomesticRateMethod === 'fixed'
+                ? 'Сумма делится между позициями пропорционально объёму (м³). Позиции без объёма получают 0.'
+                : 'Курс пересчёта — тот же что у Урумчи–Алматы.'
+              }<br/>
               Включается в себестоимость и НДС (таможня).
             </p>
           </div>

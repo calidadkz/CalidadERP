@@ -116,7 +116,6 @@ const ProductCard: React.FC<{
                         className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors"
                     >
                         <Pencil size={13} />
-                        Изменить
                     </button>
                     <div className="w-px bg-slate-100" />
                     <button
@@ -124,7 +123,6 @@ const ProductCard: React.FC<{
                         className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-slate-500 hover:bg-slate-50 transition-colors"
                     >
                         <Copy size={13} />
-                        Дублировать
                     </button>
                     <div className="w-px bg-slate-100" />
                     <button

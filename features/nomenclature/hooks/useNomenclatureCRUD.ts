@@ -7,6 +7,7 @@ export const useNomenclatureCRUD = (selectedType: ProductType) => {
     const { actions } = useStore();
 
     const [confirmDelete, setConfirmDelete] = useState<{ show: boolean, id: string, name: string }>({ show: false, id: '', name: '' });
+    const [deleteError, setDeleteError] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
     const [modalInitialData, setModalInitialData] = useState<Partial<Product>>({});
@@ -15,7 +16,7 @@ export const useNomenclatureCRUD = (selectedType: ProductType) => {
     const handleAdd = () => {
         setModalMode('create');
         setIsCopy(false);
-        setModalInitialData({ type: selectedType, currency: Currency.CNY, markupPercentage: 80 });
+        setModalInitialData({ type: selectedType, currency: Currency.Cny, markupPercentage: 80 });
         setIsModalOpen(true);
     };
 
@@ -41,10 +42,14 @@ export const useNomenclatureCRUD = (selectedType: ProductType) => {
         setConfirmDelete({ show: true, id, name });
     };
 
-    const confirmDeleteAction = () => {
-        if (confirmDelete.id) {
-            actions.deleteProduct(confirmDelete.id);
+    const confirmDeleteAction = async () => {
+        if (!confirmDelete.id) return;
+        setDeleteError(null);
+        try {
+            await actions.deleteProduct(confirmDelete.id);
             setConfirmDelete({ show: false, id: '', name: '' });
+        } catch (e: any) {
+            setDeleteError(e.message || 'Ошибка удаления');
         }
     };
 
@@ -75,6 +80,7 @@ export const useNomenclatureCRUD = (selectedType: ProductType) => {
         handleDelete,
         confirmDeleteAction,
         cancelDelete,
+        deleteError,
         onSave,
     };
 };

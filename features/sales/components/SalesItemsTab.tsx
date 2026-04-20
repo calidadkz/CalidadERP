@@ -28,6 +28,7 @@ export const SalesItemsTab: React.FC<SalesItemsTabProps> = ({
     const [categoryFilter, setCategoryFilter] = useState<string | 'all'>('all');
     const [productInput, setProductInput] = useState('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [displayLimit, setDisplayLimit] = useState(50);
     const [itemQty, setItemQty] = useState(1);
     const [isConfiguring, setIsConfiguring] = useState(false);
     const [configMachine, setConfigMachine] = useState<Product | null>(null);
@@ -98,7 +99,7 @@ export const SalesItemsTab: React.FC<SalesItemsTabProps> = ({
                     <div className="flex justify-between items-center gap-6">
                         <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-200 flex-none">
                             {[ProductType.MACHINE, ProductType.PART, ProductType.SERVICE].map(type => (
-                                <button key={type} onClick={() => { setActiveType(type); setMachineTypeFilter('all'); setCategoryFilter('all'); setProductInput(''); }} className={`flex items-center gap-2 px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${activeType === type ? (type === ProductType.MACHINE ? 'bg-blue-600' : type === ProductType.PART ? 'bg-orange-600' : 'bg-purple-600') + ' text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>{type === ProductType.MACHINE ? <Box size={14}/> : type === ProductType.PART ? <Zap size={14}/> : <Briefcase size={14}/>} {type === ProductType.MACHINE ? 'Станки' : type === ProductType.PART ? 'Запчасти' : 'Услуги'}</button>
+                                <button key={type} onClick={() => { setActiveType(type); setMachineTypeFilter('all'); setCategoryFilter('all'); setProductInput(''); setDisplayLimit(50); }} className={`flex items-center gap-2 px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${activeType === type ? (type === ProductType.MACHINE ? 'bg-blue-600' : type === ProductType.PART ? 'bg-orange-600' : 'bg-purple-600') + ' text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>{type === ProductType.MACHINE ? <Box size={14}/> : type === ProductType.PART ? <Zap size={14}/> : <Briefcase size={14}/>} {type === ProductType.MACHINE ? 'Станки' : type === ProductType.PART ? 'Запчасти' : 'Услуги'}</button>
                             ))}
                         </div>
                         <div className="flex flex-1 justify-end gap-3">
@@ -111,20 +112,28 @@ export const SalesItemsTab: React.FC<SalesItemsTabProps> = ({
                     <div className="flex gap-3 items-end">
                         <div className="flex-1 relative">
                             <label className="block text-[8px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest flex items-center gap-1.5"><Search size={10} className="text-blue-500"/> Наименование или Артикул</label>
-                            <div className="relative"><Search size={16} className="absolute left-4 top-3 text-slate-300"/><input type="text" className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:border-blue-400 outline-none text-sm font-bold shadow-sm" placeholder="Начните вводить..." value={productInput} onFocus={() => setIsDropdownOpen(true)} onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)} onChange={e => setProductInput(e.target.value)} /></div>
+                            <div className="relative"><Search size={16} className="absolute left-4 top-3 text-slate-300"/><input type="text" className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:border-blue-400 outline-none text-sm font-bold shadow-sm" placeholder="Начните вводить..." value={productInput} onFocus={() => { setIsDropdownOpen(true); setDisplayLimit(50); }} onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)} onChange={e => { setProductInput(e.target.value); setDisplayLimit(50); }} /></div>
                             {isDropdownOpen && (
                                 <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden z-[100] max-h-64 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-200">
-                                    {availableProducts.length > 0 ? availableProducts.map(p => {
-                                        const balance = InventoryService.getProductBalance(p.id, stockMovements);
-                                        const isMachine = p.type === ProductType.MACHINE;
-                                        const hasDeficit = isMachine && checkMachineDeficit(p.id, stockMovements);
-                                        return (
-                                            <div key={p.id} className="px-5 py-3 hover:bg-blue-50 cursor-pointer text-xs border-b last:border-0 flex justify-between items-center group transition-colors" onClick={() => { setProductInput(p.name); setIsDropdownOpen(false); if(p.type === ProductType.MACHINE) { setConfigMachine(p); setIsConfiguring(true); } else handleAddItemToOrder(); }}>
-                                                <div className="flex-1 min-w-0 pr-4"><div className="font-black text-slate-700 group-hover:text-blue-700 truncate flex items-center gap-1.5">{p.name}{hasDeficit && <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded-[4px] text-[7px] font-black uppercase">Дефицит</span>}</div><div className="text-[10px] text-slate-400 font-mono tracking-tighter mt-0.5">{p.sku}</div></div>
-                                                <div className="text-right flex items-center gap-4"><div className="text-right min-w-[50px]"><div className="text-[7px] font-black text-slate-400 uppercase leading-none mb-1">Склад</div><div className="text-[11px] font-black text-slate-700">{balance.physical}</div></div><div className="text-right min-w-[50px]"><div className="text-[7px] font-black text-slate-400 uppercase leading-none mb-1">Доступно</div><div className={`text-[11px] font-black ${balance.free <= 0 ? 'text-red-500' : 'text-emerald-600'}`}>{balance.free}</div></div><div className="text-right min-w-[80px]"><div className="text-[11px] font-black text-blue-700">{f(p.salesPrice || 0)} ₸</div><div className="text-[7px] text-slate-400 uppercase font-black tracking-tighter">Рекоменд.</div></div></div>
+                                    {availableProducts.length > 0 ? (<>
+                                        {availableProducts.slice(0, displayLimit).map(p => {
+                                            const balance = InventoryService.getProductBalance(p.id, stockMovements);
+                                            const isMachine = p.type === ProductType.MACHINE;
+                                            const hasDeficit = isMachine && checkMachineDeficit(p.id, stockMovements);
+                                            return (
+                                                <div key={p.id} className="px-5 py-3 hover:bg-blue-50 cursor-pointer text-xs border-b last:border-0 flex justify-between items-center group transition-colors" onClick={() => { setProductInput(p.name); setIsDropdownOpen(false); if(p.type === ProductType.MACHINE) { setConfigMachine(p); setIsConfiguring(true); } else handleAddItemToOrder(); }}>
+                                                    <div className="flex-1 min-w-0 pr-4"><div className="font-black text-slate-700 group-hover:text-blue-700 truncate flex items-center gap-1.5">{p.name}{hasDeficit && <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded-[4px] text-[7px] font-black uppercase">Дефицит</span>}</div><div className="text-[10px] text-slate-400 font-mono tracking-tighter mt-0.5">{p.sku}</div></div>
+                                                    <div className="text-right flex items-center gap-4"><div className="text-right min-w-[50px]"><div className="text-[7px] font-black text-slate-400 uppercase leading-none mb-1">Склад</div><div className="text-[11px] font-black text-slate-700">{balance.physical}</div></div><div className="text-right min-w-[50px]"><div className="text-[7px] font-black text-slate-400 uppercase leading-none mb-1">Доступно</div><div className={`text-[11px] font-black ${balance.free <= 0 ? 'text-red-500' : 'text-emerald-600'}`}>{balance.free}</div></div><div className="text-right min-w-[80px]"><div className="text-[11px] font-black text-blue-700">{f(p.salesPrice || 0)} ₸</div><div className="text-[7px] text-slate-400 uppercase font-black tracking-tighter">Рекоменд.</div></div></div>
+                                                </div>
+                                            );
+                                        })}
+                                        {availableProducts.length > displayLimit && (
+                                            <div className="px-5 py-2.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between">
+                                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{displayLimit} из {availableProducts.length}</span>
+                                                <button onMouseDown={e => { e.preventDefault(); setDisplayLimit(n => n + 50); }} className="text-[9px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-widest">Показать ещё</button>
                                             </div>
-                                        );
-                                    }) : (<div className="p-10 text-center text-slate-400 italic text-[10px] font-bold uppercase tracking-widest">Товары не найдены</div>)}
+                                        )}
+                                    </>) : (<div className="p-10 text-center text-slate-400 italic text-[10px] font-bold uppercase tracking-widest">Товары не найдены</div>)}
                                 </div>
                             )}
                         </div>

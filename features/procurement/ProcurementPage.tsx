@@ -1,5 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+
+const MobileProcurementView = React.lazy(() =>
+    import('./components/MobileProcurementView').then(m => ({ default: m.MobileProcurementView }))
+);
 import { useStore } from '@/features/system/context/GlobalStore';
 import { SupplierOrder, PlannedPayment, ProductType, Batch } from '@/types';
 import { ShoppingCart, Plus, AlertCircle } from 'lucide-react';
@@ -7,8 +11,12 @@ import { OrdersList } from './components/OrdersList';
 import { OrderForm } from './components/OrderForm';
 import { api } from '@/services';
 import { TableNames } from '@/constants';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export const ProcurementPage: React.FC = () => {
+    const isMobile = useIsMobile();
+    if (isMobile) return <Suspense fallback={null}><MobileProcurementView /></Suspense>;
+
     const { state, actions } = useStore();
     const [view, setView] = useState<'list' | 'form'>('list');
     const [batches, setBatches] = useState<Batch[]>([]);

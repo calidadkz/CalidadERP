@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-    AlertTriangle, Plus, Trash2, FileText, Settings2, Search, ChevronDown, ChevronUp, Download
+    AlertTriangle, Plus, Trash2, FileText, Settings2, Search, ChevronDown, ChevronUp, Download, CheckCircle2, Clock
 } from 'lucide-react';
 import { useStore } from '@/features/system/context/GlobalStore';
 import { WriteOff, WriteOffReasonType } from '@/types/inventory';
@@ -18,18 +18,19 @@ const COLOR_BADGE: Record<string, string> = {
     slate:  'bg-slate-100 text-slate-600 border-slate-200',
 };
 
-const f = (v: number) => Math.round(v).toLocaleString();
+const f = (v: number) => Math.round(v).toLocaleString('ru-RU');
 const fDate = (d: string) => new Date(d).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
 export const WriteOffPage: React.FC = () => {
     const { state, actions } = useStore();
-    const { writeoffs, writeoffReasonTypes, products } = state;
+    const { writeoffs, writeoffReasonTypes, products, inventorySummary } = state;
 
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showReasonTypesModal, setShowReasonTypesModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+    const [postingId, setPostingId] = useState<string | null>(null);
 
     const reasonTypesMap = useMemo(
         () => new Map<string, WriteOffReasonType>(writeoffReasonTypes.map(rt => [rt.id, rt])),
@@ -52,14 +53,38 @@ export const WriteOffPage: React.FC = () => {
         return result;
     }, [writeoffs, searchTerm, sortDir]);
 
+    // KPI считаем только по проведённым
     const totals = useMemo(() => ({
         count: filtered.length,
-        qty: filtered.reduce((s, w) => s + w.quantity, 0),
-        value: filtered.reduce((s, w) => s + w.quantity * w.unitCostKzt, 0),
+        drafts: filtered.filter(w => (w.status ?? 'Posted') === 'Draft').length,
+        qty: filtered.filter(w => (w.status ?? 'Posted') === 'Posted').reduce((s, w) => s + w.quantity, 0),
+        value: filtered.filter(w => (w.status ?? 'Posted') === 'Posted').reduce((s, w) => s + w.quantity * w.unitCostKzt, 0),
     }), [filtered]);
 
+    const handleCreateSubmit = async (wo: WriteOff, postImmediately: boolean) => {
+        const created = await actions.createWriteOff(wo);
+        if (postImmediately) {
+            await actions.postWriteOff(created);
+        }
+    };
+
+    const handlePost = async (wo: WriteOff) => {
+        setPostingId(wo.id);
+        try {
+            await actions.postWriteOff(wo);
+        } catch (e: any) {
+            alert(e.message || 'Ошибка при проведении');
+        } finally {
+            setPostingId(null);
+        }
+    };
+
     const handleDelete = async (wo: WriteOff) => {
-        if (!confirm(`Отменить списание ${wo.quantity} шт. ${wo.productName}?\nВ Движения будет добавлено сторно.`)) return;
+        const isPosted = (wo.status ?? 'Posted') === 'Posted';
+        const msg = isPosted
+            ? `Отменить проведённое списание ${wo.quantity} шт. ${wo.productName}?\nВ Движения будет добавлено сторно.`
+            : `Удалить черновик списания ${wo.quantity} шт. ${wo.productName}?`;
+        if (!confirm(msg)) return;
         await actions.deleteWriteOff(wo);
     };
 
@@ -93,10 +118,14 @@ export const WriteOffPage: React.FC = () => {
             </div>
 
             {/* KPI плашки */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
                     <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Всего записей</div>
                     <div className="text-2xl font-black text-slate-800">{totals.count}</div>
+                </div>
+                <div className="bg-white rounded-2xl border border-amber-100 shadow-sm p-4">
+                    <div className="text-[9px] font-black text-amber-400 uppercase tracking-widest mb-1">Черновиков</div>
+                    <div className="text-2xl font-black text-amber-600">{totals.drafts}</div>
                 </div>
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
                     <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Кол-во списано</div>
@@ -133,20 +162,21 @@ export const WriteOffPage: React.FC = () => {
                 <table className="min-w-full divide-y divide-slate-100">
                     <thead className="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                         <tr>
-                            <th className="px-6 py-4 text-left w-10"></th>
-                            <th className="px-6 py-4 text-left">ID / Дата</th>
-                            <th className="px-6 py-4 text-left">Товар</th>
+                            <th className="px-4 py-3 text-left w-10"></th>
+                            <th className="px-4 py-3 text-left">ID / Дата</th>
+                            <th className="px-4 py-3 text-left w-28">Статус</th>
+                            <th className="px-4 py-3 text-left">Товар</th>
                             <th className="px-4 py-4 text-right w-20">Кол-во</th>
                             <th className="px-4 py-4 text-right w-32 bg-red-50/30 text-red-400">Сумма потерь</th>
                             <th className="px-4 py-4 text-left">Тип / Причина</th>
                             <th className="px-4 py-4 text-center w-16">Файлы</th>
-                            <th className="px-4 py-4 text-center w-12"></th>
+                            <th className="px-4 py-4 text-center w-28"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                         {filtered.length === 0 && (
                             <tr>
-                                <td colSpan={8} className="py-16 text-center text-slate-400 text-sm font-medium">
+                                <td colSpan={9} className="py-16 text-center text-slate-400 text-sm font-medium">
                                     Нет записей о списаниях
                                 </td>
                             </tr>
@@ -155,23 +185,36 @@ export const WriteOffPage: React.FC = () => {
                             const rt = wo.reasonTypeId ? reasonTypesMap.get(wo.reasonTypeId) : undefined;
                             const isExpanded = expandedId === wo.id;
                             const hasDocs = wo.documents && wo.documents.length > 0;
+                            const isDraft = (wo.status ?? 'Posted') === 'Draft';
+                            const isPosting = postingId === wo.id;
 
                             return (
                                 <React.Fragment key={wo.id}>
                                     <tr
-                                        className={`hover:bg-slate-50/40 transition-colors ${hasDocs || wo.reasonNote ? 'cursor-pointer' : ''}`}
+                                        className={`hover:bg-slate-50/40 transition-colors ${hasDocs || wo.reasonNote ? 'cursor-pointer' : ''} ${isDraft ? 'bg-amber-50/20' : ''}`}
                                         onClick={() => (hasDocs || wo.reasonNote) && setExpandedId(isExpanded ? null : wo.id)}
                                     >
-                                        <td className="px-6 py-3 text-center text-slate-300">
+                                        <td className="px-4 py-3 text-center text-slate-400">
                                             {(hasDocs || wo.reasonNote) && (
                                                 isExpanded ? <ChevronUp size={13}/> : <ChevronDown size={13}/>
                                             )}
                                         </td>
-                                        <td className="px-6 py-3">
+                                        <td className="px-4 py-3">
                                             <div className="font-mono text-[11px] font-bold text-red-500">{wo.id}</div>
                                             <div className="text-[10px] text-slate-400 mt-0.5">{fDate(wo.date)}</div>
                                         </td>
-                                        <td className="px-6 py-3">
+                                        <td className="px-4 py-3">
+                                            {isDraft ? (
+                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-100 text-amber-700 border border-amber-200 text-[10px] font-bold">
+                                                    <Clock size={10}/> Черновик
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                                                    <CheckCircle2 size={10}/> Проведено
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3">
                                             <div className="text-xs font-bold text-slate-700">{wo.productName}</div>
                                             <div className="text-[10px] text-slate-400 font-mono">{wo.sku}</div>
                                         </td>
@@ -179,11 +222,17 @@ export const WriteOffPage: React.FC = () => {
                                             −{f(wo.quantity)}
                                         </td>
                                         <td className="px-4 py-3 text-right bg-red-50/10">
-                                            <span className="font-mono text-[11px] font-black text-red-600">
-                                                {wo.unitCostKzt > 0 ? f(wo.quantity * wo.unitCostKzt) : '—'}
-                                            </span>
-                                            {wo.unitCostKzt > 0 && (
-                                                <div className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">KZT</div>
+                                            {isDraft ? (
+                                                <span className="text-[10px] text-slate-400 font-bold">—</span>
+                                            ) : (
+                                                <>
+                                                    <span className="font-mono text-[11px] font-black text-red-600">
+                                                        {wo.unitCostKzt > 0 ? f(wo.quantity * wo.unitCostKzt) : '—'}
+                                                    </span>
+                                                    {wo.unitCostKzt > 0 && (
+                                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">KZT</div>
+                                                    )}
+                                                </>
                                             )}
                                         </td>
                                         <td className="px-4 py-3">
@@ -204,19 +253,32 @@ export const WriteOffPage: React.FC = () => {
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                                            <button
-                                                onClick={() => handleDelete(wo)}
-                                                className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                title="Отменить списание (сторно)"
-                                            >
-                                                <Trash2 size={13}/>
-                                            </button>
+                                            <div className="flex items-center justify-center gap-1">
+                                                {isDraft && (
+                                                    <button
+                                                        onClick={() => handlePost(wo)}
+                                                        disabled={isPosting}
+                                                        className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                                                        title="Провести в складской учёт"
+                                                    >
+                                                        <CheckCircle2 size={11}/>
+                                                        {isPosting ? '...' : 'Провести'}
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleDelete(wo)}
+                                                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title={isDraft ? 'Удалить черновик' : 'Отменить списание (сторно)'}
+                                                >
+                                                    <Trash2 size={13}/>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                     {isExpanded && (
                                         <tr className="bg-slate-50/40 border-b">
                                             <td></td>
-                                            <td colSpan={7} className="px-6 py-3 space-y-2">
+                                            <td colSpan={8} className="px-6 py-3 space-y-2">
                                                 {wo.reasonNote && (
                                                     <div>
                                                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Причина: </span>
@@ -253,7 +315,8 @@ export const WriteOffPage: React.FC = () => {
                 <WriteOffModal
                     products={products}
                     reasonTypes={writeoffReasonTypes}
-                    onSubmit={actions.createWriteOff}
+                    inventorySummary={inventorySummary}
+                    onSubmit={handleCreateSubmit}
                     onClose={() => setShowCreateModal(false)}
                 />
             )}

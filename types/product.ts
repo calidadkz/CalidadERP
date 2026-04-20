@@ -53,6 +53,7 @@ export interface Product {
         quantity: number;
     }[];
     compatibleMachineCategoryIds?: string[];
+    compatibleMachineIds?: string[];
     volumeM3?: number;
     imageUrl?: string; // URL or path to image in storage
 }

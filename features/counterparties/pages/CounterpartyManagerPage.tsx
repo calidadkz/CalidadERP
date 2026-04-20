@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '@/features/system/context/GlobalStore';
-import { Counterparty, CounterpartyAccount, Currency, CounterpartyType } from '@/types';
+import { Counterparty, CounterpartyAccount, Currency, CounterpartyType, AppRole } from '@/types';
 import { Users, Briefcase, Truck, Plus, Pencil, Search, Phone, User, Trash2, Factory, Building2, UserCircle, Globe } from 'lucide-react';
 import { useAccess } from '@/features/auth/hooks/useAccess';
+import { useAuth } from '@/features/system/context/AuthContext';
 import { CounterpartyCreateModal } from '../components/CounterpartyCreateModal';
 
 const getCounterpartyTypeTranslation = (type: CounterpartyType) => {
@@ -30,12 +31,25 @@ const CounterpartyTypeIcon = ({ type }: { type: CounterpartyType }) => {
 export const CounterpartyManagerPage: React.FC = () => {
     const { state, actions } = useStore();
     const access = useAccess('counterparties');
+    const { user } = useAuth();
+
+    // Менеджер может создавать/редактировать только клиентов
+    const isClientOnly = user?.role === AppRole.MANAGER;
 
     const [activeTab, setActiveTab] = useState<CounterpartyType | 'all'>('all');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCounterparty, setEditingCounterparty] = useState<Counterparty | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [confirmDelete, setConfirmDelete] = useState<Counterparty | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+
+    const canMutateCounterparty = (cp: Counterparty) => {
+        if (isClientOnly) {
+            const roles = cp.roles || [cp.type];
+            return roles.includes(CounterpartyType.CLIENT);
+        }
+        return true;
+    };
 
     const openCreateModal = () => {
         if (!access.canWrite('actions', 'manage')) return;
@@ -45,6 +59,7 @@ export const CounterpartyManagerPage: React.FC = () => {
 
     const openEditModal = (cp: Counterparty) => {
         if (!access.canSee('actions', 'edit')) return;
+        if (!canMutateCounterparty(cp)) return;
         setEditingCounterparty(cp);
         setIsModalOpen(true);
     };
@@ -152,26 +167,29 @@ export const CounterpartyManagerPage: React.FC = () => {
                 <table className="min-w-full divide-y divide-slate-100">
                     <thead className="bg-slate-50/50">
                         <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            <th className="px-6 py-4 text-left">Название</th>
-                            <th className="px-6 py-4 text-left">Роли</th>
-                            <th className="px-6 py-4 text-left">Контакты</th>
-                            <th className="px-6 py-4 text-left">БИН/ИИН</th>
-                            <th className="px-6 py-4 text-right"></th>
+                            <th className="px-4 py-3 text-left">Название</th>
+                            <th className="px-4 py-3 text-left">Роли</th>
+                            <th className="px-4 py-3 text-left">Контакты</th>
+                            <th className="px-4 py-3 text-left">БИН/ИИН</th>
+                            <th className="px-4 py-3 text-right"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 bg-white">
                         {filteredCounterparties.length === 0 ? (
-                            <tr><td colSpan={5} className="p-20 text-center text-slate-300 italic font-medium">Контрагенты не найдены</td></tr>
+                            <tr><td colSpan={5} className="p-20 text-center text-slate-400 italic font-medium">Контрагенты не найдены</td></tr>
                         ) : (
                             filteredCounterparties.map(cp => {
                                 const roles = cp.roles || [cp.type];
                                 return (
                                     <tr key={cp.id} className="hover:bg-slate-50/50 transition-colors group">
-                                        <td className="px-6 py-4">
+                                        <td className="px-4 py-3">
                                             <div className="text-sm font-black text-slate-800">{cp.name}</div>
-                                            {cp.country && <div className="flex items-center gap-1 text-[9px] text-slate-400 font-bold uppercase mt-0.5"><Globe size={10}/> {cp.country}</div>}
+                                            {cp.position && roles.includes(CounterpartyType.EMPLOYEE) && (
+                                                <div className="text-[9px] text-orange-500 font-bold uppercase mt-0.5">{cp.position}</div>
+                                            )}
+                                            {cp.country && !cp.position && <div className="flex items-center gap-1 text-[9px] text-slate-400 font-bold uppercase mt-0.5"><Globe size={10}/> {cp.country}</div>}
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-4 py-3">
                                             <div className="flex flex-wrap gap-1.5">
                                                 {roles.map(r => (
                                                     <div key={r} className="flex items-center gap-1 px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-black uppercase tracking-tighter text-slate-500">
@@ -181,15 +199,15 @@ export const CounterpartyManagerPage: React.FC = () => {
                                                 ))}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2 text-xs font-bold text-slate-500"><User size={14} className="text-slate-300"/> {cp.contactPerson || '—'}</div>
-                                            <div className="flex items-center gap-2 text-xs font-bold text-slate-400 mt-1"><Phone size={14} className="text-slate-300"/> {cp.phone || '—'}</div>
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2 text-xs font-bold text-slate-500"><User size={14} className="text-slate-400"/> {cp.contactPerson || '—'}</div>
+                                            <div className="flex items-center gap-2 text-xs font-bold text-slate-400 mt-1"><Phone size={14} className="text-slate-400"/> {cp.phone || '—'}</div>
                                         </td>
-                                        <td className="px-6 py-4"><div className="text-sm font-mono text-slate-500">{cp.binIin || '—'}</div></td>
-                                        <td className="px-6 py-4 text-right">
+                                        <td className="px-4 py-3"><div className="text-sm font-mono text-slate-500">{cp.binIin || '—'}</div></td>
+                                        <td className="px-4 py-3 text-right">
                                             <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                {access.canSee('actions', 'edit') && <button onClick={() => openEditModal(cp)} className="p-2 text-slate-300 hover:text-blue-600 transition-all" title="Редактировать"><Pencil size={18}/></button>}
-                                                {access.canWrite('actions', 'delete') && <button onClick={() => setConfirmDelete(cp)} className="p-2 text-slate-300 hover:text-red-500 transition-all" title="Удалить"><Trash2 size={18}/></button>}
+                                                {access.canSee('actions', 'edit') && canMutateCounterparty(cp) && <button onClick={() => openEditModal(cp)} className="p-2 text-slate-400 hover:text-blue-600 transition-all" title="Редактировать"><Pencil size={18}/></button>}
+                                                {access.canWrite('actions', 'delete') && canMutateCounterparty(cp) && <button onClick={() => { setConfirmDelete(cp); setDeleteError(null); }} className="p-2 text-slate-400 hover:text-red-500 transition-all" title="Удалить"><Trash2 size={18}/></button>}
                                             </div>
                                         </td>
                                     </tr>
@@ -201,10 +219,11 @@ export const CounterpartyManagerPage: React.FC = () => {
             </div>
 
              {isModalOpen && (
-                <CounterpartyCreateModal 
+                <CounterpartyCreateModal
                     onClose={() => setIsModalOpen(false)}
                     onSubmit={handleModalSubmit}
-                    initialType={activeTab !== 'all' ? (activeTab as CounterpartyType) : CounterpartyType.SUPPLIER}
+                    initialType={isClientOnly ? CounterpartyType.CLIENT : (activeTab !== 'all' ? (activeTab as CounterpartyType) : CounterpartyType.SUPPLIER)}
+                    lockedType={isClientOnly ? CounterpartyType.CLIENT : undefined}
                     editingCounterparty={editingCounterparty}
                     initialAccounts={editingAccounts}
                 />
@@ -218,15 +237,29 @@ export const CounterpartyManagerPage: React.FC = () => {
                             <h3 className="text-2xl font-black text-slate-800 mb-3 uppercase tracking-tight">В корзину?</h3>
                             <p className="text-slate-500 font-medium mb-8 leading-relaxed text-sm">Переместить <b>{confirmDelete.name}</b> в список удаленных объектов?</p>
                             <div className="flex flex-col gap-3">
-                                <button 
+                                <button
                                     onClick={async () => {
-                                        await actions.deleteCounterparty(confirmDelete.id);
-                                        setConfirmDelete(null);
+                                        try {
+                                            setDeleteError(null);
+                                            await actions.deleteCounterparty(confirmDelete.id);
+                                            setConfirmDelete(null);
+                                        } catch (e: any) {
+                                            const code = e?.code || '';
+                                            const msg = (e?.message || '').toLowerCase();
+                                            if (code === '23503' || msg.includes('foreign key') || msg.includes('violates') || msg.includes('conflict')) {
+                                                setDeleteError('Невозможно удалить: контрагент используется в заказах, платежах или других документах.');
+                                            } else {
+                                                setDeleteError('Ошибка при удалении. Попробуйте ещё раз.');
+                                            }
+                                        }
                                     }}
                                     className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-red-200 transition-all active:scale-95"
                                 >
                                     Да, удалить
                                 </button>
+                                {deleteError && (
+                                    <p className="text-red-500 text-xs font-bold text-center leading-snug">{deleteError}</p>
+                                )}
                                 <button onClick={() => setConfirmDelete(null)} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 py-4 rounded-2xl font-bold uppercase tracking-widest transition-all">
                                     Отмена
                                 </button>

@@ -4,6 +4,7 @@ import { useStore } from '@/features/system/context/GlobalStore';
 import { StatementParser, ParsedStatementRow, ParseResult } from '@/services/StatementParser';
 import { Currency, ActualPayment, Counterparty, CounterpartyAccount, CounterpartyType, CashFlowItem, PlannedPayment, PaymentAllocation } from '@/types';
 import { ApiService } from '@/services/api';
+import { TableNames } from '@/constants';
 import { CounterpartyCreateModal } from '@/features/counterparties/components/CounterpartyCreateModal';
 import { CashFlowSelector } from '@/components/ui/CashFlowSelector';
 
@@ -19,12 +20,16 @@ interface MatchResult {
     plannedPaymentId: string | null;
     isNew: boolean;
     status: 'matched' | 'unmatched' | 'new';
-    pendingData?: any; 
+    pendingData?: any;
+    // Обнаруженный дубль (уже существующий фактический платёж с той же датой/суммой/направлением)
+    duplicatePayment: ActualPayment | null;
+    // Решение пользователя: объединить с существующим или создать новую запись
+    mergeDecision: 'merge' | 'create';
 }
 
 export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onClose }) => {
     const { state, actions } = useStore();
-    const { counterparties, bankAccounts, cashFlowItems, plannedPayments } = state;
+    const { counterparties, bankAccounts, cashFlowItems, plannedPayments, actualPayments } = state;
     const [savingPriorityFor, setSavingPriorityFor] = useState<number | null>(null);
 
     const [parsedData, setParsedData] = useState<{ rows: ParsedStatementRow[] } | null>(null);
@@ -119,14 +124,15 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
         const initialMatches: MatchResult[] = result.rows.map(row => {
             const direction = row.income > 0 ? 'Income' : 'Expense';
             const amount = row.income > 0 ? row.income : row.expense;
+            const rowDirection = row.income > 0 ? 'Incoming' : 'Outgoing';
 
-            let matchedCp = row.counterpartyBinIin 
+            let matchedCp = row.counterpartyBinIin
                 ? counterparties.find(c => c.binIin === row.counterpartyBinIin)
                 : counterparties.find(c => c.name.toLowerCase().includes(row.counterpartyName.toLowerCase()));
-            
-            let matchedPp = matchedCp ? plannedPayments.find(p => 
-                !p.isPaid && 
-                p.counterpartyId === matchedCp?.id && 
+
+            let matchedPp = matchedCp ? plannedPayments.find(p =>
+                !p.isPaid &&
+                p.counterpartyId === matchedCp?.id &&
                 Math.abs(p.amountDue - p.amountPaid - amount) < 0.01
             ) : null;
 
@@ -134,14 +140,27 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
             const priorityIds = matchedCp?.cashFlowItemIds?.filter(Boolean) || [];
             const prioritySuggestion = priorityIds.length > 0 ? priorityIds[0] : null;
 
+            // --- Поиск дубля среди существующих фактических платежей ---
+            // Дата из выписки: "DD.MM.YYYY" или "DD.MM.YYYY HH:mm:ss" → YYYY-MM-DD
+            const normalizedDate = row.date.split(' ')[0].split('.').reverse().join('-');
+            const duplicatePayment = actualPayments.find(ap => {
+                const apDate = ap.date?.split('T')[0]; // YYYY-MM-DD
+                if (apDate !== normalizedDate) return false;
+                if (Math.abs(Number(ap.amount) - amount) > 0.01) return false;
+                if (ap.direction !== rowDirection) return false;
+                return true;
+            }) || null;
+
             return {
                 row: { ...row },
-                matchedId: matchedCp?.id || null,
+                matchedId: matchedCp?.id || (duplicatePayment?.counterpartyId ?? null),
                 matchedType: matchedCp?.type || null,
                 cashFlowItemId: matchedPp?.cashFlowItemId || prioritySuggestion || suggestCashFlowItem(row.purpose, direction),
                 plannedPaymentId: matchedPp?.id || null,
                 isNew: false,
-                status: matchedCp ? 'matched' : 'unmatched' as any
+                status: (matchedCp ? 'matched' : 'unmatched') as 'matched' | 'unmatched' | 'new',
+                duplicatePayment,
+                mergeDecision: (duplicatePayment ? 'merge' : 'create') as 'merge' | 'create',
             };
         });
         setMatches(initialMatches);
@@ -159,6 +178,12 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
 
         newMatches[index] = current;
         setMatches(newMatches);
+    };
+
+    const toggleMergeDecision = (index: number) => {
+        setMatches(prev => prev.map((m, i) =>
+            i === index ? { ...m, mergeDecision: m.mergeDecision === 'merge' ? 'create' : 'merge' } : m
+        ));
     };
 
     const openCreateForm = (index: number, initialType: CounterpartyType) => {
@@ -239,16 +264,44 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
         setError(null);
         try {
             for (const match of matches) {
-                let counterpartyId = match.matchedId;
+                // ── СРАЩИВАНИЕ: обогащаем существующий платёж, новый не создаём ──
+                if (match.mergeDecision === 'merge' && match.duplicatePayment) {
+                    const dup = match.duplicatePayment;
+                    const row = match.row;
+                    const patch: Record<string, any> = {};
 
+                    // Дополняем только пустые поля — не затираем уже заполненные
+                    if (!dup.counterpartyBinIin && row.counterpartyBinIin) patch.counterpartyBinIin = row.counterpartyBinIin;
+                    if (!dup.counterpartyIik && row.counterpartyIik) patch.counterpartyIik = row.counterpartyIik;
+                    if (!dup.counterpartyBik && row.counterpartyBik) patch.counterpartyBik = row.counterpartyBik;
+                    if (!dup.counterpartyBankName && row.counterpartyBankName) patch.counterpartyBankName = row.counterpartyBankName;
+                    if (!dup.documentNumber && row.documentNumber) patch.documentNumber = row.documentNumber;
+                    if (!(dup as any).knp && row.knp) patch.knp = row.knp;
+                    if (!(dup as any).purpose && row.purpose) patch.purpose = row.purpose;
+                    // Обновляем имя контрагента если было "физлицо" или пустое
+                    const genericNames = ['физлицо', 'физ.лицо', 'физическое лицо', ''];
+                    if (row.counterpartyName && genericNames.includes((dup.counterpartyName || '').toLowerCase().trim())) {
+                        patch.counterpartyName = row.counterpartyName;
+                    }
+                    // Если контрагент теперь может быть привязан по БИН
+                    if (!dup.counterpartyId && match.matchedId) patch.counterpartyId = match.matchedId;
+
+                    if (Object.keys(patch).length > 0) {
+                        await ApiService.update(TableNames.ACTUAL_PAYMENTS, dup.id, patch);
+                    }
+                    continue; // дубль обработан — дальше не создаём
+                }
+
+                // ── СОЗДАНИЕ: стандартный путь ──
+                let counterpartyId = match.matchedId;
                 if (!counterpartyId) continue;
-                
+
                 const amount = match.row.income > 0 ? match.row.income : match.row.expense;
                 const direction = match.row.income > 0 ? 'Incoming' : 'Outgoing';
 
                 const allocations: PaymentAllocation[] = [{
                     id: ApiService.generateId('AL'),
-                    actualPaymentId: '', 
+                    actualPaymentId: '',
                     plannedPaymentId: match.plannedPaymentId || undefined,
                     cashFlowItemId: match.cashFlowItemId || '',
                     amountCovered: amount,
@@ -257,10 +310,10 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
 
                 await actions.executePayment({
                     id: ApiService.generateId('TX'),
-                    date: match.row.date.split(' ')[0].split('.').reverse().join('-'), 
+                    date: match.row.date.split(' ')[0].split('.').reverse().join('-'),
                     direction,
                     counterpartyId,
-                    counterpartyName: match.row.counterpartyName, 
+                    counterpartyName: match.row.counterpartyName,
                     amount,
                     currency: selectedCurrency,
                     bankAccountId: selectedBankAccountId,
@@ -288,8 +341,12 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
         return bankAccounts.find(a => a.id === selectedBankAccountId);
     }, [bankAccounts, selectedBankAccountId]);
 
+    const duplicateCount = useMemo(() => matches.filter(m => m.duplicatePayment !== null).length, [matches]);
+
+    // Суммы только по создаваемым записям (merge-строки не создают новых платежей)
     const totals = useMemo(() => {
         return matches.reduce((acc, m) => {
+            if (m.mergeDecision === 'merge') return acc;
             acc.income += (m.row.income || 0);
             acc.expense += (m.row.expense || 0);
             return acc;
@@ -402,6 +459,12 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
                                 <div className="flex items-center gap-4">
                                     <div className="text-xs font-black text-slate-500 uppercase tracking-widest">Транзакций в файле:</div>
                                     <div className="px-4 py-1 bg-blue-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest">{matches.length}</div>
+                                    {duplicateCount > 0 && (
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 border border-amber-300 rounded-full text-[10px] font-black text-amber-700 uppercase tracking-widest">
+                                            <AlertCircle size={11}/>
+                                            {duplicateCount} возможных дублей — по умолчанию «Объединить»
+                                        </div>
+                                    )}
                                 </div>
                                 {!selectedBankAccountId && (
                                     <div className="px-4 py-2 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest animate-bounce">
@@ -426,15 +489,24 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
                                         {matches.map((match, idx) => {
                                             const direction = match.row.income > 0 ? 'Income' : 'Expense';
                                             const realAmount = match.row.income > 0 ? match.row.income : match.row.expense;
-                                            
+                                            const hasDuplicate = match.duplicatePayment !== null;
+                                            const isMerging = hasDuplicate && match.mergeDecision === 'merge';
+
                                             return (
-                                                <tr key={idx} className="bg-white shadow-sm hover:shadow-md transition-all group">
-                                                    <td className="px-4 py-4 rounded-l-2xl border-y border-l border-slate-100">
+                                                <React.Fragment key={idx}>
+                                                <tr className={`shadow-sm hover:shadow-md transition-all group ${isMerging ? 'bg-amber-50/40' : hasDuplicate ? 'bg-red-50/30' : 'bg-white'}`}>
+                                                    <td className={`px-4 py-4 rounded-l-2xl border-y border-l ${hasDuplicate ? 'border-amber-200' : 'border-slate-100'}`}>
                                                         <div className="text-[11px] font-black text-slate-700">{match.row.date}</div>
                                                         <div className="text-[9px] font-bold text-slate-400 uppercase mt-1">#{match.row.documentNumber}</div>
+                                                        {hasDuplicate && (
+                                                            <div className={`mt-1.5 flex items-center gap-1 text-[8px] font-black px-1.5 py-0.5 rounded w-fit uppercase ${isMerging ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
+                                                                <AlertCircle size={8}/>
+                                                                {isMerging ? 'Объединить' : 'Создать новую'}
+                                                            </div>
+                                                        )}
                                                     </td>
                                                     
-                                                    <td className="px-4 py-4 border-y border-slate-100">
+                                                    <td className={`px-4 py-4 border-y ${hasDuplicate ? 'border-amber-200' : 'border-slate-100'} ${isMerging ? 'opacity-50 pointer-events-none' : ''}`}>
                                                         {match.status === 'matched' ? (
                                                             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-2 rounded-xl border border-emerald-100 group/item">
                                                                 <CheckCircle2 size={14}/>
@@ -462,7 +534,7 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
                                                         )}
                                                     </td>
 
-                                                    <td className="px-4 py-4 border-y border-slate-100">
+                                                    <td className={`px-4 py-4 border-y ${hasDuplicate ? 'border-amber-200' : 'border-slate-100'} ${isMerging ? 'opacity-40 pointer-events-none' : ''}`}>
                                                         {(() => {
                                                             const cp = match.matchedId ? counterparties.find(c => c.id === match.matchedId) : null;
                                                             const cpPriorityIds = cp?.cashFlowItemIds || [];
@@ -502,10 +574,10 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
                                                         })()}
                                                     </td>
 
-                                                    <td className="px-4 py-4 border-y border-slate-100">
+                                                    <td className={`px-4 py-4 border-y ${hasDuplicate ? 'border-amber-200' : 'border-slate-100'} ${isMerging ? 'opacity-40 pointer-events-none' : ''}`}>
                                                         <div className="flex flex-col gap-1">
                                                             <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Привязка к плану (IPP)</label>
-                                                            <select 
+                                                            <select
                                                                 className={`w-full text-[10px] font-bold rounded-xl p-2 border outline-none transition-all ${match.plannedPaymentId ? 'bg-blue-600 text-white border-transparent' : 'bg-slate-50 border-slate-200 text-slate-600'}`}
                                                                 value={match.plannedPaymentId || ''}
                                                                 onChange={e => updateMatch(idx, 'plannedPaymentId', e.target.value)}
@@ -519,17 +591,90 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
                                                         </div>
                                                     </td>
 
-                                                    <td className="px-4 py-4 border-y border-slate-100 text-right">
+                                                    <td className={`px-4 py-4 border-y ${hasDuplicate ? 'border-amber-200' : 'border-slate-100'} text-right`}>
                                                         <div className={`text-sm font-black font-mono ${match.row.income > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                                            {match.row.income > 0 ? '+' : '-'}{ realAmount.toLocaleString() }
+                                                            {match.row.income > 0 ? '+' : '-'}{realAmount.toLocaleString()}
                                                         </div>
                                                         <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">{selectedCurrency}</div>
                                                     </td>
 
-                                                    <td className="px-4 py-4 rounded-r-2xl border-y border-r border-slate-100 max-w-xs">
+                                                    <td className={`px-4 py-4 rounded-r-2xl border-y border-r ${hasDuplicate ? 'border-amber-200' : 'border-slate-100'} max-w-xs`}>
                                                         <div className="text-[9px] font-medium text-slate-500 line-clamp-2 leading-relaxed italic" title={match.row.purpose}>"{match.row.purpose}"</div>
                                                     </td>
                                                 </tr>
+
+                                                {/* ── Sub-row: панель сращивания ── */}
+                                                {hasDuplicate && (() => {
+                                                    const dup = match.duplicatePayment!;
+                                                    const dupAlloc = (dup.allocations || []).reduce((s: number, a: any) => s + Number(a.amountCovered), 0);
+                                                    const dupUnalloc = Math.max(0, Number(dup.amount) - dupAlloc);
+                                                    const dupCp = counterparties.find(c => c.id === dup.counterpartyId);
+                                                    return (
+                                                        <tr>
+                                                            <td colSpan={6} className={`px-6 pb-3 border-x border-b rounded-b-2xl ${isMerging ? 'border-amber-200 bg-amber-50/60' : 'border-red-100 bg-red-50/30'}`}>
+                                                                <div className="flex items-center gap-4 flex-wrap">
+                                                                    {/* Статус дубля */}
+                                                                    <div className={`flex items-center gap-1.5 text-[9px] font-black uppercase px-2 py-1 rounded-lg ${isMerging ? 'text-amber-700 bg-amber-100' : 'text-red-600 bg-red-100'}`}>
+                                                                        <AlertCircle size={10}/>
+                                                                        Найден в системе
+                                                                    </div>
+                                                                    {/* Детали существующего платежа */}
+                                                                    <div className="flex items-center gap-3 text-[10px] text-slate-600">
+                                                                        <span className="font-bold text-slate-800">
+                                                                            {dupCp?.name || dup.counterpartyName || '—'}
+                                                                        </span>
+                                                                        <span className="text-slate-400">{dup.date}</span>
+                                                                        <span className="font-mono font-black">
+                                                                            {Number(dup.amount).toLocaleString('ru-RU')} {dup.currency}
+                                                                        </span>
+                                                                        {dup.counterpartyBinIin && (
+                                                                            <span className="text-[8px] font-mono text-slate-400">БИН {dup.counterpartyBinIin}</span>
+                                                                        )}
+                                                                        <span className={`text-[8px] font-black px-2 py-0.5 rounded ${dupUnalloc < 0.01 ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-600'}`}>
+                                                                            {dupUnalloc < 0.01 ? '✓ Разнесён' : `Нераз. ${dupUnalloc.toLocaleString('ru-RU')}`}
+                                                                        </span>
+                                                                    </div>
+                                                                    {/* Что будет обогащено */}
+                                                                    {isMerging && (() => {
+                                                                        const enrichFields: string[] = [];
+                                                                        if (!dup.counterpartyBinIin && match.row.counterpartyBinIin) enrichFields.push('БИН');
+                                                                        if (!dup.counterpartyIik && match.row.counterpartyIik) enrichFields.push('ИИК');
+                                                                        if (!(dup as any).documentNumber && match.row.documentNumber) enrichFields.push('№ документа');
+                                                                        if (!(dup as any).knp && match.row.knp) enrichFields.push('КНП');
+                                                                        const genericNames = ['физлицо', 'физ.лицо', 'физическое лицо', ''];
+                                                                        if (match.row.counterpartyName && genericNames.includes((dup.counterpartyName || '').toLowerCase().trim())) enrichFields.push('Имя');
+                                                                        return enrichFields.length > 0 ? (
+                                                                            <div className="flex items-center gap-1 text-[8px] text-amber-600">
+                                                                                <span className="font-bold">Добавит:</span>
+                                                                                {enrichFields.map(f => (
+                                                                                    <span key={f} className="bg-amber-100 px-1.5 py-0.5 rounded font-black">{f}</span>
+                                                                                ))}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <span className="text-[8px] text-slate-400 italic">данные уже заполнены</span>
+                                                                        );
+                                                                    })()}
+                                                                    {/* Toggle merge/create */}
+                                                                    <div className="ml-auto flex rounded-xl overflow-hidden border border-slate-200 text-[9px] font-black uppercase shrink-0">
+                                                                        <button
+                                                                            onClick={() => match.mergeDecision !== 'merge' && toggleMergeDecision(idx)}
+                                                                            className={`px-3 py-2 transition-all ${isMerging ? 'bg-amber-500 text-white' : 'bg-white text-slate-500 hover:bg-amber-50 hover:text-amber-600'}`}
+                                                                        >
+                                                                            Объединить
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => match.mergeDecision !== 'create' && toggleMergeDecision(idx)}
+                                                                            className={`px-3 py-2 border-l border-slate-200 transition-all ${!isMerging ? 'bg-red-500 text-white' : 'bg-white text-slate-500 hover:bg-red-50 hover:text-red-500'}`}
+                                                                        >
+                                                                            Создать отдельно
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })()}
+                                                </React.Fragment>
                                             );
                                         })}
                                     </tbody>
@@ -561,7 +706,7 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({ onCl
                                     </div>
                                     <button 
                                         onClick={handleImport} 
-                                        disabled={isProcessing || !selectedBankAccountId || matches.some(m => (m.status === 'unmatched' || !m.cashFlowItemId))} 
+                                        disabled={isProcessing || !selectedBankAccountId || matches.some(m => m.mergeDecision === 'create' && (m.status === 'unmatched' || !m.cashFlowItemId))}
                                         className="px-16 py-4 bg-blue-600 text-white rounded-[1.5rem] font-black uppercase text-sm shadow-xl shadow-blue-500/20 hover:bg-blue-700 disabled:opacity-30 transition-all active:scale-95 flex items-center gap-3"
                                     >
                                         {isProcessing ? <Loader2 className="animate-spin" size={20}/> : <CheckCircle2 size={20}/>}

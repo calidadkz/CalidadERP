@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { Shipment, ShipmentItem } from '@/types';
 import { useStore } from '../system/context/GlobalStore';
 import { Truck, RotateCcw, Trash2, ArrowLeft, AlertCircle } from 'lucide-react';
@@ -9,8 +9,16 @@ import { PendingShipments } from './components/PendingShipments';
 import { ShipmentHistory } from './components/ShipmentHistory';
 import { ShipmentForm } from './components/ShipmentForm';
 import { ApiService } from '@/services/api';
+import { useIsMobile } from '@/hooks/useIsMobile';
+
+const MobileShipmentView = React.lazy(() =>
+    import('./components/MobileShipmentView').then(m => ({ default: m.MobileShipmentView }))
+);
 
 export const ShipmentPage: React.FC = () => {
+    const isMobile = useIsMobile();
+    if (isMobile) return <Suspense fallback={null}><MobileShipmentView /></Suspense>;
+
     const { state, actions } = useStore();
     const access = useAccess('shipment');
     const { getSpecificStock, getAlreadyShippedForOrder } = useShipmentLogic(state.products, state.stockMovements, state.shipments, null);

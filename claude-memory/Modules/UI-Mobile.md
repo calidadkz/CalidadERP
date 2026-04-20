@@ -119,3 +119,41 @@ if (mode === 'options' && isMobile) {
 | Layout | top bar + drawer | ✅ готово |
 | Nomenclature | MobileNomenclatureView, MobileProductForm | ✅ готово |
 | Options (standalone) | MobileOptionsEditor | ✅ готово |
+| Bundles / Configurator | MobileConfiguratorBuilder, MobileTemplatesGallery | ✅ готово |
+| Inventory | MobileInventoryView (остатки + движения + корректировки) | ✅ готово |
+| Sales | MobileSalesView + **MobileSalesOrderForm** (нативная мобильная форма ЗК) | ✅ готово |
+| Procurement | MobileProcurementView (карточки ЗП + форма fullscreen) | ✅ готово |
+| Shipment | MobileShipmentView (таб К отгрузке/История + форма fullscreen) | ✅ готово |
+| Receiving | MobileReceivingView (ожидают + журнал + форма fullscreen) | ✅ готово |
+
+## Паттерн нативных мобильных форм (MobileSalesOrderForm)
+
+Для ЗК реализована **нативная** мобильная форма (`MobileSalesOrderForm`), не использующая десктопные компоненты:
+- Самодостаточная: `useStore()` + `useAccess()` внутри, принимает только `initialOrder/Payments` + колбэки
+- Overlays (z-[400]) рендерятся **до** основного контейнера (паттерн `<>overlays + main</>`)
+- `ClientSearchOverlay` → полноэкранный поиск с кнопкой "Новый клиент"
+- `ProductSearchOverlay` → тип / категория / поиск → для станков открывает `MobileConfiguratorOverlay`
+- `MobileConfiguratorOverlay` → 3 вкладки (Вручную / Шаблоны / Со склада), футер с ценой IPP
+- `ItemsTab` → карточки позиций с qty-picker (−/+), цена, итого
+- `PaymentsTab` → карточки траншей (дата / сумма / ДДС / посредник), баланс-баннер
+
+## Паттерн мобильных форм (fullscreen) — устаревший
+
+Для форм, не имеющих нативной мобильной версии (OrderForm, ReceivingForm, ShipmentForm):
+```tsx
+if (view === 'form') {
+    return (
+        <div className="fixed inset-0 z-[200] bg-white overflow-y-auto">
+            <ComplexDesktopForm isMobile={true} ... />
+        </div>
+    );
+}
+```
+Форма доступна в полноэкранном режиме с прокруткой. Заголовок со стрелкой «назад» рендерится внутри десктопной формы через `isMobile` флаг.
+
+## Паттерн самодостаточных мобильных вьюшек
+
+Все Mobile*View компоненты:
+- Вызывают `useStore()` и `useAccess()` **внутри** (не получают state как пропсы)
+- Страница добавляет только `useIsMobile()` + early return: `if (isMobile) return <MobileXxxView />;`
+- Управляют своим `view` состоянием (list/form) самостоятельно

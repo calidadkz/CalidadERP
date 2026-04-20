@@ -8,10 +8,11 @@
 ## Ключевые файлы
 | Файл | Назначение |
 |---|---|
-| `features/finance/FinancePage.tsx` | Точка входа, переключение view: plan/fact/treasury |
+| `features/finance/FinancePage.tsx` | Точка входа, переключение view: plan/fact/treasury/movements |
 | `features/finance/tabs/PaymentsCalendar.tsx` | Вкладка: Платёжный календарь (план) |
-| `features/finance/tabs/BankStatements.tsx` | Вкладка: Выписки (факт) |
+| `features/finance/tabs/BankStatements.tsx` | Вкладка: Выписки (факт) + кнопка удаления платежа |
 | `features/finance/tabs/TreasuryAccounts.tsx` | Вкладка: Казначейство |
+| `features/finance/tabs/MoneyMovementsRegistry.tsx` | Вкладка: Реестр ДДС (движения денег) |
 | `features/finance/FinanceCategoriesPage.tsx` | Справочник статей ДДС |
 | `features/finance/pages/CurrencyRatesPage.tsx` | Курсы валют |
 | `features/finance/hooks/useFinanceState.ts` | Основной хук состояния |
@@ -26,6 +27,7 @@
 | `/finance_calendar` | `plan` | Платёжный календарь |
 | `/finance_statements` | `fact` | Фактические платежи / выписки |
 | `/finance_accounts` | `treasury` | Счета и валюта |
+| `/finance_movements` | `movements` | Реестр движений денег (ДДС) |
 | `/finance_categories` | — | Статьи ДДС |
 | `/rates` | — | Курсы валют |
 
@@ -111,3 +113,36 @@
 
 ### Парсинг выписок
 `StatementParser.ts` разбирает CSV из Каспи Банка и Народного Банка (есть файлы-примеры в корне проекта: `Выписка Калидат - Каспи банк.csv`, `Выписка Калидат - Народный банк.csv`).
+
+### Удаление фактического платежа (2026-04-16)
+`deleteActualPayment(id)` в `useFinanceState`:
+1. Блокировка для `isInternalTransfer = true`
+2. Откат аллокаций: `PlannedPayment.amountPaid -= amountCovered`
+3. Удаление `payment_allocations` по `actualPaymentId`
+4. Откат баланса счёта (Outgoing → +amount, Incoming → -amount)
+5. Попытка удалить валютный лот (только Incoming non-KZT, если нетронутый)
+6. Запись компенсирующего движения в `money_movements` (type='Reversal')
+
+**Точный откат FIFO-лотов (2026-04-17):**
+- `actual_payments.consumed_lots` (JSONB) — хранит список `{lotId, amount, op: 'consume'|'create'}`
+- При Outgoing non-KZT: записывает все частично/полностью потреблённые лоты
+- При Incoming non-KZT: записывает созданный лот (`op:'create'`)
+- `deleteActualPayment` восстанавливает точно: для `consume` → `amountRemaining += amount`; для `create` → удаляет лот (если нетронутый) или уменьшает
+- Лоты вышедшие из активного стека (amountRemaining=0) → `fetchOne` из БД и восстановление
+- Fallback для старых платежей без `consumed_lots`: эвристика по amountOriginal + currency
+
+### Реестр движений денег / money_movements (2026-04-16)
+Таблица `money_movements` — аудит-лог движений, аналог `stock_movements` для товаров.
+
+**Поля:** `id, date, bank_account_id, direction (In/Out), amount, currency, amount_kzt, exchange_rate, actual_payment_id, cash_flow_item_id, batch_id, counterparty_id/name, type (Payment/Reversal/Transfer), note`
+
+**Запись происходит:**
+- `executePayment` → row type='Payment' (cashFlowItemId из первой аллокации)
+- `deleteActualPayment` → row type='Reversal' с противоположным direction
+
+**Бэкфил:** при миграции все `actual_payments` перенесены в `money_movements` с cashFlowItemId из первой аллокации.
+
+**UI:** `/finance_movements` — вкладка "Реестр ДДС":
+- Сводные карточки по счетам (In/Out/Net в KZT)
+- Таблица с фильтрами + итоги по выборке
+- Сторно-записи: opacity-60 + бейдж "Сторно"
